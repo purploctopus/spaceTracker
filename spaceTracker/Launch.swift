@@ -25,6 +25,26 @@ struct SpaceLaunch: Decodable, Identifiable {
     let rocket: RocketInfo?
     let mission: MissionObjective?
     let image: LaunchImage? // 💡 CRITICAL FIX: Maps to the v2.3.0 'image' nested object wrapper
+    
+    // 💡 THE DATE DECODER EXTENSION: Formats the raw timestamp into clear calendar layouts
+    var localLaunchTimeDisplay: String {
+        guard let netString = self.net else { return "NET LAUNCH SCHEDULED" }
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        var date = formatter.date(from: netString)
+        if date == nil {
+            let backup = ISO8601DateFormatter()
+            date = backup.date(from: netString)
+        }
+        
+        guard let validDate = date else { return "LAUNCH WINDOW OPEN" }
+        
+        let outputFormatter = DateFormatter()
+        outputFormatter.dateFormat = "MMM d 'AT' h:mm a"
+        return "LAUNCH: \(outputFormatter.string(from: validDate).uppercased())"
+    }
 }
 
 // 💡 New nested structure matching the live production schema specs

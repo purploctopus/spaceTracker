@@ -16,7 +16,9 @@ class LaunchViewModel: ObservableObject {
     @Published var errorMessage: String? = nil
     
     func fetchLaunches() async {
-        guard let url = URL(string: "https://purploctopus.github.io/launches.json") else { return }
+        let timestamp = Int(Date().timeIntervalSince1970)
+
+        guard let url = URL(string: "https://purploctopus.github.io/launches.json?cb=\(timestamp)") else { return }
         
         isLoading = true
         errorMessage = nil

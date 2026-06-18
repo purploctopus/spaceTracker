@@ -8,10 +8,13 @@
 import SwiftUI
 
 struct ContentView: View {
+    // 📡 Global Data Engine Hooks
     @StateObject private var viewModel = LaunchViewModel()
+    @StateObject private var satViewModel = SatelliteViewModel()
+    @State private var manualCitySearch: String = ""
     
-    // Filter out launches taking place TODAY based on current device calendar
-    private var todaysLaunches: [SpaceLaunch] {
+    // 💡 THE 7-DAY MANIFEST ENGINE: Calculates tracking windows for the next 7 days
+    private var upcomingManifest: [SpaceLaunch] {
         viewModel.launches.filter { launch in
             guard let netString = launch.net else { return false }
             
@@ -25,9 +28,16 @@ struct ContentView: View {
             }
             
             guard let validDate = launchDate else { return false }
-            return Calendar.current.isDateInToday(validDate)
+            
+            // Core structural boundary conditions
+            let now = Date()
+            guard let sevenDaysFromNow = Calendar.current.date(byAdding: .day, value: 7, to: now) else { return false }
+            
+            // Capture any target operations scheduled between right now and next week
+            return validDate >= now && validDate <= sevenDaysFromNow
         }
     }
+
     
     var body: some View {
         NavigationView {
@@ -39,9 +49,9 @@ struct ContentView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 32) {
                         
-                        // 1. TODAY'S MANIFEST SECTION BLOCK
+                        // 1. WEEKLY MANIFEST SECTION BLOCK
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("TODAY'S MISSIONS")
+                            Text("UPCOMING 7-DAY MISSIONS")
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundColor(.secondary)
                                 .tracking(2)
@@ -52,10 +62,9 @@ struct ContentView: View {
                                     .font(.system(.caption, design: .monospaced))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 20)
-                            } else if todaysLaunches.isEmpty {
-                                // Standby status state when no flights match today's date parameters
+                            } else if upcomingManifest.isEmpty {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("NO TARGET OPERATIONS TODAY")
+                                    Text("NO TARGET OPERATIONS THIS WEEK")
                                         .font(.system(.subheadline, design: .monospaced))
                                         .fontWeight(.bold)
                                         .foregroundColor(.orange)
@@ -69,8 +78,8 @@ struct ContentView: View {
                                 .cornerRadius(4)
                                 .padding(.horizontal)
                             } else {
-                                // Live list mapping launches happening TODAY
-                                ForEach(todaysLaunches) { launch in
+                                // Maps flights sequentially down your viewport grid
+                                ForEach(upcomingManifest) { launch in
                                     NavigationLink(destination: MissionSingleDetailView(launch: launch)) {
                                         VStack(alignment: .leading, spacing: 8) {
                                             HStack {
@@ -86,6 +95,12 @@ struct ContentView: View {
                                             Text(launch.launch_service_provider?.name?.uppercased() ?? "GLOBAL RANGE")
                                                 .font(.system(.caption, design: .monospaced))
                                                 .foregroundColor(.blue)
+                                            
+                                            // 💡 THE DATE INJECTION ROW: Clearly separates the upcoming schedule days
+                                            Text(launch.localLaunchTimeDisplay)
+                                                .font(.system(.caption2, design: .monospaced))
+                                                .foregroundColor(.yellow)
+                                            
                                             Divider()
                                                 .background(Color.white.opacity(0.1))
                                         }
@@ -95,8 +110,96 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        
-                        // 2. MASTER ACCESS CHANNEL ROADWAY LINK
+                        // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("OVERHEAD VISUAL TRACKS (48H)")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .tracking(2)
+                                .padding(.horizontal)
+                            
+                            if satViewModel.isTracking {
+                                VStack(spacing: 12) {
+                                    HStack {
+                                        Spacer()
+                                        ProgressView("COMPUTING SKY FOOTPRINT...")
+                                            .font(.system(.caption, design: .monospaced))
+                                            .foregroundColor(.gray)
+                                        Spacer()
+                                    }
+                                    
+                                    // 💡 THE MANUAL OVERRIDE: Tap this to break the loop instantly if it hangs
+                                    Button(action: {
+                                        satViewModel.isTracking = false
+                                        satViewModel.requiresManualSelection = true
+                                    }) {
+                                        Text("CHOOSE CITY MANUALLY ❯")
+                                            .font(.system(.caption2, design: .monospaced))
+                                            .foregroundColor(.cyan)
+                                            .underline()
+                                    }
+                                }
+                                .padding(.vertical, 10)
+                            } else if satViewModel.requiresManualSelection || !(satViewModel.errorMessage?.isEmpty ?? true) {
+                                // THE SEARCH CONSOLE: Universal Geocoding Lookup Box Layout
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text(satViewModel.errorMessage ?? "ENTER LOCATION MANUALLY")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(satViewModel.errorMessage != nil ? .red : .orange)
+                                        .padding(.horizontal)
+                                    
+                                    HStack(spacing: 12) {
+                                        TextField("ENTER CITY NAME (EG. MADISON)", text: $manualCitySearch)
+                                            .font(.system(.subheadline, design: .monospaced))
+                                            .autocorrectionDisabled()
+                                            .textInputAutocapitalization(.characters)
+                                            .padding(12)
+                                            .background(Color.white.opacity(0.04))
+                                            .cornerRadius(4)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                            )
+                                        
+                                        Button(action: {
+                                            satViewModel.searchAndSelectCity(query: manualCitySearch)
+                                        }) {
+                                            Image(systemName: "magnifyingglass.circle.fill")
+                                                .font(.title)
+                                                .foregroundColor(.cyan)
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+                            } else if satViewModel.visiblePasses.isEmpty {
+                                Button(action: { satViewModel.requestPasses() }) {
+                                    HStack {
+                                        Text("INITIALIZE BACKYARD RADAR")
+                                            .font(.system(.subheadline, design: .monospaced))
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.cyan)
+                                        Spacer()
+                                        Image(systemName: "location.radar.antenna")
+                                            .foregroundColor(.cyan)
+                                    }
+                                    .padding(16)
+                                    .background(Color.white.opacity(0.03))
+                                    .border(Color.cyan.opacity(0.3), width: 1)
+                                    .padding(.horizontal)
+                                }
+                            } else {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { sat in
+                                            SatelliteCardView(sat: sat)
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
+
+                        // 3. MASTER ACCESS CHANNEL ROADWAY LINK
                         VStack(alignment: .leading, spacing: 12) {
                             Divider()
                                 .background(Color.white.opacity(0.15))
@@ -135,6 +238,7 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 await viewModel.fetchLaunches()
+                satViewModel.requestPasses()
             }
         }
         .navigationViewStyle(.stack)
