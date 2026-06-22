@@ -6,6 +6,8 @@
 //  MAKE AN APP COLIN LOVES
 
 import SwiftUI
+import CoreLocation
+import MapKit
 
 struct ContentView: View {
     // 📡 Global Data Engine Hooks
@@ -13,7 +15,11 @@ struct ContentView: View {
     @StateObject private var satViewModel = SatelliteViewModel()
     @State private var manualCitySearch: String = ""
     @StateObject private var rockViewModel = SpaceRocksViewModel()
+    @State private var universalLatitude: Double = 43.0731
+    @State private var universalLongitude: Double = -89.4012
     @State private var selectedSatellitePass: SatellitePass? = nil
+    @StateObject private var meteorViewModel = MeteorShowerViewModel()
+    @State private var selectedMeteorShower: MeteorShower? = nil
     
     // 💡 THE 7-DAY MANIFEST ENGINE: Calculates tracking windows for the next 7 days
     private var upcomingManifest: [SpaceLaunch] {
@@ -155,7 +161,6 @@ struct ContentView: View {
                                         Spacer()
                                     }
                                     
-                                    // 💡 THE MANUAL OVERRIDE: Tap this to break the loop instantly if it hangs
                                     Button(action: {
                                         satViewModel.isTracking = false
                                         satViewModel.requiresManualSelection = true
@@ -189,7 +194,8 @@ struct ContentView: View {
                                             )
                                         
                                         Button(action: {
-                                            satViewModel.searchAndSelectCity(query: manualCitySearch)
+                                            // 💡 CLEAN ACTION TRIGGER: Dispatches to helper function below
+                                            executeUniversalCitySearch()
                                         }) {
                                             Image(systemName: "magnifyingglass.circle.fill")
                                                 .font(.title)
@@ -219,7 +225,6 @@ struct ContentView: View {
                                     HStack(spacing: 12) {
                                         ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { sat in
                                             SatelliteCardView(sat: sat)
-                                                // 💡 INJECTED TACTICAL TAP TRIGGER: Captures card reference on touch
                                                 .onTapGesture {
                                                     selectedSatellitePass = sat
                                                 }
@@ -227,7 +232,6 @@ struct ContentView: View {
                                     }
                                     .padding(.horizontal)
                                 }
-
                             }
                         }
                         // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
@@ -262,6 +266,34 @@ struct ContentView: View {
                                     HStack(spacing: 12) {
                                         ForEach(rockViewModel.asteroids) { asteroid in
                                             AsteroidCardView(asteroid: asteroid)
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
+                        // 🛰️ 4. ANNUAL METEOR SHOWER LOOKAHEAD MANIFEST CHANNEL
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("ANNUAL METEOR SHOWER OUTLOOK")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .tracking(2)
+                                .padding(.horizontal)
+                            
+                            if meteorViewModel.upcomingShowers.isEmpty {
+                                Text("STANDBY LOGS LOADING...")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.gray)
+                                    .padding(.horizontal)
+                            } else {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(meteorViewModel.upcomingShowers) { shower in
+                                            MeteorShowerCardView(shower: shower, userLatitude: universalLatitude)
+                                                // 💡 INJECTED TAP TRIGGER: Captures shower data reference token on touch tap
+                                                .onTapGesture {
+                                                    selectedMeteorShower = shower
+                                                }
                                         }
                                     }
                                     .padding(.horizontal)
@@ -303,16 +335,69 @@ struct ContentView: View {
             .task {
                 await viewModel.fetchLaunches()
                 satViewModel.requestPasses()
-                await rockViewModel.fetchAsteroidRadar() 
+                await rockViewModel.fetchAsteroidRadar()
+                
+                // 💡 FIXED: Dynamically pulls live hardware coordinates, defaulting safely to Madison only if GPS chip is waking up
+                let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
+                meteorViewModel.generateOutlook(userLatitude: hardwareLat)
             }
         } // Closes NavigationView
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
-        // 💡 INJECTED BINDER DRAWER SHEET: Slides up automatically when selection is updated
+        // Satellite profile card sheet container
         .sheet(item: $selectedSatellitePass) { pass in
             SatelliteDetailSheet(sat: pass)
         }
+        // 💡 INJECTED BINDER DRAWER SHEET: Slides up automatically when a meteor cell is tapped
+        .sheet(item: $selectedMeteorShower) { shower in
+            MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
+        }
     } // Closes var body: some View
+    // 💡 THE UNTANGLED GEOCODING INTERCEPT METHOD: Handles universal vector mapping
+    private func executeUniversalCitySearch() {
+        guard !manualCitySearch.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        
+        satViewModel.isTracking = true
+        satViewModel.errorMessage = nil
+        
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = manualCitySearch
+        request.resultTypes = .address
+        
+        let search = MKLocalSearch(request: request)
+        
+        Task {
+            do {
+                let response = try await search.start()
+                if let coordinate = response.mapItems.first?.location.coordinate {
+                    await MainActor.run {
+                        // 1. Commit coordinates to your local universal state parameters instantly
+                        self.universalLatitude = coordinate.latitude
+                        self.universalLongitude = coordinate.longitude
+                        
+                        // 2. Force meteor view model to dynamically calculate the new horizon ratings
+                        meteorViewModel.generateOutlook(userLatitude: coordinate.latitude)
+                        
+                        // 3. Dispatch the exact clean coordinates down to your satellite engine network pipeline
+                        let latStr = String(format: "%.4f", coordinate.latitude)
+                        let lngStr = String(format: "%.4f", coordinate.longitude)
+                        satViewModel.selectCityCoordinates(lat: latStr, lng: lngStr)
+                    }
+                } else {
+                    await MainActor.run {
+                        satViewModel.errorMessage = "CITY NOT FOUND"
+                        satViewModel.isTracking = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    satViewModel.errorMessage = "SEARCH FAILED"
+                    satViewModel.isTracking = false
+                }
+            }
+        }
+    }
+
 }
 
 
