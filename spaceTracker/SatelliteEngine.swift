@@ -18,14 +18,12 @@ struct SatelliteResponse: Codable {
 }
 
 struct SatellitePass: Codable, Identifiable {
-    // 💡 THE ID FIX: Divert SwiftUI from using the raw NORAD number as the primary identity key
     let id: String
     let name: String
     let utcTimeISO: String
     let peakElevationDegrees: Double
     let durationMinutes: Int
     
-    // Conforms to Identifiable uniquely by attaching the exact timestamp matrix
     var id_swiftui: String {
         return "\(id)-\(utcTimeISO)"
     }
@@ -41,57 +39,61 @@ struct SatellitePass: Codable, Identifiable {
     }
 }
 
-// MARK: - 2. THE PIPELINE RADAR VIEW MODEL
+// MARK: - 2. THE DEBUG-READY RADAR VIEW MODEL
 class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var visiblePasses: [SatellitePass] = []
     @Published var isTracking: Bool = false
     @Published var errorMessage: String? = nil
-    @Published var requiresManualSelection: Bool = false // 💡 Triggers the manual UI picker
+    @Published var requiresManualSelection: Bool = false
     
     private let locationManager = CLLocationManager()
-    
-    // 💡 KEEPING YOUR URL: Your exact production endpoint string
     private let workerURLString = "https://sat-tracker.purploctopus.workers.dev"
-    
-    // 💡 THE DE-DUPLICATION CACHE: Tracks previous position parameters to block duplicate calls
     private var lastQueriedLocationVector: String = ""
     
     override init() {
         super.init()
+        print("🤖 [RADAR ENGINE]: Initializing core class framework...")
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
     }
     
     func requestPasses() {
+        print("🤖 [RADAR ENGINE]: requestPasses() triggered by parent view.")
         isTracking = true
         errorMessage = nil
         requiresManualSelection = false
         
         let status = locationManager.authorizationStatus
+        print("🤖 [RADAR ENGINE]: Current system authorization status code: \(status.rawValue)")
         
         if status == .denied || status == .restricted {
+            print("❌ [RADAR ENGINE]: Access denied by user system security controls.")
             isTracking = false
             requiresManualSelection = true
             return
         }
         
         if status == .notDetermined {
+            print("🤖 [RADAR ENGINE]: Permission undetermined. Triggering native Apple dialog...")
             locationManager.requestWhenInUseAuthorization()
         } else {
-            locationManager.requestLocation()
+            print("🤖 [RADAR ENGINE]: Permission authorized. Initializing core background GPS chip update stream...")
+            locationManager.startUpdatingLocation()
             
-            // Safety timeout: If simulator/hardware takes more than 4 seconds, show city selection options
             DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
-                guard let self = self, self.isTracking && self.visiblePasses.isEmpty else { return }
-                self.isTracking = false
-                self.requiresManualSelection = true
+                guard let self = self else { return }
+                if self.isTracking && self.visiblePasses.isEmpty {
+                    print("⚠️ [RADAR ENGINE]: 4-second safety boundary reached with zero coordinates captured. Switching to manual selector UI.")
+                    self.locationManager.stopUpdatingLocation()
+                    self.isTracking = false
+                    self.requiresManualSelection = true
+                }
             }
         }
     }
     
-    // Manual entry gateway method for your city selection button taps
     func selectCityCoordinates(lat: String, lng: String) {
-        // Clear coordinate cache on manual choice to force override the system lock
+        print("🤖 [RADAR ENGINE]: Manual coordinates received vector: \(lat), \(lng)")
         lastQueriedLocationVector = ""
         isTracking = true
         requiresManualSelection = false
@@ -103,31 +105,44 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.first else {
-            self.requiresManualSelection = true
+        print("✅ [RADAR ENGINE]: Hardware callback received! Found \(locations.count) valid locations in vector stack.")
+        guard let location = locations.last else {
+            print("⚠️ [RADAR ENGINE]: Location array was empty inside completion delegate.")
             return
         }
         
+        manager.stopUpdatingLocation()
+        
         let lat = String(format: "%.4f", location.coordinate.latitude)
         let lng = String(format: "%.4f", location.coordinate.longitude)
+        print("🤖 [RADAR ENGINE]: Extracted coordinates: Lat \(lat), Lng \(lng)")
         
-        Task {
+        Task { @MainActor in
             await fetchPasses(latitude: lat, longitude: lng)
         }
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        if visiblePasses.isEmpty {
-            self.isTracking = false
-            self.requiresManualSelection = true
+        print("❌ [RADAR ENGINE]: CoreLocation Hardware Error stream: \(error.localizedDescription)")
+        manager.stopUpdatingLocation()
+        Task { @MainActor in
+            if self.visiblePasses.isEmpty {
+                self.isTracking = false
+                self.requiresManualSelection = true
+                self.errorMessage = "HARDWARE TIMEOUT: \(error.localizedDescription)"
+            }
         }
     }
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
+        print("🤖 [RADAR ENGINE]: System Authorization changed dynamically to status code: \(status.rawValue)")
         if status == .authorizedWhenInUse || status == .authorizedAlways {
-            manager.requestLocation()
+            print("🤖 [RADAR ENGINE]: Authorization granted. Activating hardware scan cycle...")
+            isTracking = true
+            manager.startUpdatingLocation()
         } else if status == .denied || status == .restricted {
+            print("❌ [RADAR ENGINE]: Authorization explicitly refused on user prompt.")
             self.requiresManualSelection = true
         }
     }
@@ -135,32 +150,45 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     @MainActor
     private func fetchPasses(latitude: String, longitude: String) async {
         let locationKey = "\(latitude),\(longitude)"
-        
-        // 💡 THE SMART REPETITION GUARD: If these exact coordinates are already loading or loaded, stop instantly!
-        guard locationKey != lastQueriedLocationVector else { return }
+        guard locationKey != lastQueriedLocationVector else {
+            print("🤖 [RADAR ENGINE]: Target vector matches existing footprint. Aborting double query stream fetch.")
+            return
+        }
         
         lastQueriedLocationVector = locationKey
         isTracking = true
         errorMessage = nil
         
-        // Form the URL string accurately mapping parameters
-        guard let url = URL(string: "\(workerURLString)?lat=\(latitude)&lng=\(longitude)&days=2") else { return }
+        let urlString = "\(workerURLString)?lat=\(latitude)&lng=\(longitude)&days=2"
+        print("📡 [RADAR ENGINE]: Initiating background fetch path to: \(urlString)")
+        
+        guard let url = URL(string: urlString) else {
+            print("❌ [RADAR ENGINE]: Malformed endpoint URL parsing construction.")
+            return
+        }
         
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [RADAR ENGINE]: Upstream server response was not an HTTP transmission matrix.")
+                return
+            }
+            
+            print("📡 [RADAR ENGINE]: Cloudflare Gateway handshake complete. Response HTTP Code: \(httpResponse.statusCode)")
+            
+            guard httpResponse.statusCode == 200 else {
                 self.errorMessage = "UPSTREAM SYNC FAIL"
                 self.isTracking = false
-                self.lastQueriedLocationVector = "" // Reset on error so user can re-try
+                self.lastQueriedLocationVector = ""
                 return
             }
             
             let decoded = try JSONDecoder().decode(SatelliteResponse.self, from: data)
-            
-            // Commit the unique tracking cards directly to the main thread timeline
+            print("✅ [RADAR ENGINE]: Successful pipeline synchronization. Loaded \(decoded.passes.count) visual pass records.")
             self.visiblePasses = decoded.passes
             self.isTracking = false
         } catch {
+            print("❌ [RADAR ENGINE]: Data processing conversion exception thrown: \(error)")
             self.errorMessage = "DECODING ENGINE FAULT"
             self.isTracking = false
             self.lastQueriedLocationVector = ""
@@ -168,6 +196,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     }
     
     func searchAndSelectCity(query: String) {
+        print("🤖 [RADAR ENGINE]: Processing manual string text geocode search query: '\(query)'")
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         
         DispatchQueue.main.async {
@@ -185,11 +214,10 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         Task {
             do {
                 let response = try await search.start()
-                
                 if let coordinate = response.mapItems.first?.location.coordinate {
                     let lat = String(format: "%.4f", coordinate.latitude)
                     let lng = String(format: "%.4f", coordinate.longitude)
-                    
+                    print("✅ [RADAR ENGINE]: Manual string lookup successful: \(lat), \(lng)")
                     await MainActor.run {
                         self.selectCityCoordinates(lat: lat, lng: lng)
                     }
@@ -200,6 +228,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
                     }
                 }
             } catch {
+                print("❌ [RADAR ENGINE]: MapKit geocoding search block context failed: \(error)")
                 await MainActor.run {
                     self.errorMessage = "SEARCH FAILED"
                     self.isTracking = false
@@ -208,6 +237,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
 }
+
 
 // MARK: - 3. THE ISOLATED SUB-VIEW COMPONENT
 struct SatelliteCardView: View {

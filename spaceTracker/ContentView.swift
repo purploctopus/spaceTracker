@@ -37,7 +37,7 @@ struct ContentView: View {
             return validDate >= now && validDate <= sevenDaysFromNow
         }
     }
-
+    
     
     var body: some View {
         NavigationView {
@@ -179,7 +179,7 @@ struct ContentView: View {
                                             .fontWeight(.bold)
                                             .foregroundColor(.cyan)
                                         Spacer()
-                                        Image(systemName: "location.radar.antenna")
+                                        Image(systemName: "antenna.radiowaves.left.and.right")
                                             .foregroundColor(.cyan)
                                     }
                                     .padding(16)
@@ -198,7 +198,7 @@ struct ContentView: View {
                                 }
                             }
                         }
-
+                        
                         // 3. MASTER ACCESS CHANNEL ROADWAY LINK
                         VStack(alignment: .leading, spacing: 12) {
                             Divider()
@@ -230,21 +230,48 @@ struct ContentView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
-                    }
+                    } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
+                } // Closes ScrollView
+            } // Closes ZStack
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 16) {
+                        // Left Flank
+                        Image("logo_trans")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: ((UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.width ?? 800) * 0.08)
+                            .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
+                        
+                        Text("COMMAND OPERATIONS")
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        
+                        // Right Flank
+                        Image("logo_trans")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: ((UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.width ?? 800) * 0.08)
+                            .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
+                    }
+                    .font(.system(.body, design: .monospaced))
+                    .tracking(2)
                 }
             }
-            .navigationTitle("COMMAND OPERATIONS")
-            .navigationBarTitleDisplayMode(.inline)
             .task {
                 await viewModel.fetchLaunches()
                 satViewModel.requestPasses()
             }
-        }
+        } // Closes NavigationView
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
-    }
+    } // Closes var body: some View
 }
+
 
 // MARK: - SUB-VIEW: ALPHABETICAL CORPORATE FIRM DIRECTORY INDEX
 struct ProviderIndexView: View {
