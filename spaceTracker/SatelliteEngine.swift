@@ -280,3 +280,102 @@ struct SatelliteCardView: View {
         )
     }
 }
+
+// MARK: - 4. THE DETAILED MISSIONS PROFILE SHEET
+struct SatelliteDetailSheet: View {
+    let sat: SatellitePass
+    @Environment(\.dismiss) var dismiss
+    
+    // Curated telemetry database for your 11 high-visibility targets
+    private var missionProfile: (country: String, launched: String, type: String, summary: String) {
+        let name = sat.name.uppercased()
+        if name.contains("ISS") {
+            return ("MULTINATIONAL", "1998-11-20", "HABITATION LAB", "THE INTERNATIONAL SPACE STATION SERVES AS A PERMANENT ORBITAL BASE FOR ASTROPHYSICS, BIOLOGY, AND MICROGRAVITY LABORATORY RESEARCH.")
+        } else if name.contains("CSS") || name.contains("TIANHE") || name.contains("TIANGONG") || name.contains("SHENZHOU") {
+            return ("CHINA", "2021-04-29", "HABITATION LAB", "THE TIANGONG CORE MODULE SERVES AS THE FOUNDATION FOR EXPANDED LONG-DURATION CHINESE ACADEMIC ORBITAL FLIGHTS.")
+        } else if name.contains("HUBBLE") {
+            return ("UNITED STATES (NASA)", "1990-04-24", "SPACE TELESCOPE", "THE DEEP SPACE OBSERVATORY TRACKS OPTICAL, ULTRAVIOLET, AND INFRARED SPECTRAL COSMIC TRAJECTORIES.")
+        } else if name.contains("STARLINK") {
+            return ("UNITED STATES (SPACEX)", "COMMERCIAL", "TELECOM CONSTELLATION", "LOW-EARTH ORBIT BROADBAND TRANSMISSION SATELLITE DESIGNED FOR GLOBAL HIGH-SPEED INTERNET LINK ROUTING.")
+        } else if name.contains("X37-B") {
+            return ("UNITED STATES (USAF)", "CLASSIFIED", "EXPERIMENTAL SPACEPLANE", "AUTONOMOUS REUSABLE MILITARY ROBOTIC VEHICLE CONDUCTING LONG-DURATION ORBITAL TECHNOLOGICAL FLIGHT TESTS.")
+        } else if name.contains("ENVISAT") {
+            return ("EUROPEAN UNION (ESA)", "2002-03-01", "ENVIRONMENTAL RADAR", "MASSIVE ACTIVE INFRASTRUCTURE ELEMENT DEDICATED TO RADAR ATMOSPHERIC AND EARTH FOOTPRINT TRACKING INTERCEPTS.")
+        } else if name.contains("AQUA") {
+            return ("UNITED STATES (NASA)", "2002-05-04", "EARTH OBSERVATION", "MULTINATIONAL RECONNAISSANCE PLATFORM STUDYING EARTH WATER CYCLES, PRECIPITATION, AND OCEAN EVAPORATION SIGNS.")
+        } else if name.contains("TERRA") {
+            return ("UNITED STATES (NASA)", "1999-12-18", "EARTH OBSERVATION", "PRIMARY FLAGSHIP SPECTRUM MONITOR ANALYZING THE GLOBAL SPREAD OF VEGETATION AND CLIMATE TRANSITIONS OVER HORIZONS.")
+        }
+        return ("INTERNATIONAL", "UNKNOWN", "ORBITAL PAYLOAD", "HIGH-VISIBILITY TARGET TRACKED IN REAL-TIME BY HORIZON COMPASS SURVEILLANCE RADAR RAILS.")
+    }
+    
+    var body: some View {
+        ZStack {
+            Color(red: 0.04, green: 0.04, blue: 0.04).ignoresSafeArea()
+            
+            VStack(alignment: .leading, spacing: 24) {
+                // Header Panel Control
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(sat.name.uppercased())
+                            .font(.system(.title2, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        Text("NORAD CATALOG ID: #\(sat.id)")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundColor(.cyan)
+                    }
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding(.bottom, 8)
+                
+                // Telemetry Matrix Table
+                VStack(spacing: 0) {
+                    telemetryRow(label: "ORIGIN REALM", value: missionProfile.country)
+                    telemetryRow(label: "LAUNCH TIMELINE", value: missionProfile.launched)
+                    telemetryRow(label: "PLATFORM TYPE", value: missionProfile.type)
+                    telemetryRow(label: "MAX ELEVATION", value: "\(Int(sat.peakElevationDegrees))° ANGLE")
+                    telemetryRow(label: "WINDOW DURATION", value: "\(sat.durationMinutes) MINUTES")
+                }
+                .border(Color.white.opacity(0.1), width: 1)
+                
+                // Mission Narrative
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("MISSION OBJECTIVES //")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.yellow)
+                    Text(missionProfile.summary)
+                        .font(.system(.subheadline, design: .monospaced))
+                        .foregroundColor(.gray)
+                        .lineSpacing(4)
+                }
+                
+                Spacer()
+            }
+            .padding(24)
+        }
+        .preferredColorScheme(.dark)
+    }
+    
+    private func telemetryRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value.uppercased())
+                .font(.system(.caption, design: .monospaced))
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .background(Color.white.opacity(0.01))
+        .overlay(Rectangle().stroke(Color.white.opacity(0.04), lineWidth: 0.5))
+    }
+}

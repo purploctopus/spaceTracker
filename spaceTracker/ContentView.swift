@@ -13,6 +13,7 @@ struct ContentView: View {
     @StateObject private var satViewModel = SatelliteViewModel()
     @State private var manualCitySearch: String = ""
     @StateObject private var rockViewModel = SpaceRocksViewModel()
+    @State private var selectedSatellitePass: SatellitePass? = nil
     
     // 💡 THE 7-DAY MANIFEST ENGINE: Calculates tracking windows for the next 7 days
     private var upcomingManifest: [SpaceLaunch] {
@@ -38,7 +39,6 @@ struct ContentView: View {
             return validDate >= now && validDate <= sevenDaysFromNow
         }
     }
-    
     
     var body: some View {
         NavigationView {
@@ -102,8 +102,6 @@ struct ContentView: View {
                                                 .font(.system(.caption2, design: .monospaced))
                                                 .foregroundColor(.yellow)
                                             
-                                            Divider()
-                                                .background(Color.white.opacity(0.1))
                                         }
                                         .padding(.horizontal)
                                     }
@@ -111,8 +109,36 @@ struct ContentView: View {
                                 }
                             }
                         }
+                        // 3. MASTER ACCESS CHANNEL ROADWAY LINK
+                        VStack(alignment: .leading, spacing: 12) {
+                            NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("ALL ORBITAL PROVIDERS")
+                                            .font(.system(.headline, design: .monospaced))
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.white)
+                                            .tracking(1)
+                                        Text("VIEW MANIFEST DATA BY FIRM")
+                                            .font(.system(.caption2, design: .monospaced))
+                                            .foregroundColor(.gray)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "line.3.horizontal.decrease.circle")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                }
+                                .padding(16)
+                                .background(Color.white.opacity(0.05))
+                                .cornerRadius(6)
+                                .padding(.horizontal)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                         // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
                         VStack(alignment: .leading, spacing: 16) {
+                            Divider()
+                                .background(Color.white.opacity(0.1))
                             Text("OVERHEAD VISUAL TRACKS (48H)")
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundColor(.secondary)
@@ -193,43 +219,16 @@ struct ContentView: View {
                                     HStack(spacing: 12) {
                                         ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { sat in
                                             SatelliteCardView(sat: sat)
+                                                // 💡 INJECTED TACTICAL TAP TRIGGER: Captures card reference on touch
+                                                .onTapGesture {
+                                                    selectedSatellitePass = sat
+                                                }
                                         }
                                     }
                                     .padding(.horizontal)
                                 }
+
                             }
-                        }
-                        
-                        // 3. MASTER ACCESS CHANNEL ROADWAY LINK
-                        VStack(alignment: .leading, spacing: 12) {
-                            Divider()
-                                .background(Color.white.opacity(0.15))
-                                .padding(.horizontal)
-                                .padding(.bottom, 10)
-                            
-                            NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("ALL ORBITAL PROVIDERS")
-                                            .font(.system(.headline, design: .monospaced))
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.white)
-                                            .tracking(1)
-                                        Text("VIEW MANIFEST DATA BY FIRM")
-                                            .font(.system(.caption2, design: .monospaced))
-                                            .foregroundColor(.gray)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "line.3.horizontal.decrease.circle")
-                                        .font(.title2)
-                                        .foregroundColor(.white)
-                                }
-                                .padding(16)
-                                .background(Color.white.opacity(0.05))
-                                .cornerRadius(6)
-                                .padding(.horizontal)
-                            }
-                            .buttonStyle(PlainButtonStyle())
                         }
                         // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
                         VStack(alignment: .leading, spacing: 16) {
@@ -285,7 +284,7 @@ struct ContentView: View {
                             .frame(width: ((UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.width ?? 800) * 0.08)
                             .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
                         
-                        Text("COMMAND OPERATIONS")
+                        Text("DAILY COMMAND")
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                         
@@ -309,6 +308,10 @@ struct ContentView: View {
         } // Closes NavigationView
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
+        // 💡 INJECTED BINDER DRAWER SHEET: Slides up automatically when selection is updated
+        .sheet(item: $selectedSatellitePass) { pass in
+            SatelliteDetailSheet(sat: pass)
+        }
     } // Closes var body: some View
 }
 
