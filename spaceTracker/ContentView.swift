@@ -12,6 +12,7 @@ struct ContentView: View {
     @StateObject private var viewModel = LaunchViewModel()
     @StateObject private var satViewModel = SatelliteViewModel()
     @State private var manualCitySearch: String = ""
+    @StateObject private var rockViewModel = SpaceRocksViewModel()
     
     // 💡 THE 7-DAY MANIFEST ENGINE: Calculates tracking windows for the next 7 days
     private var upcomingManifest: [SpaceLaunch] {
@@ -230,6 +231,44 @@ struct ContentView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
+                        // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("NEAR-EARTH OBJECTS RADAR (7-DAY)")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .tracking(2)
+                                .padding(.horizontal)
+                            
+                            if rockViewModel.isLoading {
+                                HStack {
+                                    Spacer()
+                                    ProgressView("SCANNING JPL DEEP SPACE NETWORK...")
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundColor(.gray)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 10)
+                            } else if let error = rockViewModel.errorMessage {
+                                Text(error)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.red)
+                                    .padding(.horizontal)
+                            } else if rockViewModel.asteroids.isEmpty {
+                                Text("RADAR RANGE CLEAR")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.green)
+                                    .padding(.horizontal)
+                            } else {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(rockViewModel.asteroids) { asteroid in
+                                            AsteroidCardView(asteroid: asteroid)
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
                     } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
                 } // Closes ScrollView
@@ -265,6 +304,7 @@ struct ContentView: View {
             .task {
                 await viewModel.fetchLaunches()
                 satViewModel.requestPasses()
+                await rockViewModel.fetchAsteroidRadar() 
             }
         } // Closes NavigationView
         .navigationViewStyle(.stack)
