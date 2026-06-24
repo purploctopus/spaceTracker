@@ -224,13 +224,18 @@ struct ContentView: View {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 12) {
                                         ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { sat in
-                                            SatelliteCardView(sat: sat)
+                                            // UPDATED: Now passing the location name dynamically down into the card matrix layout
+                                            SatelliteCardView(sat: sat, location: satViewModel.locationName)
                                                 .onTapGesture {
                                                     selectedSatellitePass = sat
                                                 }
                                         }
                                     }
                                     .padding(.horizontal)
+                                }
+                                // UPDATED: Attach sheet binding directly here to launch your updated Detail Sheet layout
+                                .sheet(item: $selectedSatellitePass) { sat in
+                                    SatelliteDetailSheet(sat: sat, location: satViewModel.locationName)
                                 }
                             }
                         }
@@ -346,7 +351,8 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         // Satellite profile card sheet container
         .sheet(item: $selectedSatellitePass) { pass in
-            SatelliteDetailSheet(sat: pass)
+            // UPDATED: Now passing the location name string into the detail telemetry sheet layout matrix
+            SatelliteDetailSheet(sat: pass, location: satViewModel.locationName)
         }
         // 💡 INJECTED BINDER DRAWER SHEET: Slides up automatically when a meteor cell is tapped
         .sheet(item: $selectedMeteorShower) { shower in

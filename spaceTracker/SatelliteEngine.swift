@@ -41,6 +41,7 @@ struct SatellitePass: Codable, Identifiable {
 
 // MARK: - 2. THE DEBUG-READY RADAR VIEW MODEL
 class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate {
+    @Published var locationName: String = ""
     @Published var visiblePasses: [SatellitePass] = []
     @Published var isTracking: Bool = false
     @Published var errorMessage: String? = nil
@@ -112,10 +113,35 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
         
         manager.stopUpdatingLocation()
-        
-        let lat = String(format: "%.4f", location.coordinate.latitude)
-        let lng = String(format: "%.4f", location.coordinate.longitude)
+        // Replace your old String(format:) lines with this:
+        let lat = String(format: "%.4f", locale: Locale(identifier: "en_US_POSIX"), location.coordinate.latitude)
+        let lng = String(format: "%.4f", locale: Locale(identifier: "en_US_POSIX"), location.coordinate.longitude)
+
         print("🤖 [RADAR ENGINE]: Extracted coordinates: Lat \(lat), Lng \(lng)")
+        
+        // Modern MapKit Reverse Geocoding API Sequence
+        Task {
+            // SAFE UNWRAP: Safely handle the optional failable initialization matrix
+            guard let reverseRequest = MKReverseGeocodingRequest(location: location) else {
+                print("❌ [RADAR ENGINE]: Failed to allocate memory context for MKReverseGeocodingRequest.")
+                return
+            }
+            
+            do {
+                let mapItems = try await reverseRequest.mapItems
+                
+                if let localizedMapItem = mapItems.first {
+                    let resolvedCityName = localizedMapItem.address?.shortAddress ?? "Unknown Location"
+                    
+                    await MainActor.run {
+                        self.locationName = resolvedCityName
+                        print("🤖 [RADAR ENGINE]: Resolved GPS Hardware coordinates to: \(self.locationName)")
+                    }
+                }
+            } catch {
+                print("⚠️ [RADAR ENGINE]: Modern MapKit Reverse Geocoder execution fault: \(error.localizedDescription)")
+            }
+        }
         
         Task { @MainActor in
             await fetchPasses(latitude: lat, longitude: lng)
@@ -168,25 +194,35 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
         
         do {
+            // 1. Execute the network transaction first
             let (data, response) = try await URLSession.shared.data(from: url)
+            
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [RADAR ENGINE]: Upstream server response was not an HTTP transmission matrix.")
+                self.errorMessage = "NETWORK INTERFACE FAULT"
+                self.isTracking = false
                 return
             }
             
             print("📡 [RADAR ENGINE]: Cloudflare Gateway handshake complete. Response HTTP Code: \(httpResponse.statusCode)")
             
+            // 2. Safely evaluate errors now that httpResponse and data exist in this scope
             guard httpResponse.statusCode == 200 else {
-                self.errorMessage = "UPSTREAM SYNC FAIL"
+                if let errorBody = String(data: data, encoding: .utf8) {
+                    print("❌ [RADAR ENGINE] Upstream Error Body: \(errorBody)")
+                }
+                self.errorMessage = "UPSTREAM SYNC FAIL (\(httpResponse.statusCode))"
                 self.isTracking = false
                 self.lastQueriedLocationVector = ""
                 return
             }
             
+            // 3. Parse successful 200 payload
             let decoded = try JSONDecoder().decode(SatelliteResponse.self, from: data)
             print("✅ [RADAR ENGINE]: Successful pipeline synchronization. Loaded \(decoded.passes.count) visual pass records.")
             self.visiblePasses = decoded.passes
             self.isTracking = false
+            
         } catch {
             print("❌ [RADAR ENGINE]: Data processing conversion exception thrown: \(error)")
             self.errorMessage = "DECODING ENGINE FAULT"
@@ -214,11 +250,21 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         Task {
             do {
                 let response = try await search.start()
-                if let coordinate = response.mapItems.first?.location.coordinate {
+                if let firstItem = response.mapItems.first {
+                    // FIXED: Direct assignment without guard let because location is non-optional
+                    let location = firstItem.location
+                    let coordinate = location.coordinate
+                    
                     let lat = String(format: "%.4f", coordinate.latitude)
                     let lng = String(format: "%.4f", coordinate.longitude)
-                    print("✅ [RADAR ENGINE]: Manual string lookup successful: \(lat), \(lng)")
+                    
+                    // Using the modern MapKit structural address engine
+                    let formattedName = firstItem.address?.shortAddress ?? firstItem.name ?? query
+                    
+                    print("✅ [RADAR ENGINE]: Manual string lookup successful: \(lat), \(lng) for \(formattedName)")
+                    
                     await MainActor.run {
+                        self.locationName = formattedName
                         self.selectCityCoordinates(lat: lat, lng: lng)
                     }
                 } else {
@@ -242,6 +288,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
 // MARK: - 3. THE ISOLATED SUB-VIEW COMPONENT
 struct SatelliteCardView: View {
     let sat: SatellitePass
+    let location: String // Added to receive the view model's city/country string
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -254,6 +301,19 @@ struct SatelliteCardView: View {
             Text(sat.localDisplayTime.uppercased())
                 .font(.system(.caption, design: .monospaced))
                 .foregroundColor(.yellow)
+            
+            // New Location Row Context Matrix
+            if !location.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 10))
+                    Text(location.uppercased())
+                        .font(.system(size: 10, design: .monospaced))
+                        .lineLimit(1)
+                }
+                .foregroundColor(.cyan)
+                .padding(.top, -2) // Tighten layout spacing
+            }
             
             HStack(spacing: 4) {
                 Image(systemName: "scope")
@@ -281,9 +341,11 @@ struct SatelliteCardView: View {
     }
 }
 
+
 // MARK: - 4. THE DETAILED MISSIONS PROFILE SHEET
 struct SatelliteDetailSheet: View {
     let sat: SatellitePass
+    let location: String // Added to receive the view model's city/country string
     @Environment(\.dismiss) var dismiss
     
     // Curated telemetry database for your 11 high-visibility targets
@@ -339,6 +401,7 @@ struct SatelliteDetailSheet: View {
                     telemetryRow(label: "ORIGIN REALM", value: missionProfile.country)
                     telemetryRow(label: "LAUNCH TIMELINE", value: missionProfile.launched)
                     telemetryRow(label: "PLATFORM TYPE", value: missionProfile.type)
+                    telemetryRow(label: "OBSERVER LOCATION", value: location.isEmpty ? "CURRENT POSITION" : location.uppercased())
                     telemetryRow(label: "MAX ELEVATION", value: "\(Int(sat.peakElevationDegrees))° ANGLE")
                     telemetryRow(label: "WINDOW DURATION", value: "\(sat.durationMinutes) MINUTES")
                 }
