@@ -26,12 +26,15 @@ struct ContentView: View {
     @State private var showAPODDetails = false
     
     private var toolbarLogoSize: CGFloat {
-        // If running on an iPad (regular width layout window context)
+        // ✅ RESPONSIVE FRACTION: Scales dynamically by measuring the typographic base font profile line height
+        let bodyFontMetric = UIFont.preferredFont(forTextStyle: .body).lineHeight
+        
         if horizontalSizeClass == .regular {
-            return 28.0
+            // Amplified scaling factor proportional to large-screen layout metrics
+            return bodyFontMetric * 5
         } else {
-            // If running on an iPhone (compact width layout window context)
-            return 18.0
+            // Streamlined scaling factor proportional to mobile phone screen layouts
+            return bodyFontMetric * 3
         }
     }
 
@@ -62,13 +65,8 @@ struct ContentView: View {
     
     var body: some View {
         NavigationView {
-            GeometryReader { safeAreaGeometry in // ✅ Moved to the root to capture exact glass bounds first
+            GeometryReader { safeAreaGeometry in
                 ZStack {
-                    TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
-                        // ✅ FIXED: Forces the background image to stay inside the phone's physical glass bounds
-                        .frame(width: safeAreaGeometry.size.width, height: safeAreaGeometry.size.height)
-                        .clipped()
-                    
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 32) {
                             
@@ -324,15 +322,15 @@ struct ContentView: View {
             }
  // Closes ZStack
             .navigationBarTitleDisplayMode(.inline)
+            // ✅ PURE SWIFTUI FIX: Forcefully hides the navigation bar's solid background plate
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: horizontalSizeClass == .regular ? 16 : 10) {
-                        // Left Flank
-                        Image("logo_trans")
+                        Image("logo_transparent")
                             .renderingMode(.template)
                             .resizable()
                             .scaledToFit()
-                            // ✅ RESPONSIVE: Adapts dynamically matching size-class constraints with zero window geometry dependencies
                             .frame(width: toolbarLogoSize, height: toolbarLogoSize)
                             .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
                         
@@ -342,16 +340,25 @@ struct ContentView: View {
                             .foregroundColor(.white)
                             .tracking(2)
                         
-                        // Right Flank
-                        Image("logo_trans")
+                        Image("logo_transparent")
                             .renderingMode(.template)
                             .resizable()
                             .scaledToFit()
-                            // ✅ RESPONSIVE: Adapts dynamically matching size-class constraints with zero window geometry dependencies
                             .frame(width: toolbarLogoSize, height: toolbarLogoSize)
                             .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
                     }
                 }
+            }
+
+            .onAppear {
+                let navigationBarAppearance = UINavigationBarAppearance()
+                // ✅ REMOVES BG: Clears any default gray solid plates or translucent blurs
+                navigationBarAppearance.configureWithTransparentBackground()
+                
+                // Lock the transparency across all scroll states universally
+                UINavigationBar.appearance().standardAppearance = navigationBarAppearance
+                UINavigationBar.appearance().compactAppearance = navigationBarAppearance
+                UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
             }
             .task {
                 await viewModel.fetchLaunches()
@@ -363,6 +370,10 @@ struct ContentView: View {
                 meteorViewModel.generateOutlook(userLatitude: hardwareLat)
                 await apodViewModel.fetchDailyBackdrop()
             }
+            .background(
+                TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
+                    .ignoresSafeArea()
+            )
         } // Closes NavigationView
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
