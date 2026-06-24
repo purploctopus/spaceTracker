@@ -21,6 +21,8 @@ struct ContentView: View {
     @StateObject private var meteorViewModel = MeteorShowerViewModel()
     @State private var selectedMeteorShower: MeteorShower? = nil
     @State private var selectedSpaceLaunch: SpaceLaunch? = nil
+    @StateObject private var apodViewModel = APODViewModel()
+    @State private var showAPODDetails = false
     
     // 💡 THE 7-DAY MANIFEST ENGINE: Calculates tracking windows for the next 7 days
     private var upcomingManifest: [SpaceLaunch] {
@@ -50,9 +52,8 @@ struct ContentView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Core SpaceX Dark Void Backdrop
-                Color(red: 0.05, green: 0.05, blue: 0.05)
-                    .ignoresSafeArea()
+                TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
+
                 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 32) {
@@ -326,11 +327,16 @@ struct ContentView: View {
                 // 💡 FIXED: Dynamically pulls live hardware coordinates, defaulting safely to Madison only if GPS chip is waking up
                 let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
                 meteorViewModel.generateOutlook(userLatitude: hardwareLat)
+                await apodViewModel.fetchDailyBackdrop()
             }
         } // Closes NavigationView
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
         // Satellite profile card sheet container
+        .sheet(isPresented: $showAPODDetails) {
+            // Triggers the background data matrix information read-out sheet overlay
+            APODCreditDetailSheet(title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
+        }
         .sheet(item: $selectedSatellitePass) { pass in
             // ✅ FIXED: Passing both location and heading variables down cleanly from satViewModel scope
             SatelliteDetailSheet(
