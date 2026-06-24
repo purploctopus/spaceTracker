@@ -65,15 +65,14 @@ struct SatelliteTacticalHUDView: View {
                 .padding(.top, 16)
                 
                 Spacer()
-                
-                // THE HERO CORE: Maximize the Radar circle scale bounds across the canvas space
+                // THE HERO CORE: Maximize the Radar circle scale bounds adaptively
                 CompassRadarView(pass: pass, userHeading: userHeading)
-                    .scaleEffect(1.15) // Slightly boost vector assets resolution scale
-                    .frame(maxWidth: 550, maxHeight: 550) // Cap upper bounds layout safety for wide iPads
-                    .padding(24)
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(32)
                 
                 Spacer()
-                
+
                 // Bottom Real-Time Flight Vector Sub-Display Readout panel
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {

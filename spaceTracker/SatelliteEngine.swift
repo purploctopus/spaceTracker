@@ -406,88 +406,86 @@ struct SatelliteDetailSheet: View {
         ZStack {
             Color(red: 0.04, green: 0.04, blue: 0.04).ignoresSafeArea()
             
-            VStack(alignment: .leading, spacing: 24) {
-                // Header Panel Control
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(sat.name.uppercased())
-                            .font(.system(.title2, design: .monospaced))
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        Text("NORAD CATALOG ID: #\(sat.id)")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(.cyan)
-                    }
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 12) {
-                        // ✨ NEW: Full-Screen Radar HUD Interface Trigger Button
-                        Button(action: { presentFullScreenHUD = true }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arkit")
-                                    .font(.caption)
-                                Text("ENGAGE RADAR HUD")
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            }
-                            .foregroundColor(.cyan)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.cyan.opacity(0.08))
-                            .cornerRadius(4)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
-                            )
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 24) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(sat.name.uppercased())
+                                .font(.system(.title2, design: .monospaced))
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                            Text("NORAD CATALOG ID: #\(sat.id)")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundColor(.cyan)
                         }
                         
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.gray)
+                        Spacer()
+                        
+                        HStack(spacing: 12) {
+                            Button(action: { presentFullScreenHUD = true }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arkit")
+                                        .font(.caption)
+                                    Text("ENGAGE RADAR HUD")
+                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                }
+                                .foregroundColor(.cyan)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.cyan.opacity(0.08))
+                                .cornerRadius(4)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                            
+                            Button(action: { dismiss() }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.gray)
+                            }
                         }
                     }
-                }
-                .padding(.bottom, 8)
-                
-                // Live Calibrated Radar Component View
-                CompassRadarView(pass: sat, userHeading: userHeading)
-                    .padding(.vertical, 8)
-                    // ✨ UPDATED: Tapping the radar body now launches the HUD directly
-                    .contentShape(Circle()) // Ensures the tap target accurately covers the structural round container layout
+                    .padding(.bottom, 8)
+                    
+                    HStack {
+                        Spacer()
+                        CompassRadarView(pass: sat, userHeading: userHeading)
+                            .aspectRatio(1, contentMode: .fit)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 32)
+                    .contentShape(Circle())
                     .onTapGesture {
                         presentFullScreenHUD = true
                     }
-                
-                // Telemetry Matrix Table
-                VStack(spacing: 0) {
-                    telemetryRow(label: "ORIGIN REALM", value: missionProfile.country)
-                    telemetryRow(label: "LAUNCH TIMELINE", value: missionProfile.launched)
-                    telemetryRow(label: "PLATFORM TYPE", value: missionProfile.type)
-                    telemetryRow(label: "OBSERVER LOCATION", value: location.isEmpty ? "CURRENT POSITION" : location.uppercased())
-                    telemetryRow(label: "FLIGHT TRAJECTORY", value: sat.travelDirection.uppercased())
-                    telemetryRow(label: "MAX ELEVATION", value: "\(Int(sat.peakElevationDegrees))° ANGLE")
-                    telemetryRow(label: "WINDOW DURATION", value: "\(sat.durationMinutes) MINUTES")
+                    
+                    VStack(spacing: 0) {
+                        telemetryRow(label: "ORIGIN REALM", value: missionProfile.country)
+                        telemetryRow(label: "LAUNCH TIMELINE", value: missionProfile.launched)
+                        telemetryRow(label: "PLATFORM TYPE", value: missionProfile.type)
+                        telemetryRow(label: "OBSERVER LOCATION", value: location.isEmpty ? "CURRENT POSITION" : location.uppercased())
+                        telemetryRow(label: "FLIGHT TRAJECTORY", value: sat.travelDirection.uppercased())
+                        telemetryRow(label: "MAX ELEVATION", value: "\(Int(sat.peakElevationDegrees))° ANGLE")
+                        telemetryRow(label: "WINDOW DURATION", value: "\(sat.durationMinutes) MINUTES")
+                    }
+                    .border(Color.white.opacity(0.1), width: 1)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("MISSION OBJECTIVES //")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.yellow)
+                        Text(missionProfile.summary)
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundColor(.gray)
+                            .lineSpacing(4)
+                    }
                 }
-                .border(Color.white.opacity(0.1), width: 1)
-                
-                // Mission Narrative
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("MISSION OBJECTIVES //")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(.yellow)
-                    Text(missionProfile.summary)
-                        .font(.system(.subheadline, design: .monospaced))
-                        .foregroundColor(.gray)
-                        .lineSpacing(4)
-                }
-                
-                Spacer()
+                .padding(24)
             }
-            .padding(24)
         }
         .preferredColorScheme(.dark)
-        // ✨ NEW: Full-Screen presentation layer link context mapping rules
         .fullScreenCover(isPresented: $presentFullScreenHUD) {
             SatelliteTacticalHUDView(pass: sat, userHeading: userHeading)
         }
