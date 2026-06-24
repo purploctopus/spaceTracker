@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var selectedSatellitePass: SatellitePass? = nil
     @StateObject private var meteorViewModel = MeteorShowerViewModel()
     @State private var selectedMeteorShower: MeteorShower? = nil
+    @State private var selectedSpaceLaunch: SpaceLaunch? = nil
     
     // 💡 THE 7-DAY MANIFEST ENGINE: Calculates tracking windows for the next 7 days
     private var upcomingManifest: [SpaceLaunch] {
@@ -85,33 +86,17 @@ struct ContentView: View {
                                 .cornerRadius(4)
                                 .padding(.horizontal)
                             } else {
-                                // Maps flights sequentially down your viewport grid
-                                ForEach(upcomingManifest) { launch in
-                                    NavigationLink(destination: MissionSingleDetailView(launch: launch)) {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            HStack {
-                                                Text(launch.name.uppercased())
-                                                    .font(.system(.headline, design: .monospaced))
-                                                    .fontWeight(.bold)
-                                                    .foregroundColor(.white)
-                                                Spacer()
-                                                Image(systemName: "chevron.right")
-                                                    .font(.caption)
-                                                    .foregroundColor(.gray)
-                                            }
-                                            Text(launch.launch_service_provider?.name?.uppercased() ?? "GLOBAL RANGE")
-                                                .font(.system(.caption, design: .monospaced))
-                                                .foregroundColor(.blue)
-                                            
-                                            // 💡 THE DATE INJECTION ROW: Clearly separates the upcoming schedule days
-                                            Text(launch.localLaunchTimeDisplay)
-                                                .font(.system(.caption2, design: .monospaced))
-                                                .foregroundColor(.yellow)
-                                            
+                                // ✅ FIXED: Replaced your old vertical loop with the smooth horizontal scroll view
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(upcomingManifest) { launch in
+                                            LaunchCardView(launch: launch)
+                                                .onTapGesture {
+                                                    selectedSpaceLaunch = launch
+                                                }
                                         }
-                                        .padding(.horizontal)
                                     }
-                                    .buttonStyle(PlainButtonStyle())
+                                    .padding(.horizontal)
                                 }
                             }
                         }
@@ -347,12 +332,23 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         // Satellite profile card sheet container
         .sheet(item: $selectedSatellitePass) { pass in
-            // UPDATED: Now passing the location name string into the detail telemetry sheet layout matrix
-            SatelliteDetailSheet(sat: pass, location: satViewModel.locationName)
+            // ✅ FIXED: Passing both location and heading variables down cleanly from satViewModel scope
+            SatelliteDetailSheet(
+                sat: pass,
+                location: satViewModel.locationName,
+                userHeading: satViewModel.currentHeading
+            )
         }
         // 💡 INJECTED BINDER DRAWER SHEET: Slides up automatically when a meteor cell is tapped
         .sheet(item: $selectedMeteorShower) { shower in
             MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
+        }
+        
+        .sheet(item: $selectedSpaceLaunch) { launch in
+            NavigationStack {
+                MissionSingleDetailView(launch: launch)
+            }
+            .preferredColorScheme(.dark)
         }
     } // Closes var body: some View
     // 💡 THE UNTANGLED GEOCODING INTERCEPT METHOD: Handles universal vector mapping

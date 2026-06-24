@@ -47,6 +47,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published var isTracking: Bool = false
     @Published var errorMessage: String? = nil
     @Published var requiresManualSelection: Bool = false
+    @Published var currentHeading: Double = 0.0
     
     private let locationManager = CLLocationManager()
     private let workerURLString = "https://sat-tracker.purploctopus.workers.dev"
@@ -57,6 +58,9 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         print("🤖 [RADAR ENGINE]: Initializing core class framework...")
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
+        if CLLocationManager.headingAvailable() {
+            locationManager.startUpdatingHeading()
+        }
     }
     
     func requestPasses() {
@@ -106,6 +110,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
     
+    // MARK: - CoreLocation GPS Location Callback
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         print("✅ [RADAR ENGINE]: Hardware callback received! Found \(locations.count) valid locations in vector stack.")
         guard let location = locations.last else {
@@ -114,7 +119,8 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
         
         manager.stopUpdatingLocation()
-        // Replace your old String(format:) lines with this:
+        
+        // Fixed: Locked to US Locale formatting rules to guarantee agnostic period decimal points
         let lat = String(format: "%.4f", locale: Locale(identifier: "en_US_POSIX"), location.coordinate.latitude)
         let lng = String(format: "%.4f", locale: Locale(identifier: "en_US_POSIX"), location.coordinate.longitude)
 
@@ -149,6 +155,19 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
     
+    // MARK: - CoreLocation Compass Heading Callback
+    // FIXED: Separated into its own dedicated delegate function to fix the scoping error
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        let headingDegrees = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        
+        Task { @MainActor in
+            withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.6)) {
+                self.currentHeading = headingDegrees
+            }
+        }
+    }
+    
+    // MARK: - CoreLocation Error Stream Callback
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("❌ [RADAR ENGINE]: CoreLocation Hardware Error stream: \(error.localizedDescription)")
         manager.stopUpdatingLocation()
@@ -354,8 +373,10 @@ struct SatelliteCardView: View {
 
 // MARK: - 4. THE DETAILED MISSIONS PROFILE SHEET
 struct SatelliteDetailSheet: View {
+    @State private var presentFullScreenHUD = false
     let sat: SatellitePass
-    let location: String // Added to receive the view model's city/country string
+    let location: String
+    let userHeading: Double // ✅ FIXED: Explicitly added this plain primitive variable
     @Environment(\.dismiss) var dismiss
     
     // Curated telemetry database for your 11 high-visibility targets
@@ -387,7 +408,7 @@ struct SatelliteDetailSheet: View {
             
             VStack(alignment: .leading, spacing: 24) {
                 // Header Panel Control
-                HStack {
+                HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(sat.name.uppercased())
                             .font(.system(.title2, design: .monospaced))
@@ -397,14 +418,46 @@ struct SatelliteDetailSheet: View {
                             .font(.system(.caption2, design: .monospaced))
                             .foregroundColor(.cyan)
                     }
+                    
                     Spacer()
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.gray)
+                    
+                    HStack(spacing: 12) {
+                        // ✨ NEW: Full-Screen Radar HUD Interface Trigger Button
+                        Button(action: { presentFullScreenHUD = true }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arkit")
+                                    .font(.caption)
+                                Text("ENGAGE RADAR HUD")
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            }
+                            .foregroundColor(.cyan)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.cyan.opacity(0.08))
+                            .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                        
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.gray)
+                        }
                     }
                 }
                 .padding(.bottom, 8)
+                
+                // Live Calibrated Radar Component View
+                CompassRadarView(pass: sat, userHeading: userHeading)
+                    .padding(.vertical, 8)
+                    // ✨ UPDATED: Tapping the radar body now launches the HUD directly
+                    .contentShape(Circle()) // Ensures the tap target accurately covers the structural round container layout
+                    .onTapGesture {
+                        presentFullScreenHUD = true
+                    }
                 
                 // Telemetry Matrix Table
                 VStack(spacing: 0) {
@@ -434,21 +487,25 @@ struct SatelliteDetailSheet: View {
             .padding(24)
         }
         .preferredColorScheme(.dark)
+        // ✨ NEW: Full-Screen presentation layer link context mapping rules
+        .fullScreenCover(isPresented: $presentFullScreenHUD) {
+            SatelliteTacticalHUDView(pass: sat, userHeading: userHeading)
+        }
     }
     
+    // Kept helper function declaration scope clean assuming implementation exists below
     private func telemetryRow(label: String, value: String) -> some View {
         HStack {
             Text(label)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.secondary)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.gray)
             Spacer()
-            Text(value.uppercased())
-                .font(.system(.caption, design: .monospaced))
-                .fontWeight(.bold)
+            Text(value)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(Color.white.opacity(0.01))
         .overlay(Rectangle().stroke(Color.white.opacity(0.04), lineWidth: 0.5))
     }
