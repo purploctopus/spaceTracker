@@ -319,67 +319,62 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals meteor section horizontal container
                     } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: horizontalSizeClass == .regular ? 16 : 10) {
-                        Image("logo_transparent")
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: toolbarLogoSize, height: toolbarLogoSize)
-                            .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
-                        
-                        Text("DAILY COMMAND")
-                            .font(.system(horizontalSizeClass == .regular ? .body : .subheadline, design: .monospaced))
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .tracking(2)
-                        
-                        Image("logo_transparent")
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: toolbarLogoSize, height: toolbarLogoSize)
-                            .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
-                    }
-                }
-            }// Closes ScrollView
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button(action: { showAPODDetails = true }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "info.circle")
-                            Text("NASA APOD")
-                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .padding(.bottom, 60)
+                } // Closes ScrollView
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        HStack(spacing: horizontalSizeClass == .regular ? 16 : 10) {
+                            Image("logo_transparent")
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: toolbarLogoSize, height: toolbarLogoSize)
+                                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
+                            
+                            Text("DAILY COMMAND")
+                                .font(.system(horizontalSizeClass == .regular ? .body : .subheadline, design: .monospaced))
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .tracking(2)
+                            
+                            Image("logo_transparent")
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: toolbarLogoSize, height: toolbarLogoSize)
+                                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
                         }
-                        .foregroundColor(.white.opacity(0.35))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.4))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
                     }
-                    .padding(16)
                 }
-            }
-            .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
-            
-            //      }
+                
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: { showAPODDetails = true }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "info.circle")
+                                Text("NASA APOD")
+                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                            }
+                            .foregroundColor(.white.opacity(0.35))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.black.opacity(0.4))
+                            .cornerRadius(4)
+                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                        }
+                        .padding(16)
+                    }
+                }
+                .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
 
-        }
+            } // Closes ZStack
             .onAppear {
                 let navigationBarAppearance = UINavigationBarAppearance()
-                // ✅ REMOVES BG: Clears any default gray solid plates or translucent blurs
                 navigationBarAppearance.configureWithTransparentBackground()
-                
-                // Lock the transparency across all scroll states universally
                 UINavigationBar.appearance().standardAppearance = navigationBarAppearance
                 UINavigationBar.appearance().compactAppearance = navigationBarAppearance
                 UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
@@ -388,19 +383,14 @@ struct ContentView: View {
                 await viewModel.fetchLaunches()
                 satViewModel.requestPasses()
                 await rockViewModel.fetchAsteroidRadar()
-                
-                // 💡 FIXED: Dynamically pulls live hardware coordinates, defaulting safely to Madison only if GPS chip is waking up
                 let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
                 meteorViewModel.generateOutlook(userLatitude: hardwareLat)
                 await apodViewModel.fetchDailyBackdrop()
             }
-        //} // Closes NavigationView
+        } // Closes NavigationView
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
-        
-        // Satellite profile card sheet container
         .sheet(isPresented: $showAPODDetails) {
-            // Triggers the background data matrix information read-out sheet overlay
             APODCreditDetailSheet(title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
         }
         .sheet(item: $selectedSatellitePass) { pass in
@@ -411,18 +401,17 @@ struct ContentView: View {
             )
             .presentationSizing(.page)
         }
-        // 💡 INJECTED BINDER DRAWER SHEET: Slides up automatically when a meteor cell is tapped
         .sheet(item: $selectedMeteorShower) { shower in
             MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
         }
-        
         .sheet(item: $selectedSpaceLaunch) { launch in
             NavigationStack {
                 MissionSingleDetailView(launch: launch)
             }
             .preferredColorScheme(.dark)
         }
-    } // Closes var body: some View
+    }
+ // Closes var body: some View
     // 💡 THE UNTANGLED GEOCODING INTERCEPT METHOD: Handles universal vector mapping
     private func executeUniversalCitySearch() {
         guard !manualCitySearch.trimmingCharacters(in: .whitespaces).isEmpty else { return }
