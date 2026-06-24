@@ -310,58 +310,70 @@ struct SatelliteCardView: View {
     let sat: SatellitePass
     let location: String
     
+    // ✅ RESPONSIVE: Listens directly to the device window width size class environment
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    
+    // ✅ RESPONSIVE: Calculates fluid proportional width boundaries without hardcoded pixels
+    private var responsiveCardWidth: CGFloat {
+        if horizontalSizeClass == .regular {
+            return 260.0
+        } else {
+            return 190.0
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(sat.name.uppercased())
-                .font(.system(.subheadline, design: .monospaced))
+                .font(.system(horizontalSizeClass == .regular ? .body : .subheadline, design: .monospaced))
                 .fontWeight(.bold)
                 .foregroundColor(.white)
                 .lineLimit(1)
             
             Text(sat.localDisplayTime.uppercased())
-                .font(.system(.caption, design: .monospaced))
+                .font(.system(horizontalSizeClass == .regular ? .subheadline : .caption, design: .monospaced))
                 .foregroundColor(.yellow)
             
             if !location.isEmpty {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.and.ellipse")
-                        .font(.system(size: 10))
+                        .font(.system(size: horizontalSizeClass == .regular ? 11 : 10))
                     Text(location.uppercased())
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(size: horizontalSizeClass == .regular ? 11 : 10, design: .monospaced))
                         .lineLimit(1)
                 }
                 .foregroundColor(.cyan)
                 .padding(.top, -2)
             }
             
-            // ✨ NEW: Dynamic Compass Vector Route Trajectory Badge
             HStack(spacing: 4) {
                 Image(systemName: "safari")
-                    .font(.system(size: 9))
+                    .font(.system(size: horizontalSizeClass == .regular ? 10 : 9))
                 Text(sat.travelDirection.uppercased())
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: horizontalSizeClass == .regular ? 10 : 9, design: .monospaced))
                     .fontWeight(.semibold)
             }
-            .foregroundColor(.green) // Choose any active accent color color like .green or .indigo
+            .foregroundColor(.green)
             .padding(.vertical, 2)
             
             HStack(spacing: 4) {
                 Image(systemName: "scope")
                     .font(.caption2)
                 Text("HEIGHT: \(Int(sat.peakElevationDegrees))°")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: horizontalSizeClass == .regular ? 11 : 10, design: .monospaced))
                 
                 Spacer()
                 
                 Image(systemName: "clock")
                     .font(.caption2)
                 Text("\(sat.durationMinutes) MIN")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: horizontalSizeClass == .regular ? 11 : 10, design: .monospaced))
             }
             .foregroundColor(.gray)
         }
-        .padding(14)
-        .frame(width: 220, alignment: .leading)
+        .padding(horizontalSizeClass == .regular ? 16 : 14)
+        // ✅ RESPONSIVE: Locked smoothly to size-class boundaries instead of a static point value
+        .frame(width: responsiveCardWidth, alignment: .leading)
         .background(Color.white.opacity(0.04))
         .cornerRadius(6)
         .overlay(
@@ -449,13 +461,20 @@ struct SatelliteDetailSheet: View {
                     }
                     .padding(.bottom, 8)
                     
-                    HStack {
-                        Spacer()
-                        CompassRadarView(pass: sat, userHeading: userHeading)
-                            .aspectRatio(1, contentMode: .fit)
-                        Spacer()
+                    // Live Calibrated Radar Component View
+                    // Live Calibrated Radar Component View
+                    GeometryReader { radarGeometry in
+                        HStack {
+                            Spacer()
+                            CompassRadarView(pass: sat, userHeading: userHeading)
+                                .aspectRatio(1, contentMode: .fit)
+                                // ✅ PURE % OF VIEWPORT WIDTH: Hard-clamps to exactly 55% of the screen box size
+                                .frame(width: radarGeometry.size.width * 0.55)
+                            Spacer()
+                        }
                     }
-                    .padding(.horizontal, 32)
+                    // Uses the viewport width directly to calculate responsive aspect constraints without any size classes
+                    .aspectRatio(1.6, contentMode: .fit)
                     .contentShape(Circle())
                     .onTapGesture {
                         presentFullScreenHUD = true
