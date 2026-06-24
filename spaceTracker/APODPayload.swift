@@ -60,56 +60,29 @@ struct TacticalAmbientBackdropView: View {
     @Binding var showInfoSheet: Bool
     
     var body: some View {
-        ZStack {
-            // Base layer default dark layout backdrop plate
-            Color(red: 0.02, green: 0.02, blue: 0.02)
-                .ignoresSafeArea()
-            
-            // Ambient Network Asset Render Tree Layer
-            if let imgUrl = apodViewModel.backgroundImageURL {
-                AsyncImage(url: imgUrl) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .ignoresSafeArea()
-                            // Crisp star points: No blur lines, balanced visibility opacity factor
-                            .opacity(0.35)
-                            .transition(.opacity.animation(.easeIn(duration: 0.5)))
-                    case .failure(let error):
-                        let _ = print("❌ [APOD IMAGE RENDER FAULT]: \(error.localizedDescription)")
-                        Color.clear
-                    default:
-                        Color.clear
-                    }
-                }
-            }
-            
-            // Corner Info Badge Overlay UI [ i ]
-            if apodViewModel.isLoaded {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: { showInfoSheet = true }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "info.circle")
-                                Text("NASA APOD")
-                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+        // Base layer takes up exactly 100% of the screen bounds
+        Color(red: 0.02, green: 0.02, blue: 0.02)
+            .ignoresSafeArea()
+            // ✅ THE FIX: Image is isolated inside an overlay so it cannot expand your layout containers
+            .overlay(
+                Group {
+                    if let imgUrl = apodViewModel.backgroundImageURL {
+                        AsyncImage(url: imgUrl) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .opacity(0.35)
+                                    .transition(.opacity.animation(.easeIn(duration: 0.5)))
+                            default:
+                                Color.clear
                             }
-                            .foregroundColor(.white.opacity(0.35))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.black.opacity(0.4))
-                            .cornerRadius(4)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
                         }
-                        .padding(16)
                     }
                 }
-            }
-        }
+                .ignoresSafeArea()
+            )
     }
 }
 
@@ -123,38 +96,40 @@ struct APODCreditDetailSheet: View {
         ZStack {
             Color(red: 0.04, green: 0.04, blue: 0.04).ignoresSafeArea()
             
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("NASA ASTRONOMY BACKGROUND //")
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(.yellow)
-                        Text(title.uppercased())
-                            .font(.system(.title3, design: .monospaced))
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
+            // ✅ THE FIX: Wraps the entire layout tree so nothing can get pushed off the phone screen
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("NASA ASTRONOMY BACKGROUND //")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.yellow)
+                            Text(title.uppercased())
+                                .font(.system(.title3, design: .monospaced))
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .fixedSize(horizontal: false, vertical: true) // Prevents title truncation
+                        }
+                        Spacer()
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.gray)
+                        }
                     }
-                    Spacer()
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.gray)
-                    }
-                }
-                
-                ScrollView(showsIndicators: false) {
+                    
                     Text(explanation)
                         .font(.system(.subheadline, design: .monospaced))
                         .foregroundColor(.gray)
                         .lineSpacing(5)
                         .padding(.vertical, 4)
+                        .fixedSize(horizontal: false, vertical: true) // Forces system to render full paragraph text
+                    
+                    Spacer()
                 }
-                
-                Spacer()
+                .padding(24)
             }
-            .padding(24)
         }
         .preferredColorScheme(.dark)
     }
 }
-
