@@ -23,6 +23,7 @@ struct SatellitePass: Codable, Identifiable {
     let utcTimeISO: String
     let peakElevationDegrees: Double
     let durationMinutes: Int
+    let travelDirection: String
     
     var id_swiftui: String {
         return "\(id)-\(utcTimeISO)"
@@ -288,7 +289,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
 // MARK: - 3. THE ISOLATED SUB-VIEW COMPONENT
 struct SatelliteCardView: View {
     let sat: SatellitePass
-    let location: String // Added to receive the view model's city/country string
+    let location: String
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -302,7 +303,6 @@ struct SatelliteCardView: View {
                 .font(.system(.caption, design: .monospaced))
                 .foregroundColor(.yellow)
             
-            // New Location Row Context Matrix
             if !location.isEmpty {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.and.ellipse")
@@ -312,8 +312,19 @@ struct SatelliteCardView: View {
                         .lineLimit(1)
                 }
                 .foregroundColor(.cyan)
-                .padding(.top, -2) // Tighten layout spacing
+                .padding(.top, -2)
             }
+            
+            // ✨ NEW: Dynamic Compass Vector Route Trajectory Badge
+            HStack(spacing: 4) {
+                Image(systemName: "safari")
+                    .font(.system(size: 9))
+                Text(sat.travelDirection.uppercased())
+                    .font(.system(size: 9, design: .monospaced))
+                    .fontWeight(.semibold)
+            }
+            .foregroundColor(.green) // Choose any active accent color color like .green or .indigo
+            .padding(.vertical, 2)
             
             HStack(spacing: 4) {
                 Image(systemName: "scope")
@@ -340,7 +351,6 @@ struct SatelliteCardView: View {
         )
     }
 }
-
 
 // MARK: - 4. THE DETAILED MISSIONS PROFILE SHEET
 struct SatelliteDetailSheet: View {
@@ -402,6 +412,7 @@ struct SatelliteDetailSheet: View {
                     telemetryRow(label: "LAUNCH TIMELINE", value: missionProfile.launched)
                     telemetryRow(label: "PLATFORM TYPE", value: missionProfile.type)
                     telemetryRow(label: "OBSERVER LOCATION", value: location.isEmpty ? "CURRENT POSITION" : location.uppercased())
+                    telemetryRow(label: "FLIGHT TRAJECTORY", value: sat.travelDirection.uppercased())
                     telemetryRow(label: "MAX ELEVATION", value: "\(Int(sat.peakElevationDegrees))° ANGLE")
                     telemetryRow(label: "WINDOW DURATION", value: "\(sat.durationMinutes) MINUTES")
                 }

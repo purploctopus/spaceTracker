@@ -233,10 +233,6 @@ struct ContentView: View {
                                     }
                                     .padding(.horizontal)
                                 }
-                                // UPDATED: Attach sheet binding directly here to launch your updated Detail Sheet layout
-                                .sheet(item: $selectedSatellitePass) { sat in
-                                    SatelliteDetailSheet(sat: sat, location: satViewModel.locationName)
-                                }
                             }
                         }
                         // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
