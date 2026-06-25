@@ -11,7 +11,6 @@ import MapKit
 
 struct ContentView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    // 📡 Global Data Engine Hooks
     @StateObject private var viewModel = LaunchViewModel()
     @StateObject private var satViewModel = SatelliteViewModel()
     @State private var manualCitySearch: String = ""
@@ -26,6 +25,7 @@ struct ContentView: View {
     @State private var showAPODDetails = false
     @State private var stableAPODTitle: String = ""
     @State private var stableAPODExplanation: String = ""
+    @StateObject private var notificationEngine = NotificationManager()
     
     private var toolbarLogoSize: CGFloat {
         // ✅ RESPONSIVE FRACTION: Scales dynamically by measuring the typographic base font profile line height
@@ -380,13 +380,27 @@ struct ContentView: View {
                 UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
             }
             .task {
+                // 1. Request local device alert permissions immediately on workspace load
+                notificationEngine.requestPermission()
+                
+                // 2. Fire down all background API web asset streams
                 await viewModel.fetchLaunches()
                 satViewModel.requestPasses()
                 await rockViewModel.fetchAsteroidRadar()
+                await apodViewModel.fetchDailyBackdrop()
+                
+                // 3. Process dynamic hardware location parameters for meteor streams
                 let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
                 meteorViewModel.generateOutlook(userLatitude: hardwareLat)
-                await apodViewModel.fetchDailyBackdrop()
+                
+                // 4. 💡 THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
+                notificationEngine.scheduleDailyBriefing(
+                    launches: viewModel.launches,
+                    satellites: satViewModel.visiblePasses,
+                    meteorShowers: meteorViewModel.upcomingShowers
+                )
             }
+
         } // Closes NavigationView
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
