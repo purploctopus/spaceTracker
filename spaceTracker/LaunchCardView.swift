@@ -29,7 +29,7 @@ struct LaunchCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // 1. Core Mission Schedule Track Timestamp
             Text(launch.localLaunchTimeDisplay.uppercased())
-                .font(.system(size: horizontalSizeClass == .regular ? 11 : 9, design: .monospaced))
+                .font(.system(size: horizontalSizeClass == .regular ? 13 : 11, design: .monospaced))
                 .foregroundColor(.yellow)
             
             // 2. Identification Configurations Block
@@ -38,13 +38,17 @@ struct LaunchCardView: View {
                     .font(.system(horizontalSizeClass == .regular ? .body : .subheadline, design: .monospaced))
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 
                 Text(launch.launch_service_provider?.name?.uppercased() ?? "GLOBAL RANGE")
                     .font(.system(horizontalSizeClass == .regular ? .caption : .caption2, design: .monospaced))
                     .foregroundColor(.blue)
                     .lineLimit(1)
             }
+            
+            // 💡 THE INJECTED RADAR COUNTDOWN TICKER: Tracks days, hours, and minutes to T-0
+            LaunchCountdownView(targetDateString: launch.net)
+                .padding(.top, 2)
         }
         .padding(horizontalSizeClass == .regular ? 16 : 12)
         // ✅ RESPONSIVE: Binds the structural layout frame constraints to the dynamic size-class property
