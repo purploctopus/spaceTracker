@@ -33,7 +33,7 @@ struct ContentView: View {
         
         if horizontalSizeClass == .regular {
             // Amplified scaling factor proportional to large-screen layout metrics
-            return bodyFontMetric * 5
+            return bodyFontMetric * 4
         } else {
             // Streamlined scaling factor proportional to mobile phone screen layouts
             return bodyFontMetric * 3
@@ -326,8 +326,8 @@ struct ContentView: View {
                 .toolbar {
                     ToolbarItem(placement: .principal) {
                         HStack(spacing: horizontalSizeClass == .regular ? 16 : 10) {
-                            Image("logo_transparent")
-                                .renderingMode(.template)
+                            Image("earthBlueSLS")
+                              //  .renderingMode(.template)
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: toolbarLogoSize, height: toolbarLogoSize)
@@ -340,7 +340,7 @@ struct ContentView: View {
                                 .tracking(2)
                             
                             Image("logo_transparent")
-                                .renderingMode(.template)
+                            //    .renderingMode(.template)
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: toolbarLogoSize, height: toolbarLogoSize)
