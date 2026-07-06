@@ -26,6 +26,7 @@ struct ContentView: View {
     @State private var stableAPODTitle: String = ""
     @State private var stableAPODExplanation: String = ""
     @StateObject private var notificationEngine = NotificationManager()
+    @StateObject private var crewViewModel = AstronautViewModel()
     
     private var toolbarLogoSize: CGFloat {
         // ✅ RESPONSIVE FRACTION: Scales dynamically by measuring the typographic base font profile line height
@@ -317,6 +318,45 @@ struct ContentView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals meteor section horizontal container
+                        // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("ACTIVE ORBITAL CREW RECON (\(crewViewModel.totalHumansInOrbit) ACTIVE)")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .tracking(2)
+                                .padding(.horizontal)
+                            
+                            if crewViewModel.isLoading {
+                                Text("SYNCHRONIZING OPEN MANIFEST...")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.gray)
+                                    .padding(.horizontal)
+                            } else if let error = crewViewModel.errorMessage {
+                                Text(error)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.red)
+                                    .padding(.horizontal)
+                            } else {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        // 💡 Draw separate cards for each active space vessel dynamically
+                                        if !crewViewModel.issCrew.isEmpty {
+                                            SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
+                                        }
+                                        
+                                        if !crewViewModel.tiangongCrew.isEmpty {
+                                            SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
+                                        }
+                                        
+                                        if !crewViewModel.otherCrew.isEmpty {
+                                            SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
+
                     } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
                     .padding(.bottom, 60)
@@ -379,6 +419,7 @@ struct ContentView: View {
                 UINavigationBar.appearance().compactAppearance = navigationBarAppearance
                 UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
             }
+            // 💡 KEEP YOUR EXACT 4-STEP PIPELINE COMPLETELY UNTOUCHED:
             .task {
                 // 1. Request local device alert permissions immediately on workspace load
                 notificationEngine.requestPermission()
@@ -393,14 +434,18 @@ struct ContentView: View {
                 let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
                 meteorViewModel.generateOutlook(userLatitude: hardwareLat)
                 
-                // 4. 💡 THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
+                // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
                 notificationEngine.scheduleDailyBriefing(
                     launches: viewModel.launches,
                     satellites: satViewModel.visiblePasses,
                     meteorShowers: meteorViewModel.upcomingShowers
                 )
             }
-
+            // 💡 ADD THIS INDEPENDENT LANE IMMEDIATELY UNDERNEATH:
+            .task {
+                print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
+                await crewViewModel.fetchAstronautRoster()
+            }
         } // Closes NavigationView
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
