@@ -105,9 +105,13 @@ struct SpacecraftRosterCardView: View {
                     }
                 }
             }
+            
+            // Upper ceiling push spring
+            Spacer(minLength: 0)
         }
         .padding(14)
-        .frame(width: 280, alignment: .top)
+        // 💡 FIXED: Zero hardcoded pixel parameters. Stretches completely dynamically to fill layout space context safely.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.white.opacity(0.04))
         .cornerRadius(6)
         .overlay(

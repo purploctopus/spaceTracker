@@ -339,7 +339,6 @@ struct ContentView: View {
                             } else {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 12) {
-                                        // 💡 Draw separate cards for each active space vessel dynamically
                                         if !crewViewModel.issCrew.isEmpty {
                                             SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
                                         }
@@ -352,6 +351,7 @@ struct ContentView: View {
                                             SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
                                         }
                                     }
+                                    .fixedSize(horizontal: false, vertical: true)
                                     .padding(.horizontal)
                                 }
                             }
