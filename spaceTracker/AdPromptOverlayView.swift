@@ -26,7 +26,7 @@ struct AdPromptOverlayView: View {
             VStack(spacing: 24) {
                 // Tactical Warning Header Row
                 VStack(spacing: 6) {
-                    Image(systemName: "video.badge.checkmark.fill")
+                    Image(systemName: "video.badge.checkmark")
                         .font(.largeTitle)
                         .foregroundColor(.cyan)
                     Text("UNLOCK DAILY DETAILED REPORTS")

@@ -65,6 +65,14 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     
     func requestPasses() {
         print("🤖 [RADAR ENGINE]: requestPasses() triggered by parent view.")
+        
+        // 💡 INSTANT MEMORY BYPASS: If we already have the location data, use it directly and skip the GPS hardware!
+        if !locationName.isEmpty && !visiblePasses.isEmpty {
+            print("📡 [RADAR ENGINE]: Cache hit. Re-using active footprints without re-triggering GPS hardware.")
+            self.isTracking = false
+            return
+        }
+        
         isTracking = true
         errorMessage = nil
         requiresManualSelection = false
@@ -198,6 +206,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         let locationKey = "\(latitude),\(longitude)"
         guard locationKey != lastQueriedLocationVector else {
             print("🤖 [RADAR ENGINE]: Target vector matches existing footprint. Aborting double query stream fetch.")
+            self.isTracking = false
             return
         }
         

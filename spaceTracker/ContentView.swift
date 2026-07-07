@@ -36,7 +36,6 @@ struct ContentView: View {
     @State private var adInterceptActionLabel = ""
     @State private var pendingAdCompletionAction: (() -> Void)? = nil
 
-    
     // 💡 THE COMPILER GATEKEEPER: Standalone modular components prevents type-check freeze loops
     private var stargazingConditionsHeaderBar: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -125,39 +124,35 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - STANDALONE COMPONENT: UNBURDENED PROVIDER LINK ROW
+    // MARK: - STANDALONE COMPONENT: CLEAN PROVIDER LINK ROW
     struct MasterAccessChannelRowView: View {
         let launches: [SpaceLaunch]
         
         var body: some View {
-            NavigationLink(destination: ProviderIndexView(launches: launches)) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("ALL ORBITAL PROVIDERS")
-                            .font(.system(.headline, design: .monospaced))
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .tracking(1)
-                        
-                        // 💡 FIXED: Replaced "FIRM" with "PROVIDER" to accurately cover both space agencies and private corporations
-                        Text("VIEW MANIFEST DATA BY PROVIDER")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(.gray)
-                    }
-                    Spacer()
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .font(.title2)
+            // 💡 FIXED: Completely removed the hardcoded NavigationLink container to stop it from hijacking touches!
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("ALL ORBITAL PROVIDERS")
+                        .font(.system(.headline, design: .monospaced))
+                        .fontWeight(.bold)
                         .foregroundColor(.white)
+                        .tracking(1)
+                    
+                    Text("VIEW MANIFEST DATA BY PROVIDER")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(.gray)
                 }
-                .padding(16)
-                .background(Color.white.opacity(0.05))
-                .cornerRadius(6)
-                .padding(.horizontal)
+                Spacer()
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.title2)
+                    .foregroundColor(.white)
             }
-            .buttonStyle(PlainButtonStyle())
+            .padding(16)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(6)
+            .padding(.horizontal)
         }
     }
-    
     // Extracted button logic to stop Xcode from freezing
     private var nasaApodButton: some View {
         Button(action: { showAPODDetails = true }) {
@@ -445,17 +440,18 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
             } else {
+                // 💡 FIXED: Completely cleaned up and type-safe layout points exclusively to your satellite array dataset
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(upcomingManifest) { launch in
-                            LaunchCardView(launch: launch)
+                        ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { (sat: SatellitePass) in
+                            SatelliteCardView(sat: sat, location: satViewModel.locationName)
                                 .onTapGesture {
                                     // 💡 INTERCEPT GATEKEEPER: Checks if the user has already unlocked access for today
                                     if adEngine.isPremiumUnlocked {
-                                        selectedSpaceLaunch = launch
+                                        selectedSatellitePass = sat
                                     } else {
-                                        adInterceptActionLabel = launch.name
-                                        pendingAdCompletionAction = { selectedSpaceLaunch = launch }
+                                        adInterceptActionLabel = sat.name
+                                        pendingAdCompletionAction = { selectedSatellitePass = sat }
                                         showAdPromptOverlay = true
                                     }
                                 }
@@ -607,11 +603,28 @@ struct ContentView: View {
                                 .padding(.horizontal)
                                 .padding(.bottom, 10)
                             
-                            // 💡 FIXED: Calling an independent view struct isolates the type-checker math completely
-                            MasterAccessChannelRowView(launches: viewModel.launches)
+                            // 💡 THE DIRECT REIFIED CHECK:
+                            if adEngine.isPremiumUnlocked {
+                                // YES OK -> Just wrap the card in a standard, direct NavigationLink push
+                                NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
+                                    MasterAccessChannelRowView(launches: viewModel.launches)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                            } else {
+                                // NO -> Freeze navigation and show your standard ad prompt overlay grid
+                                Button(action: {
+                                    adInterceptActionLabel = "Global Orbital Providers Directory"
+                                    pendingAdCompletionAction = { } // Clears out on video close
+                                    showAdPromptOverlay = true
+                                }) {
+                                    MasterAccessChannelRowView(launches: viewModel.launches)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Binds the layout matrix block width safely
-                        
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
                         // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
                         visibleSatellitesChannelBlock
                             .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Binds the tracking system module bounds safely
