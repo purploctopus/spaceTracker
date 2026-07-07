@@ -29,6 +29,8 @@ struct ContentView: View {
     @StateObject private var crewViewModel = AstronautViewModel()
     @State private var selectedSpacecraftCrewName: String? = nil
     @StateObject private var weatherViewModel = StargazingWeatherViewModel()
+    @State private var selectedAgencyFilter: String = "ALL OPERATIONS"
+
     @StateObject private var adEngine = AdMobEngine()
     @State private var showAdPromptOverlay = false
     @State private var adInterceptActionLabel = ""
@@ -136,7 +138,9 @@ struct ContentView: View {
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                             .tracking(1)
-                        Text("VIEW MANIFEST DATA BY FIRM")
+                        
+                        // 💡 FIXED: Replaced "FIRM" with "PROVIDER" to accurately cover both space agencies and private corporations
+                        Text("VIEW MANIFEST DATA BY PROVIDER")
                             .font(.system(.caption2, design: .monospaced))
                             .foregroundColor(.gray)
                     }
@@ -486,7 +490,6 @@ struct ContentView: View {
         }
     }
 
-    // Isolates the rocket manifest to permanently fix the compiler freeze
     private var upcoming7DayMissionsChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("UPCOMING 7-DAY MISSIONS")
@@ -495,48 +498,90 @@ struct ContentView: View {
                 .tracking(2)
                 .padding(.horizontal)
             
+            // MARK: - 🚀 ORBITAL PROVIDER DYNAMIC PARSER
+            // 💡 FIXED: Uses your exact model property path to extract unique sorted provider names instantly!
+            let dynamicProvidersList: [String] = {
+                let extractedNames = upcomingManifest.compactMap { launch in
+                    launch.launch_service_provider?.name ?? "UNKNOWN PROVIDER"
+                }
+                let uniqueSet = Set(extractedNames)
+                return ["ALL OPERATIONS"] + uniqueSet.sorted()
+            }()
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(dynamicProvidersList, id: \.self) { filterName in
+                        Button(action: { selectedAgencyFilter = filterName }) {
+                            Text(filterName.uppercased()) // Keeps the monospaced look consistent
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(selectedAgencyFilter == filterName ? .black : .gray)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(selectedAgencyFilter == filterName ? Color.cyan : Color.white.opacity(0.04))
+                                .cornerRadius(4)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(selectedAgencyFilter == filterName ? Color.cyan : Color.white.opacity(0.08), lineWidth: 1)
+                                )
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.bottom, 4)
+            
             if viewModel.isLoading {
                 ProgressView("POLLING LOGS...")
                     .font(.system(.caption, design: .monospaced))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
-            } else if upcomingManifest.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("NO TARGET OPERATIONS THIS WEEK")
-                        .font(.system(.subheadline, design: .monospaced))
-                        .fontWeight(.bold)
-                        .foregroundColor(.orange)
-                    Text("STANDBY STATUS ACTIVE")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundColor(.gray)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.02))
-                .cornerRadius(4)
-                .padding(.horizontal)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(upcomingManifest) { launch in
-                            LaunchCardView(launch: launch)
-                                .onTapGesture {
-                                    // 💡 INTERCEPT GATEKEEPER: Checks if the user has already unlocked access for today
-                                    if adEngine.isPremiumUnlocked {
-                                        selectedSpaceLaunch = launch
-                                    } else {
-                                        adInterceptActionLabel = launch.name
-                                        pendingAdCompletionAction = { selectedSpaceLaunch = launch }
-                                        showAdPromptOverlay = true
-                                    }
-                                }
-                        }
+                // MARK: - 🔎 ZERO-MISS FILTER MATCHING
+                // 💡 FIXED: Matches the active capsule string directly against the nested provider name property data
+                let filteredManifest = upcomingManifest.filter { launch in
+                    if selectedAgencyFilter == "ALL OPERATIONS" { return true }
+                    let providerName = launch.launch_service_provider?.name ?? "UNKNOWN PROVIDER"
+                    return providerName == selectedAgencyFilter
+                }
+                
+                if filteredManifest.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("NO ACTIVE LAUNCH VECTORS FOUND")
+                            .font(.system(.subheadline, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.orange)
+                        Text("STANDBY STATUS ACTIVE FOR SECTOR")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundColor(.gray)
                     }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.02))
+                    .cornerRadius(4)
                     .padding(.horizontal)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(filteredManifest) { launch in
+                                LaunchCardView(launch: launch)
+                                    .onTapGesture {
+                                        if adEngine.isPremiumUnlocked {
+                                            selectedSpaceLaunch = launch
+                                        } else {
+                                            adInterceptActionLabel = launch.name
+                                            pendingAdCompletionAction = { selectedSpaceLaunch = launch }
+                                            showAdPromptOverlay = true
+                                        }
+                                    }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
                 }
             }
         }
     }
+
 
     var body: some View {
         NavigationView {

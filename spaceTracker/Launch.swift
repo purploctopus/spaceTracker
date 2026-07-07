@@ -24,7 +24,7 @@ struct SpaceLaunch: Decodable, Identifiable {
     let status: LaunchStatus?
     let rocket: RocketInfo?
     let mission: MissionObjective?
-    let image: LaunchImage? // 💡 CRITICAL FIX: Maps to the v2.3.0 'image' nested object wrapper
+    let image: LaunchImage?
     
     // 💡 THE DATE DECODER EXTENSION: Formats the raw timestamp into clear calendar layouts
     var localLaunchTimeDisplay: String {
