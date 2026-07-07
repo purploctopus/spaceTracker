@@ -26,20 +26,21 @@ struct AdPromptOverlayView: View {
             VStack(spacing: 24) {
                 // Tactical Warning Header Row
                 VStack(spacing: 6) {
-                    Image(systemName: "lock.shield.fill")
+                    Image(systemName: "video.badge.checkmark.fill")
                         .font(.largeTitle)
-                        .foregroundColor(.orange)
-                    Text("DEEP SPACE DATA SYNC REQUIRED")
+                        .foregroundColor(.cyan)
+                    Text("UNLOCK DAILY DETAILED REPORTS")
                         .font(.system(.headline, design: .monospaced))
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                         .tracking(1)
-                    Text("ACCESSING SECURE TELEMETRY FOR: \(actionLabel.uppercased())")
+                    Text("SUPPORT THE TERMINAL // WATCH AN AD TO UNLOCK ALL DATA")
                         .font(.system(size: 9, design: .monospaced))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.orange)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
+
                 
                 Divider()
                     .background(Color.white.opacity(0.15))
@@ -92,7 +93,7 @@ struct AdPromptOverlayView: View {
                         countdownTimer = 0
                         onTriggerAd()
                     }) {
-                        Text(adEngine.isAdReady ? "SYNC STREAM NOW" : "LOADING INTEL...")
+                        Text(adEngine.isAdReady ? "WATCH NOW" : "LOADING INTEL...")
                             .font(.system(.caption, design: .monospaced))
                             .fontWeight(.bold)
                             .foregroundColor(.black)
