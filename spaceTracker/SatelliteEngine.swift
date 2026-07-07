@@ -387,6 +387,8 @@ struct SatelliteCardView: View {
 struct SatelliteDetailSheet: View {
     @State private var presentFullScreenHUD = false
     let sat: SatellitePass
+    @ObservedObject var weatherEngine: StargazingWeatherViewModel
+
     let location: String
     let userHeading: Double // ✅ FIXED: Explicitly added this plain primitive variable
     @Environment(\.dismiss) var dismiss
@@ -462,7 +464,6 @@ struct SatelliteDetailSheet: View {
                     .padding(.bottom, 8)
                     
                     // Live Calibrated Radar Component View
-                    // Live Calibrated Radar Component View
                     GeometryReader { radarGeometry in
                         HStack {
                             Spacer()
@@ -488,6 +489,15 @@ struct SatelliteDetailSheet: View {
                         telemetryRow(label: "FLIGHT TRAJECTORY", value: sat.travelDirection.uppercased())
                         telemetryRow(label: "MAX ELEVATION", value: "\(Int(sat.peakElevationDegrees))° ANGLE")
                         telemetryRow(label: "WINDOW DURATION", value: "\(sat.durationMinutes) MINUTES")
+                        
+                        // 💡 INTEGRATED WEATERKIT DATA MATRIX: Appended directly inside your original table container row
+                        if weatherEngine.isLoading {
+                            telemetryRow(label: "ATMOSPHERIC RADAR", value: "POLLING APPLE WEATHER ENGINE...")
+                        } else {
+                            telemetryRow(label: "LOCAL CLOUD COVER", value: "\(weatherEngine.cloudCoverPercent)% CLOUDS")
+                            telemetryRow(label: "RELATIVE MOISTURE", value: "\(weatherEngine.humidityPercent)% HUMIDITY")
+                            telemetryRow(label: "SKY OPTICAL RATING", value: weatherEngine.observationRating)
+                        }
                     }
                     .border(Color.white.opacity(0.1), width: 1)
                     
@@ -507,6 +517,12 @@ struct SatelliteDetailSheet: View {
         .preferredColorScheme(.dark)
         .fullScreenCover(isPresented: $presentFullScreenHUD) {
             SatelliteTacticalHUDView(pass: sat, userHeading: userHeading)
+        }
+        // 💡 SECURE TASK MODIFIER HOOK: Triggers background telemetry download exactly on overlay bootup
+        .task {
+            let lat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
+            let lng = CLLocationManager().location?.coordinate.longitude ?? -89.4012
+            await weatherEngine.fetchStargazingWeather(lat: lat, lng: lng, targetISO8601Date: sat.utcTimeISO)
         }
     }
     

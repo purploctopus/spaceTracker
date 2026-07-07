@@ -28,6 +28,57 @@ struct ContentView: View {
     @StateObject private var notificationEngine = NotificationManager()
     @StateObject private var crewViewModel = AstronautViewModel()
     @State private var selectedSpacecraftCrewName: String? = nil
+    @StateObject private var weatherViewModel = StargazingWeatherViewModel()
+    
+    // 💡 THE COMPILER GATEKEEPER: Standalone modular component prevents type-check freeze loops
+    private var stargazingConditionsHeaderBar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("LOCAL ATMOSPHERIC RECON")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundColor(.secondary)
+                .tracking(2)
+            
+            HStack(spacing: 16) {
+                // Cloud Cover Readout Block
+                HStack(spacing: 6) {
+                    Image(systemName: "cloud.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
+                        .font(.system(.caption, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                }
+                
+                // Humidity Readout Block
+                HStack(spacing: 6) {
+                    Image(systemName: "humidity.fill")
+                        .font(.caption)
+                        .foregroundColor(.cyan)
+                    Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
+                        .font(.system(.caption, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.cyan)
+                }
+                
+                Spacer()
+                
+                // Operational Sky Status Pill Tag
+                Text(weatherViewModel.observationRating.replacingOccurrences(of: " // ", with: ": "))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(weatherViewModel.cloudCoverPercent > 50 ? .orange : .green)
+            }
+            .padding(12)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 8)
+    }
     
     private var toolbarLogoSize: CGFloat {
         // ✅ RESPONSIVE FRACTION: Scales dynamically by measuring the typographic base font profile line height
@@ -67,6 +118,381 @@ struct ContentView: View {
         }
     }
     
+    // MARK: - STANDALONE COMPONENT: UNBURDENED PROVIDER LINK ROW
+    struct MasterAccessChannelRowView: View {
+        let launches: [SpaceLaunch]
+        
+        var body: some View {
+            NavigationLink(destination: ProviderIndexView(launches: launches)) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ALL ORBITAL PROVIDERS")
+                            .font(.system(.headline, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .tracking(1)
+                        Text("VIEW MANIFEST DATA BY FIRM")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+                .padding(16)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(6)
+                .padding(.horizontal)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+    }
+    
+    // 💡 THE COMPILER FIX: Extracted button logic to stop Xcode from freezing
+    private var nasaApodButton: some View {
+        Button(action: { showAPODDetails = true }) {
+            HStack(spacing: 4) {
+                Image(systemName: "info.circle")
+                Text("NASA APOD")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+            }
+            .foregroundColor(.white.opacity(0.35))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.black.opacity(0.4))
+            .cornerRadius(4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+            )
+        }
+        .padding(16)
+    }
+    // 💡 SYSTEM UNBUNDLING INTERCEPT: Extracts meteor layout math to permanently unblock the compiler
+    private var annualMeteorShowerChannelBlock: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("ANNUAL METEOR SHOWER OUTLOOK")
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
+                .tracking(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+            
+            if meteorViewModel.upcomingShowers.isEmpty {
+                Text("STANDBY LOGS LOADING...")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(meteorViewModel.upcomingShowers) { shower in
+                            MeteorShowerCardView(shower: shower, userLatitude: universalLatitude)
+                                .onTapGesture {
+                                    selectedMeteorShower = shower
+                                }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+    
+    // 💡 ULTIMATE TRUNK CLEANUP: Isolates the asteroid calculations to fully stabilize the compiler
+    private var nasaAsteroidRadarChannelBlock: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("NEAR-EARTH OBJECTS RADAR (7-DAY)")
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
+                .tracking(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+            
+            if rockViewModel.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView("SCANNING JPL DEEP SPACE NETWORK...")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.gray)
+                    Spacer()
+                }
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .center)
+            } else if let error = rockViewModel.errorMessage {
+                Text(error)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.red)
+                    .padding(.horizontal)
+            } else if rockViewModel.asteroids.isEmpty {
+                Text("RADAR RANGE CLEAR")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.green)
+                    .padding(.horizontal)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(rockViewModel.asteroids) { asteroid in
+                            AsteroidCardView(asteroid: asteroid)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+    
+    // 💡 THE FINAL DATA LANE CLEANUP: Isolates human crew rendering to guarantee swift compiling
+    private var liveHumansInSpaceChannelBlock: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("ACTIVE ORBITAL CREW RECON (\(crewViewModel.totalHumansInOrbit) ACTIVE)")
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
+                .tracking(2)
+                .padding(.horizontal)
+            
+            if crewViewModel.isLoading {
+                Text("SYNCHRONIZING OPEN MANIFEST...")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
+            } else if let error = crewViewModel.errorMessage {
+                Text(error)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.red)
+                    .padding(.horizontal)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        if !crewViewModel.issCrew.isEmpty {
+                            SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
+                                .onTapGesture {
+                                    selectedSpacecraftCrewName = "International Space Station"
+                                }
+                        }
+                        
+                        if !crewViewModel.tiangongCrew.isEmpty {
+                            SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
+                                .onTapGesture {
+                                    selectedSpacecraftCrewName = "Tiangong Space Station"
+                                }
+                        }
+                        
+                        if !crewViewModel.otherCrew.isEmpty {
+                            SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
+                                .onTapGesture {
+                                    selectedSpacecraftCrewName = "Experimental Transits"
+                                }
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+    
+    // 💡 THE COMPILER FIX: Extracted the location entry box to fix the layout freeze
+    private var universalLocationSearchBox: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(satViewModel.errorMessage ?? "ENTER LOCATION MANUALLY")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundColor(satViewModel.errorMessage != nil ? .red : .orange)
+                .padding(.horizontal)
+            
+            HStack(spacing: 12) {
+                TextField("ENTER CITY NAME (EG. MADISON)", text: $manualCitySearch)
+                    .font(.system(.subheadline, design: .monospaced))
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.characters)
+                    .padding(12)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(4)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+                
+                Button(action: {
+                    executeUniversalCitySearch()
+                }) {
+                    Image(systemName: "magnifyingglass.circle.fill")
+                        .font(.title)
+                        .foregroundColor(.cyan)
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    // 💡 THE SATELLITE OPERATIONS UNBUNDLING BLOCK: Safely unloads complex view logic from the main layout tree
+    private var visibleSatellitesChannelBlock: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Divider()
+                .background(Color.white.opacity(0.1))
+            Text("OVERHEAD VISUAL TRACKS (48H)")
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
+                .tracking(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+            
+            if satViewModel.isTracking {
+                VStack(spacing: 12) {
+                    HStack {
+                        Spacer()
+                        ProgressView("COMPUTING SKY FOOTPRINT...")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.gray)
+                        Spacer()
+                    }
+                    
+                    Button(action: {
+                        satViewModel.isTracking = false
+                        satViewModel.requiresManualSelection = true
+                    }) {
+                        Text("CHOOSE CITY MANUALLY ❯")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundColor(.cyan)
+                            .underline()
+                    }
+                }
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if satViewModel.requiresManualSelection || !(satViewModel.errorMessage?.isEmpty ?? true) {
+                // THE SEARCH CONSOLE: Universal Geocoding Lookup Box Layout
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(satViewModel.errorMessage ?? "ENTER LOCATION MANUALLY")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(satViewModel.errorMessage != nil ? .red : .orange)
+                        .padding(.horizontal)
+                    
+                    HStack(spacing: 12) {
+                        TextField("ENTER CITY NAME (EG. MADISON)", text: $manualCitySearch)
+                            .font(.system(.subheadline, design: .monospaced))
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.characters)
+                            .padding(12)
+                            .background(Color.white.opacity(0.04))
+                            .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                        
+                        Button(action: {
+                            executeUniversalCitySearch()
+                        }) {
+                            Image(systemName: "magnifyingglass.circle.fill")
+                                .font(.title)
+                                .foregroundColor(.cyan)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if satViewModel.visiblePasses.isEmpty {
+                Button(action: { satViewModel.requestPasses() }) {
+                    HStack {
+                        Text("INITIALIZE BACKYARD RADAR")
+                            .font(.system(.subheadline, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.cyan)
+                        Spacer()
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .foregroundColor(.cyan)
+                    }
+                    .padding(16)
+                    .background(Color.white.opacity(0.03))
+                    .border(Color.cyan.opacity(0.3), width: 1)
+                    .padding(.horizontal)
+                }
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { sat in
+                            // 💡 FIXED: Supplied the exact location parameter requested by your file target
+                            SatelliteCardView(sat: sat, location: satViewModel.locationName)
+                                .onTapGesture {
+                                    selectedSatellitePass = sat
+                                }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+    
+    // 💡 FIXED: Accepts the size class as a parameter to keep layout calculations separate
+    private func principalToolbarHeaderTitleStack(sizeClass: UserInterfaceSizeClass?) -> some View {
+        HStack(spacing: sizeClass == .regular ? 16 : 10) {
+            Image("earthBlueSLS")
+                .resizable()
+                .scaledToFit()
+                .frame(width: toolbarLogoSize, height: toolbarLogoSize)
+                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
+            
+            Text("DAILY COMMAND")
+                .font(.system(sizeClass == .regular ? .body : .subheadline, design: .monospaced))
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .tracking(2)
+            
+            Image("logo_transparent")
+                .resizable()
+                .scaledToFit()
+                .frame(width: toolbarLogoSize, height: toolbarLogoSize)
+                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
+        }
+    }
+
+    // 💡 THE ULTIMATE TRUNK CLEANUP: Isolates the rocket manifest to permanently fix the compiler freeze
+    private var upcoming7DayMissionsChannelBlock: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("UPCOMING 7-DAY MISSIONS")
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
+                .tracking(2)
+                .padding(.horizontal)
+            
+            if viewModel.isLoading {
+                ProgressView("POLLING LOGS...")
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+            } else if upcomingManifest.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("NO TARGET OPERATIONS THIS WEEK")
+                        .font(.system(.subheadline, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.orange)
+                    Text("STANDBY STATUS ACTIVE")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(.gray)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.02))
+                .cornerRadius(4)
+                .padding(.horizontal)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(upcomingManifest) { launch in
+                            LaunchCardView(launch: launch)
+                                .onTapGesture {
+                                    selectedSpaceLaunch = launch
+                                }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -74,329 +500,54 @@ struct ContentView: View {
                 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 32) {
-                        
-                        // 1. WEEKLY MANIFEST SECTION BLOCK
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("UPCOMING 7-DAY MISSIONS")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundColor(.secondary)
-                                .tracking(2)
-                                .padding(.horizontal)
-                            
-                            if viewModel.isLoading {
-                                ProgressView("POLLING LOGS...")
-                                    .font(.system(.caption, design: .monospaced))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 20)
-                            } else if upcomingManifest.isEmpty {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("NO TARGET OPERATIONS THIS WEEK")
-                                        .font(.system(.subheadline, design: .monospaced))
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.orange)
-                                    Text("STANDBY STATUS ACTIVE")
-                                        .font(.system(.caption2, design: .monospaced))
-                                        .foregroundColor(.gray)
-                                }
-                                .padding(16)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.white.opacity(0.02))
-                                .cornerRadius(4)
-                                .padding(.horizontal)
-                            } else {
-                                // ✅ FIXED: Replaced your old vertical loop with the smooth horizontal scroll view
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 12) {
-                                        ForEach(upcomingManifest) { launch in
-                                            LaunchCardView(launch: launch)
-                                                .onTapGesture {
-                                                    selectedSpaceLaunch = launch
-                                                }
-                                        }
-                                    }
-                                    .padding(.horizontal)
+                        stargazingConditionsHeaderBar
+                        // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL
+                        upcoming7DayMissionsChannelBlock
+                            .toolbar {
+                                ToolbarItem(placement: .principal) {
+                                    principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
                                 }
                             }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Clamps the block layout width
+                            .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Clamps the block layout width
                         
                         // 3. MASTER ACCESS CHANNEL ROADWAY LINK
                         VStack(alignment: .leading, spacing: 12) {
-                            NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("ALL ORBITAL PROVIDERS")
-                                            .font(.system(.headline, design: .monospaced))
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.white)
-                                            .tracking(1)
-                                        Text("VIEW MANIFEST DATA BY FIRM")
-                                            .font(.system(.caption2, design: .monospaced))
-                                            .foregroundColor(.gray)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "line.3.horizontal.decrease.circle")
-                                        .font(.title2)
-                                        .foregroundColor(.white)
-                                }
-                                .padding(16)
-                                .background(Color.white.opacity(0.05))
-                                .cornerRadius(6)
+                            Divider()
+                                .background(Color.white.opacity(0.15))
                                 .padding(.horizontal)
-                            }
-                            .buttonStyle(PlainButtonStyle())
+                                .padding(.bottom, 10)
+                            
+                            // 💡 FIXED: Calling an independent view struct isolates the type-checker math completely
+                            MasterAccessChannelRowView(launches: viewModel.launches)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Binds the layout matrix block width safely
                         
                         // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
-                        VStack(alignment: .leading, spacing: 16) {
-                            Divider()
-                                .background(Color.white.opacity(0.1))
-                            Text("OVERHEAD VISUAL TRACKS (48H)")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundColor(.secondary)
-                                .tracking(2)
-                                .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Keeps header baseline aligned left
-                                .padding(.horizontal)
-                            
-                            if satViewModel.isTracking {
-                                VStack(spacing: 12) {
-                                    HStack {
-                                        Spacer()
-                                        ProgressView("COMPUTING SKY FOOTPRINT...")
-                                            .font(.system(.caption, design: .monospaced))
-                                            .foregroundColor(.gray)
-                                        Spacer()
-                                    }
-                                    
-                                    Button(action: {
-                                        satViewModel.isTracking = false
-                                        satViewModel.requiresManualSelection = true
-                                    }) {
-                                        Text("CHOOSE CITY MANUALLY ❯")
-                                            .font(.system(.caption2, design: .monospaced))
-                                            .foregroundColor(.cyan)
-                                            .underline()
-                                    }
-                                }
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Prevents loading block width leakage
-                            } else if satViewModel.requiresManualSelection || !(satViewModel.errorMessage?.isEmpty ?? true) {
-                                // THE SEARCH CONSOLE: Universal Geocoding Lookup Box Layout
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text(satViewModel.errorMessage ?? "ENTER LOCATION MANUALLY")
-                                        .font(.system(.caption2, design: .monospaced))
-                                        .foregroundColor(satViewModel.errorMessage != nil ? .red : .orange)
-                                        .padding(.horizontal)
-                                    
-                                    HStack(spacing: 12) {
-                                        TextField("ENTER CITY NAME (EG. MADISON)", text: $manualCitySearch)
-                                            .font(.system(.subheadline, design: .monospaced))
-                                            .autocorrectionDisabled()
-                                            .textInputAutocapitalization(.characters)
-                                            .padding(12)
-                                            .background(Color.white.opacity(0.04))
-                                            .cornerRadius(4)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                            )
-                                        
-                                        Button(action: {
-                                            // 💡 CLEAN ACTION TRIGGER: Dispatches to helper function below
-                                            executeUniversalCitySearch()
-                                        }) {
-                                            Image(systemName: "magnifyingglass.circle.fill")
-                                                .font(.title)
-                                                .foregroundColor(.cyan)
-                                        }
-                                    }
-                                    .padding(.horizontal)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Prevents input layout stretch blocks
-                            } else if satViewModel.visiblePasses.isEmpty {
-                                Button(action: { satViewModel.requestPasses() }) {
-                                    HStack {
-                                        Text("INITIALIZE BACKYARD RADAR")
-                                            .font(.system(.subheadline, design: .monospaced))
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.cyan)
-                                        Spacer()
-                                        Image(systemName: "antenna.radiowaves.left.and.right")
-                                            .foregroundColor(.cyan)
-                                    }
-                                    .padding(16)
-                                    .background(Color.white.opacity(0.03))
-                                    .border(Color.cyan.opacity(0.3), width: 1)
-                                    .padding(.horizontal)
-                                }
-                            } else {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 12) {
-                                        ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { sat in
-                                            // UPDATED: Now passing the location name dynamically down into the card matrix layout
-                                            SatelliteCardView(sat: sat, location: satViewModel.locationName)
-                                                .onTapGesture {
-                                                    selectedSatellitePass = sat
-                                                }
-                                        }
-                                    }
-                                    .padding(.horizontal)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Binds the tracking system module bounds safely
+                        visibleSatellitesChannelBlock
+                            .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Binds the tracking system module bounds safely
                         
                         // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("NEAR-EARTH OBJECTS RADAR (7-DAY)")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundColor(.secondary)
-                                .tracking(2)
-                                .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Keeps header baseline aligned left
-                                .padding(.horizontal)
-                            
-                            if rockViewModel.isLoading {
-                                HStack {
-                                    Spacer()
-                                    ProgressView("SCANNING JPL DEEP SPACE NETWORK...")
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundColor(.gray)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity, alignment: .center) // ✅ FIXED: Clamps progress bar bounds
-                            } else if let error = rockViewModel.errorMessage {
-                                Text(error)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.red)
-                                    .padding(.horizontal)
-                            } else if rockViewModel.asteroids.isEmpty {
-                                Text("RADAR RANGE CLEAR")
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.green)
-                                    .padding(.horizontal)
-                            } else {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 12) {
-                                        ForEach(rockViewModel.asteroids) { asteroid in
-                                            AsteroidCardView(asteroid: asteroid)
-                                        }
-                                    }
-                                    .padding(.horizontal)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals asteroid section horizontal container
+                        nasaAsteroidRadarChannelBlock
+                            .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals asteroid section horizontal container
                         
                         // 🛰️ 4. ANNUAL METEOR SHOWER LOOKAHEAD MANIFEST CHANNEL
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("ANNUAL METEOR SHOWER OUTLOOK")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundColor(.secondary)
-                                .tracking(2)
-                                .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Keeps header baseline aligned left
-                                .padding(.horizontal)
-                            
-                            if meteorViewModel.upcomingShowers.isEmpty {
-                                Text("STANDBY LOGS LOADING...")
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.gray)
-                                    .padding(.horizontal)
-                            } else {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 12) {
-                                        ForEach(meteorViewModel.upcomingShowers) { shower in
-                                            MeteorShowerCardView(shower: shower, userLatitude: universalLatitude)
-                                            // 💡 INJECTED TAP TRIGGER: Captures shower data reference token on touch tap
-                                                .onTapGesture {
-                                                    selectedMeteorShower = shower
-                                                }
-                                        }
-                                    }
-                                    .padding(.horizontal)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals meteor section horizontal container
+                        annualMeteorShowerChannelBlock
+                            .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals meteor section horizontal container
+                        
                         // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                if !crewViewModel.issCrew.isEmpty {
-                                    SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
-                                        // 💡 INJECTED TAP TRIGGER: Captures specific name string on touch tap
-                                        .onTapGesture {
-                                            selectedSpacecraftCrewName = "International Space Station"
-                                        }
-                                }
-                                
-                                if !crewViewModel.tiangongCrew.isEmpty {
-                                    SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
-                                        .onTapGesture {
-                                            selectedSpacecraftCrewName = "Tiangong Space Station"
-                                        }
-                                }
-                                
-                                if !crewViewModel.otherCrew.isEmpty {
-                                    SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
-                                        .onTapGesture {
-                                            selectedSpacecraftCrewName = "Experimental Transits"
-                                        }
-                                }
-                            }
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal)
-                        }
+                        liveHumansInSpaceChannelBlock
                     } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
                     .padding(.bottom, 60)
                 } // Closes ScrollView
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(.hidden, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        HStack(spacing: horizontalSizeClass == .regular ? 16 : 10) {
-                            Image("earthBlueSLS")
-                              //  .renderingMode(.template)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: toolbarLogoSize, height: toolbarLogoSize)
-                                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
-                            
-                            Text("DAILY COMMAND")
-                                .font(.system(horizontalSizeClass == .regular ? .body : .subheadline, design: .monospaced))
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .tracking(2)
-                            
-                            Image("logo_transparent")
-                            //    .renderingMode(.template)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: toolbarLogoSize, height: toolbarLogoSize)
-                                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
-                        }
-                    }
-                }
                 
                 VStack {
                     Spacer()
                     HStack {
                         Spacer()
-                        Button(action: { showAPODDetails = true }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "info.circle")
-                                Text("NASA APOD")
-                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                            }
-                            .foregroundColor(.white.opacity(0.35))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.black.opacity(0.4))
-                            .cornerRadius(4)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
-                        }
-                        .padding(16)
+                        nasaApodButton
                     }
                 }
                 .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
@@ -409,7 +560,7 @@ struct ContentView: View {
                 UINavigationBar.appearance().compactAppearance = navigationBarAppearance
                 UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
             }
-            // 💡 KEEP YOUR EXACT 4-STEP PIPELINE COMPLETELY UNTOUCHED:
+            // 💡 KEEP YOUR EXACT 4-STEP PIPELINE COMPLETELY UNTOUCHED (WITH WEATHER PRE-FETCH ADDED):
             .task {
                 // 1. Request local device alert permissions immediately on workspace load
                 notificationEngine.requestPermission()
@@ -422,7 +573,12 @@ struct ContentView: View {
                 
                 // 3. Process dynamic hardware location parameters for meteor streams
                 let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
+                let hardwareLng = CLLocationManager().location?.coordinate.longitude ?? -89.4012 // Added longitude variable safely
                 meteorViewModel.generateOutlook(userLatitude: hardwareLat)
+                
+                // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
+                let currentISOString = ISO8601DateFormatter().string(from: Date())
+                await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
                 
                 // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
                 notificationEngine.scheduleDailyBriefing(
@@ -431,7 +587,7 @@ struct ContentView: View {
                     meteorShowers: meteorViewModel.upcomingShowers
                 )
             }
-            // 💡 ADD THIS INDEPENDENT LANE IMMEDIATELY UNDERNEATH:
+            // 💡 KEEP THIS INDEPENDENT LANE IMMEDIATELY UNDERNEATH UNTOUCHED:
             .task {
                 print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
                 await crewViewModel.fetchAstronautRoster()
@@ -441,14 +597,6 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showAPODDetails) {
             APODCreditDetailSheet(title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
-        }
-        .sheet(item: $selectedSatellitePass) { pass in
-            SatelliteDetailSheet(
-                sat: pass,
-                location: satViewModel.locationName,
-                userHeading: satViewModel.currentHeading
-            )
-            .presentationSizing(.page)
         }
         .sheet(item: $selectedMeteorShower) { shower in
             MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
@@ -468,8 +616,17 @@ struct ContentView: View {
             let targetedCrew = wrapper.name.contains("International") ? crewViewModel.issCrew : crewViewModel.tiangongCrew
             SpacecraftDetailSheet(craftName: wrapper.name, crewList: targetedCrew, passes: satViewModel.visiblePasses)
         }
-
+        // 💡 FIXED: Uses exact parameter matching and safely unwraps the heading Double value
+        .sheet(item: $selectedSatellitePass) { pass in
+            SatelliteDetailSheet(
+                sat: pass,
+                weatherEngine: weatherViewModel,
+                location: satViewModel.locationName,
+                userHeading: satViewModel.currentHeading
+            )
+        }
     }
+
  // Closes var body: some View
     // 💡 THE UNTANGLED GEOCODING INTERCEPT METHOD: Handles universal vector mapping
     private func executeUniversalCitySearch() {
@@ -496,7 +653,12 @@ struct ContentView: View {
                         // 2. Force meteor view model to dynamically calculate the new horizon ratings
                         meteorViewModel.generateOutlook(userLatitude: coordinate.latitude)
                         
-                        // 3. Dispatch the exact clean coordinates down to your satellite engine network pipeline
+                        // 3. Clear out any previous weather parameters so it refreshes cleanly for the new city
+                        weatherViewModel.cloudCoverPercent = 0
+                        weatherViewModel.humidityPercent = 0
+                        weatherViewModel.observationRating = "POLLING COMPASS DATA..."
+                        
+                        // 4. Dispatch the exact clean coordinates down to your satellite engine network pipeline
                         let latStr = String(format: "%.4f", coordinate.latitude)
                         let lngStr = String(format: "%.4f", coordinate.longitude)
                         satViewModel.selectCityCoordinates(lat: latStr, lng: lngStr)
@@ -515,9 +677,7 @@ struct ContentView: View {
             }
         }
     }
-
 }
-
 
 // MARK: - SUB-VIEW: ALPHABETICAL CORPORATE FIRM DIRECTORY INDEX
 struct ProviderIndexView: View {
