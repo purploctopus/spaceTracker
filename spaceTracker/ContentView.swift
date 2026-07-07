@@ -29,8 +29,13 @@ struct ContentView: View {
     @StateObject private var crewViewModel = AstronautViewModel()
     @State private var selectedSpacecraftCrewName: String? = nil
     @StateObject private var weatherViewModel = StargazingWeatherViewModel()
+    @StateObject private var adEngine = AdMobEngine()
+    @State private var showAdPromptOverlay = false
+    @State private var adInterceptActionLabel = ""
+    @State private var pendingAdCompletionAction: (() -> Void)? = nil
+
     
-    // 💡 THE COMPILER GATEKEEPER: Standalone modular component prevents type-check freeze loops
+    // 💡 THE COMPILER GATEKEEPER: Standalone modular components prevents type-check freeze loops
     private var stargazingConditionsHeaderBar: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("LOCAL ATMOSPHERIC RECON")
@@ -149,7 +154,7 @@ struct ContentView: View {
         }
     }
     
-    // 💡 THE COMPILER FIX: Extracted button logic to stop Xcode from freezing
+    // Extracted button logic to stop Xcode from freezing
     private var nasaApodButton: some View {
         Button(action: { showAPODDetails = true }) {
             HStack(spacing: 4) {
@@ -169,7 +174,7 @@ struct ContentView: View {
         }
         .padding(16)
     }
-    // 💡 SYSTEM UNBUNDLING INTERCEPT: Extracts meteor layout math to permanently unblock the compiler
+    // Extracts meteor layout math to permanently unblock the compiler
     private var annualMeteorShowerChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("ANNUAL METEOR SHOWER OUTLOOK")
@@ -190,7 +195,13 @@ struct ContentView: View {
                         ForEach(meteorViewModel.upcomingShowers) { shower in
                             MeteorShowerCardView(shower: shower, userLatitude: universalLatitude)
                                 .onTapGesture {
-                                    selectedMeteorShower = shower
+                                    if adEngine.isPremiumUnlocked {
+                                        selectedMeteorShower = shower
+                                    } else {
+                                        adInterceptActionLabel = shower.name
+                                        pendingAdCompletionAction = { selectedMeteorShower = shower }
+                                        showAdPromptOverlay = true
+                                    }
                                 }
                         }
                     }
@@ -200,7 +211,7 @@ struct ContentView: View {
         }
     }
     
-    // 💡 ULTIMATE TRUNK CLEANUP: Isolates the asteroid calculations to fully stabilize the compiler
+    // Isolates the asteroid calculations to fully stabilize the compiler
     private var nasaAsteroidRadarChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("NEAR-EARTH OBJECTS RADAR (7-DAY)")
@@ -243,7 +254,7 @@ struct ContentView: View {
         }
     }
     
-    // 💡 THE FINAL DATA LANE CLEANUP: Isolates human crew rendering to guarantee swift compiling
+    // Isolates human crew rendering to guarantee swift compiling
     private var liveHumansInSpaceChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("ACTIVE ORBITAL CREW RECON (\(crewViewModel.totalHumansInOrbit) ACTIVE)")
@@ -267,22 +278,43 @@ struct ContentView: View {
                     HStack(spacing: 12) {
                         if !crewViewModel.issCrew.isEmpty {
                             SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
+                                // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
                                 .onTapGesture {
-                                    selectedSpacecraftCrewName = "International Space Station"
+                                    if adEngine.isPremiumUnlocked {
+                                        selectedSpacecraftCrewName = "International Space Station"
+                                    } else {
+                                        adInterceptActionLabel = "International Space Station Crew"
+                                        pendingAdCompletionAction = { selectedSpacecraftCrewName = "International Space Station" }
+                                        showAdPromptOverlay = true
+                                    }
                                 }
                         }
                         
                         if !crewViewModel.tiangongCrew.isEmpty {
                             SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
+                                // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
                                 .onTapGesture {
-                                    selectedSpacecraftCrewName = "Tiangong Space Station"
+                                    if adEngine.isPremiumUnlocked {
+                                        selectedSpacecraftCrewName = "Tiangong Space Station"
+                                    } else {
+                                        adInterceptActionLabel = "Tiangong Space Station Crew"
+                                        pendingAdCompletionAction = { selectedSpacecraftCrewName = "Tiangong Space Station" }
+                                        showAdPromptOverlay = true
+                                    }
                                 }
                         }
                         
                         if !crewViewModel.otherCrew.isEmpty {
                             SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
+                                // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
                                 .onTapGesture {
-                                    selectedSpacecraftCrewName = "Experimental Transits"
+                                    if adEngine.isPremiumUnlocked {
+                                        selectedSpacecraftCrewName = "Experimental Transits"
+                                    } else {
+                                        adInterceptActionLabel = "Experimental Transit Crew"
+                                        pendingAdCompletionAction = { selectedSpacecraftCrewName = "Experimental Transits" }
+                                        showAdPromptOverlay = true
+                                    }
                                 }
                         }
                     }
@@ -293,7 +325,7 @@ struct ContentView: View {
         }
     }
     
-    // 💡 THE COMPILER FIX: Extracted the location entry box to fix the layout freeze
+    // Extracted the location entry box to fix the layout freeze
     private var universalLocationSearchBox: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(satViewModel.errorMessage ?? "ENTER LOCATION MANUALLY")
@@ -326,7 +358,7 @@ struct ContentView: View {
         }
     }
 
-    // 💡 THE SATELLITE OPERATIONS UNBUNDLING BLOCK: Safely unloads complex view logic from the main layout tree
+    // Safely unloads complex view logic from the main layout tree
     private var visibleSatellitesChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
             Divider()
@@ -411,11 +443,17 @@ struct ContentView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { sat in
-                            // 💡 FIXED: Supplied the exact location parameter requested by your file target
-                            SatelliteCardView(sat: sat, location: satViewModel.locationName)
+                        ForEach(upcomingManifest) { launch in
+                            LaunchCardView(launch: launch)
                                 .onTapGesture {
-                                    selectedSatellitePass = sat
+                                    // 💡 INTERCEPT GATEKEEPER: Checks if the user has already unlocked access for today
+                                    if adEngine.isPremiumUnlocked {
+                                        selectedSpaceLaunch = launch
+                                    } else {
+                                        adInterceptActionLabel = launch.name
+                                        pendingAdCompletionAction = { selectedSpaceLaunch = launch }
+                                        showAdPromptOverlay = true
+                                    }
                                 }
                         }
                     }
@@ -425,7 +463,7 @@ struct ContentView: View {
         }
     }
     
-    // 💡 FIXED: Accepts the size class as a parameter to keep layout calculations separate
+    // Accepts the size class as a parameter to keep layout calculations separate
     private func principalToolbarHeaderTitleStack(sizeClass: UserInterfaceSizeClass?) -> some View {
         HStack(spacing: sizeClass == .regular ? 16 : 10) {
             Image("earthBlueSLS")
@@ -448,7 +486,7 @@ struct ContentView: View {
         }
     }
 
-    // 💡 THE ULTIMATE TRUNK CLEANUP: Isolates the rocket manifest to permanently fix the compiler freeze
+    // Isolates the rocket manifest to permanently fix the compiler freeze
     private var upcoming7DayMissionsChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("UPCOMING 7-DAY MISSIONS")
@@ -483,7 +521,14 @@ struct ContentView: View {
                         ForEach(upcomingManifest) { launch in
                             LaunchCardView(launch: launch)
                                 .onTapGesture {
-                                    selectedSpaceLaunch = launch
+                                    // 💡 INTERCEPT GATEKEEPER: Checks if the user has already unlocked access for today
+                                    if adEngine.isPremiumUnlocked {
+                                        selectedSpaceLaunch = launch
+                                    } else {
+                                        adInterceptActionLabel = launch.name
+                                        pendingAdCompletionAction = { selectedSpaceLaunch = launch }
+                                        showAdPromptOverlay = true
+                                    }
                                 }
                         }
                     }
@@ -552,6 +597,33 @@ struct ContentView: View {
                 }
                 .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
 
+                // 💡 INJECTED PRE-PRESENTATION GATEWAY OVERLAY MESH
+                if showAdPromptOverlay {
+                    AdPromptOverlayView(
+                        adEngine: adEngine,
+                        actionLabel: adInterceptActionLabel,
+                        onTriggerAd: {
+                            // Extract active key controller windows to handle full screen Google rendering
+                            if let rootVC = UIApplication.shared.connectedScenes
+                                .compactMap({ $0 as? UIWindowScene })
+                                .flatMap({ $0.windows })
+                                .first(where: { $0.isKeyWindow })?.rootViewController {
+                                
+                                adEngine.showAd(from: rootVC) {
+                                    // Ad completed! Fire the pending state change and tear down the prompt
+                                    showAdPromptOverlay = false
+                                    pendingAdCompletionAction?()
+                                }
+                            }
+                        },
+                        onDismiss: {
+                            showAdPromptOverlay = false
+                            pendingAdCompletionAction = nil
+                        }
+                    )
+                    .transition(.opacity.animation(.easeInOut))
+                }
+
             } // Closes ZStack
             .onAppear {
                 let navigationBarAppearance = UINavigationBarAppearance()
@@ -560,7 +632,6 @@ struct ContentView: View {
                 UINavigationBar.appearance().compactAppearance = navigationBarAppearance
                 UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
             }
-            // 💡 KEEP YOUR EXACT 4-STEP PIPELINE COMPLETELY UNTOUCHED (WITH WEATHER PRE-FETCH ADDED):
             .task {
                 // 1. Request local device alert permissions immediately on workspace load
                 notificationEngine.requestPermission()
@@ -573,7 +644,7 @@ struct ContentView: View {
                 
                 // 3. Process dynamic hardware location parameters for meteor streams
                 let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
-                let hardwareLng = CLLocationManager().location?.coordinate.longitude ?? -89.4012 // Added longitude variable safely
+                let hardwareLng = CLLocationManager().location?.coordinate.longitude ?? -89.4012
                 meteorViewModel.generateOutlook(userLatitude: hardwareLat)
                 
                 // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
@@ -587,7 +658,6 @@ struct ContentView: View {
                     meteorShowers: meteorViewModel.upcomingShowers
                 )
             }
-            // 💡 KEEP THIS INDEPENDENT LANE IMMEDIATELY UNDERNEATH UNTOUCHED:
             .task {
                 print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
                 await crewViewModel.fetchAstronautRoster()
