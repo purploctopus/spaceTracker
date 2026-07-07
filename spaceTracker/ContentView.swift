@@ -27,6 +27,7 @@ struct ContentView: View {
     @State private var stableAPODExplanation: String = ""
     @StateObject private var notificationEngine = NotificationManager()
     @StateObject private var crewViewModel = AstronautViewModel()
+    @State private var selectedSpacecraftCrewName: String? = nil
     
     private var toolbarLogoSize: CGFloat {
         // ✅ RESPONSIVE FRACTION: Scales dynamically by measuring the typographic base font profile line height
@@ -319,44 +320,33 @@ struct ContentView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals meteor section horizontal container
                         // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("ACTIVE ORBITAL CREW RECON (\(crewViewModel.totalHumansInOrbit) ACTIVE)")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundColor(.secondary)
-                                .tracking(2)
-                                .padding(.horizontal)
-                            
-                            if crewViewModel.isLoading {
-                                Text("SYNCHRONIZING OPEN MANIFEST...")
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.gray)
-                                    .padding(.horizontal)
-                            } else if let error = crewViewModel.errorMessage {
-                                Text(error)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.red)
-                                    .padding(.horizontal)
-                            } else {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 12) {
-                                        if !crewViewModel.issCrew.isEmpty {
-                                            SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                if !crewViewModel.issCrew.isEmpty {
+                                    SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
+                                        // 💡 INJECTED TAP TRIGGER: Captures specific name string on touch tap
+                                        .onTapGesture {
+                                            selectedSpacecraftCrewName = "International Space Station"
                                         }
-                                        
-                                        if !crewViewModel.tiangongCrew.isEmpty {
-                                            SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
+                                }
+                                
+                                if !crewViewModel.tiangongCrew.isEmpty {
+                                    SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
+                                        .onTapGesture {
+                                            selectedSpacecraftCrewName = "Tiangong Space Station"
                                         }
-                                        
-                                        if !crewViewModel.otherCrew.isEmpty {
-                                            SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
+                                }
+                                
+                                if !crewViewModel.otherCrew.isEmpty {
+                                    SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
+                                        .onTapGesture {
+                                            selectedSpacecraftCrewName = "Experimental Transits"
                                         }
-                                    }
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .padding(.horizontal)
                                 }
                             }
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal)
                         }
-
                     } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
                     .padding(.bottom, 60)
@@ -469,6 +459,16 @@ struct ContentView: View {
             }
             .preferredColorScheme(.dark)
         }
+        // Astronaut crew profile manifest sheet container
+        .sheet(item: Binding(
+            get: { selectedSpacecraftCrewName != nil ? CrewSheetIdentifiable(name: selectedSpacecraftCrewName!) : nil },
+            set: { selectedSpacecraftCrewName = $0?.name }
+        )) { wrapper in
+            // 💡 COMPUTES AUTOMATIC CROSS-REFERENCE TELEMETRY ON OPEN
+            let targetedCrew = wrapper.name.contains("International") ? crewViewModel.issCrew : crewViewModel.tiangongCrew
+            SpacecraftDetailSheet(craftName: wrapper.name, crewList: targetedCrew, passes: satViewModel.visiblePasses)
+        }
+
     }
  // Closes var body: some View
     // 💡 THE UNTANGLED GEOCODING INTERCEPT METHOD: Handles universal vector mapping
@@ -565,4 +565,9 @@ struct ProviderIndexView: View {
         .navigationTitle("ORBITAL PROVIDERS")
         .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+struct CrewSheetIdentifiable: Identifiable {
+    var id: String { name }
+    let name: String
 }
