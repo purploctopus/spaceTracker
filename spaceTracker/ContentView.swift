@@ -35,6 +35,9 @@ struct ContentView: View {
     @State private var showAdPromptOverlay = false
     @State private var adInterceptActionLabel = ""
     @State private var pendingAdCompletionAction: (() -> Void)? = nil
+    
+    @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
+
 
     // 💡 THE COMPILER GATEKEEPER: Standalone modular components prevents type-check freeze loops
     private var stargazingConditionsHeaderBar: some View {
@@ -463,27 +466,81 @@ struct ContentView: View {
         }
     }
     
-    // Accepts the size class as a parameter to keep layout calculations separate
+    // Accepts the size class as a parameter to maximize layout readability
     private func principalToolbarHeaderTitleStack(sizeClass: UserInterfaceSizeClass?) -> some View {
-        HStack(spacing: sizeClass == .regular ? 16 : 10) {
-            Image("earthBlueSLS")
-                .resizable()
-                .scaledToFit()
-                .frame(width: toolbarLogoSize, height: toolbarLogoSize)
-                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
+        HStack(alignment: .center, spacing: sizeClass == .regular ? 24 : 14) {
             
-            Text("DAILY COMMAND")
-                .font(.system(sizeClass == .regular ? .body : .subheadline, design: .monospaced))
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .tracking(2)
-            
-            Image("logo_transparent")
+            // 🚀 UPSCALE LEFT LOGO APERTURE
+            Image("launch_logo")
                 .resizable()
-                .scaledToFit()
-                .frame(width: toolbarLogoSize, height: toolbarLogoSize)
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: sizeClass == .regular ? 38 : 28, height: sizeClass == .regular ? 38 : 28)
                 .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
+                .padding(sizeClass == .regular ? 10 : 8)
+                .background(Color.init(red: 0.4, green: 0.8, blue: 0.9).opacity(0.05))
+                .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.init(red: 0.4, green: 0.8, blue: 0.9).opacity(0.2), lineWidth: 1)
+                )
+            
+            // 🚀 CENTRAL CALL SIGN WITH LIVE HARDWARE SYSTEM STATUS BEACON
+            VStack(alignment: .center, spacing: 4) {
+                Text("DAILY COMMAND")
+                    .font(.system(size: sizeClass == .regular ? 24 : 18, weight: .black, design: .monospaced))
+                    .foregroundColor(.white)
+                    .tracking(sizeClass == .regular ? 6 : 3)
+                
+                HStack(spacing: 5) {
+                    // 💡 FIXED: Reads directly from your standalone connectivity manager element!
+                    Circle()
+                        .fill(connectivityMonitor.isSystemOnline ? Color.green : Color.red)
+                        .frame(width: 6, height: 6)
+                        .shadow(color: connectivityMonitor.isSystemOnline ? Color.green.opacity(0.5) : Color.red.opacity(0.5), radius: 3)
+                    
+                    Text(connectivityMonitor.isSystemOnline ? "ORBITAL LINK OPERATIONAL" : "TELEMETRY DISCONNECTED")
+                        .font(.system(size: sizeClass == .regular ? 9 : 8, weight: .bold, design: .monospaced))
+                        .foregroundColor(connectivityMonitor.isSystemOnline ? .gray : .red)
+                        .tracking(1.5)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            
+            // 🚀 UPSCALE RIGHT DESCRIPTOR TEXT
+            if sizeClass == .regular {
+                VStack(alignment: .trailing, spacing: 2) {
+                    let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+                    Text("SYS.VER // \(appVersion)")
+                    
+                    let locationPrefix: String = {
+                        let city = satViewModel.locationName.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                        if city.isEmpty || city.contains("COMPUTING") { return "LOC-PND" }
+                        return "\(String(city.prefix(3)))-USA"
+                    }()
+                    Text("SECTOR  // \(locationPrefix)")
+                }
+                .font(.system(size: sizeClass == .regular ? 9 : 8, weight: .semibold, design: .monospaced))
+                .foregroundColor(.gray)
+                .opacity(0.65)
+                .frame(width: 86, alignment: .trailing)
+            } else {
+                Spacer()
+                    .frame(width: 24)
+            }
         }
+        .padding(.horizontal, sizeClass == .regular ? 20 : 14)
+        .padding(.vertical, sizeClass == .regular ? 18 : 14)
+        .background(Color.black.opacity(0.25))
+        .overlay(
+            VStack {
+                Divider().background(Color.white.opacity(0.12))
+                Spacer()
+                Divider().background(Color.white.opacity(0.12))
+            }
+        )
+        .padding(.horizontal)
+        .padding(.top, sizeClass == .regular ? 16 : 10)
     }
 
     private var upcoming7DayMissionsChannelBlock: some View {
