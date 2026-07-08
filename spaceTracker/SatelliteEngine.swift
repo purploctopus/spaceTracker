@@ -134,27 +134,39 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
 
         print("🤖 [RADAR ENGINE]: Extracted coordinates: Lat \(lat), Lng \(lng)")
         
-        // MARK: - 📡 FIXED: PRODUCTION-GRADE CLGECODER REVERSE GEOCLEANING SEQUENCE
+        // MARK: - 📡 FIXED: HIGH-DENSITY AEROSPACE ADRESS RECONSTRUCTION
         Task {
             let geocoder = CLGeocoder()
             
             do {
-                // Natively process the raw hardware location metrics directly
                 let placemarks = try await geocoder.reverseGeocodeLocation(location)
                 
                 if let verifiedPlacemark = placemarks.first {
-                    // Extract city or locality names cleanly without broken .address property paths
-                    let resolvedCityName = verifiedPlacemark.locality ?? verifiedPlacemark.name ?? "Unknown Location"
+                    // Extract individual street attributes natively from the Apple placemark model
+                    let subThoroughfare = verifiedPlacemark.subThoroughfare ?? "" // e.g., "1-99"
+                    let thoroughfare = verifiedPlacemark.thoroughfare ?? ""       // e.g., "Stockton St"
+                    let locality = verifiedPlacemark.locality ?? "Unknown City"   // e.g., "San Francisco"
+                    
+                    // Combine them into a clean string matching your original format
+                    let streetPart = "\(subThoroughfare) \(thoroughfare)".trimmingCharacters(in: .whitespacesAndNewlines)
+                    let resolvedCityName: String = {
+                        if streetPart.isEmpty {
+                            return locality
+                        } else {
+                            return "\(streetPart), \(locality)" // Reconstructs: "1-99 Stockton St, San Francisco"
+                        }
+                    }()
                     
                     await MainActor.run {
                         self.locationName = resolvedCityName
-                        print("🤖 [RADAR ENGINE]: Successfully resolved GPS hardware coordinates to: \(self.locationName)")
+                        print("🤖 [RADAR ENGINE]: Restored high-density address parameters to: \(self.locationName)")
                     }
                 }
             } catch {
                 print("⚠️ [RADAR ENGINE]: System Core Location Geocoder execution fault: \(error.localizedDescription)")
             }
         }
+
         
         Task { @MainActor in
             await fetchPasses(latitude: lat, longitude: lng)
