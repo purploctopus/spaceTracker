@@ -2,80 +2,72 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- 🛰️ THE GOOGLE MASTER ACCOUNT LINK IDENTITY -->
-    <key>GADApplicationIdentifier</key>
-    <string>ca-app-pub-1070603260872166~2504508868</string>
-
-    <!-- 🛰️ NETWORK SECURITY OVERRIDES WITH NEWLINE FIXED -->
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsArbitraryLoads</key>
-        <true/>
-        <key>NSExceptionDomains</key>
-        <dict>
-            <key>digitaloceanspaces.com</key>
-            <dict>
-                <key>NSExceptionAllowsInsecureHTTPLoads</key>
-                <true/>
-                <key>NSIncludesSubdomains</key>
-                <true/>
-            </dict>
-        </dict>
-    </dict>
-
-    <!-- 🛰️ MAXIMUM REVENUE MARKETPLACE TRACKERS (10 PREMIUM BIDDING CHANNELS) -->
-    <key>SKAdNetworkItems</key>
-    <array>
-        <!-- Google AdMob Market Manager Root Key -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>cstr6suwn9.skadnetwork</string>
-        </dict>
-        <!-- AppLovin MAX Network Engine Core -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>ludvb6z3bs.skadnetwork</string>
-        </dict>
-        <!-- Unity Ads Global Gaming Demand Matrix -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>4dzt52r2t5.skadnetwork</string>
-        </dict>
-        <!-- Mintegral Global Ad Distribution Engine -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>kbd7576vr8.skadnetwork</string>
-        </dict>
-        <!-- ironSource Marketplace Core Vector -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>su67r6k2v3.skadnetwork</string>
-        </dict>
-        <!-- Meta Audience Network Game Display Hub -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>v9wttpbfk9.skadnetwork</string>
-        </dict>
-        <!-- Vungle (Liftoff) Video Demand Target -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>gta9lk7p23.skadnetwork</string>
-        </dict>
-        <!-- InMobi Ad Server Network Engine -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>wzmmz9fp6w.skadnetwork</string>
-        </dict>
-        <!-- Chartboost High-Volume Gaming Direct Buyer -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>f7s53z58qe.skadnetwork</string>
-        </dict>
-        <!-- Pangle (TikTok/ByteDance Gaming Network) -->
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>238da6jt44.skadnetwork</string>
-        </dict>
-    </array>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-1070603260872166~2504508868</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>digitaloceanspaces.com</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>ludvb6z3bs.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>4dzt52r2t5.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>kbd7576vr8.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>su67r6k2v3.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>v9wttpbfk9.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>gta9lk7p23.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>wzmmz9fp6w.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>f7s53z58qe.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>238da6jt44.skadnetwork</string>
+		</dict>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>launch_background</string>
+		<key>UIImageName</key>
+		<string>launch_logo</string>
+	</dict>
 </dict>
 </plist>
