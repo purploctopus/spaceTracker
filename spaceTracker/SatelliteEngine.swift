@@ -61,7 +61,20 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         if CLLocationManager.headingAvailable() {
             locationManager.startUpdatingHeading()
         }
-    }
+        
+        // 💡 FIXED: Make sure this structural check is nested INSIDE these initializer brackets!
+        let savedCity = UserDefaults.standard.string(forKey: "cached_location_name") ?? ""
+        let savedLat = UserDefaults.standard.string(forKey: "cached_latitude") ?? ""
+        let savedLng = UserDefaults.standard.string(forKey: "cached_longitude") ?? ""
+        
+        if !savedCity.isEmpty && !savedLat.isEmpty && !savedLng.isEmpty {
+            self.locationName = savedCity
+            print("📡 [CACHE hit]: Instant terminal initialization using saved footprint metrics.")
+            Task { @MainActor in
+                await self.fetchPasses(latitude: savedLat, longitude: savedLng)
+            }
+        }
+    } // 🎛️ This is the closing bracket of override init()
     
     func requestPasses() {
         print("🤖 [RADAR ENGINE]: requestPasses() triggered by parent view.")
@@ -158,8 +171,21 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
                     }()
                     
                     await MainActor.run {
-                        self.locationName = resolvedCityName
-                        print("🤖 [RADAR ENGINE]: Restored high-density address parameters to: \(self.locationName)")
+                        // 💡 RADAR GUARD: Only trigger a full refresh loop if the user actually shifted cities! [1.13]
+                        if self.locationName != resolvedCityName {
+                            print("🛰️ [SECTOR CHANGED]: Transitioning data channels over to: \(resolvedCityName)")
+                            
+                            // Commit the fresh data points straight over to local system storage memory [1.13]
+                            UserDefaults.standard.set(resolvedCityName, forKey: "cached_location_name")
+                            UserDefaults.standard.set(lat, forKey: "cached_latitude")
+                            UserDefaults.standard.set(lng, forKey: "cached_longitude")
+                            
+                            withAnimation(.easeInOut) {
+                                self.locationName = resolvedCityName
+                            }
+                        } else {
+                            print("🎯 [RADAR GUARD]: Station location matches existing footprint vector fields. Aborting redundant download pipelines.")
+                        }
                     }
                 }
             } catch {
