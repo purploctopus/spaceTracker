@@ -829,7 +829,9 @@ struct ContentView: View {
         Task {
             do {
                 let response = try await search.start()
-                if let coordinate = response.mapItems.first?.location.coordinate {
+                
+                // 💡 FIXED: Changing this to .placemark.coordinate satisfies modern MapKit standards and clears compilation errors instantly
+                if let coordinate = response.mapItems.first?.placemark.coordinate {
                     await MainActor.run {
                         // 1. Commit coordinates to your local universal state parameters instantly
                         self.universalLatitude = coordinate.latitude

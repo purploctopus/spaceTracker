@@ -134,27 +134,25 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
 
         print("🤖 [RADAR ENGINE]: Extracted coordinates: Lat \(lat), Lng \(lng)")
         
-        // Modern MapKit Reverse Geocoding API Sequence
+        // MARK: - 📡 FIXED: PRODUCTION-GRADE CLGECODER REVERSE GEOCLEANING SEQUENCE
         Task {
-            // SAFE UNWRAP: Safely handle the optional failable initialization matrix
-            guard let reverseRequest = MKReverseGeocodingRequest(location: location) else {
-                print("❌ [RADAR ENGINE]: Failed to allocate memory context for MKReverseGeocodingRequest.")
-                return
-            }
+            let geocoder = CLGeocoder()
             
             do {
-                let mapItems = try await reverseRequest.mapItems
+                // Natively process the raw hardware location metrics directly
+                let placemarks = try await geocoder.reverseGeocodeLocation(location)
                 
-                if let localizedMapItem = mapItems.first {
-                    let resolvedCityName = localizedMapItem.address?.shortAddress ?? "Unknown Location"
+                if let verifiedPlacemark = placemarks.first {
+                    // Extract city or locality names cleanly without broken .address property paths
+                    let resolvedCityName = verifiedPlacemark.locality ?? verifiedPlacemark.name ?? "Unknown Location"
                     
                     await MainActor.run {
                         self.locationName = resolvedCityName
-                        print("🤖 [RADAR ENGINE]: Resolved GPS Hardware coordinates to: \(self.locationName)")
+                        print("🤖 [RADAR ENGINE]: Successfully resolved GPS hardware coordinates to: \(self.locationName)")
                     }
                 }
             } catch {
-                print("⚠️ [RADAR ENGINE]: Modern MapKit Reverse Geocoder execution fault: \(error.localizedDescription)")
+                print("⚠️ [RADAR ENGINE]: System Core Location Geocoder execution fault: \(error.localizedDescription)")
             }
         }
         
@@ -280,15 +278,15 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
             do {
                 let response = try await search.start()
                 if let firstItem = response.mapItems.first {
-                    // FIXED: Direct assignment without guard let because location is non-optional
-                    let location = firstItem.location
-                    let coordinate = location.coordinate
+                    
+                    // 💡 FIXED: Extract the location coordinate vector directly from your placemark model
+                    let coordinate = firstItem.placemark.coordinate
                     
                     let lat = String(format: "%.4f", coordinate.latitude)
                     let lng = String(format: "%.4f", coordinate.longitude)
                     
-                    // Using the modern MapKit structural address engine
-                    let formattedName = firstItem.address?.shortAddress ?? firstItem.name ?? query
+                    // 💡 FIXED: Extract the clean city string parameters using standard placemark attributes safely
+                    let formattedName = firstItem.placemark.locality ?? firstItem.name ?? query
                     
                     print("✅ [RADAR ENGINE]: Manual string lookup successful: \(lat), \(lng) for \(formattedName)")
                     
