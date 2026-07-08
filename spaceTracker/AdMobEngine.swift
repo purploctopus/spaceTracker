@@ -9,26 +9,123 @@ import Foundation
 import SwiftUI
 import Combine
 import GoogleMobileAds
+import StoreKit // 💡 INJECTED: Modern StoreKit 2 E-Commerce Framework
 
-// 💡 FIXED: Annotated with @MainActor to safely bind UI state modifications to the main execution thread
 @MainActor
 class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     @Published var isPremiumUnlocked = false
     @Published var isAdReady = false
+    @Published var premiumProduct: Product? // 💡 INJECTED: Stores localized pricing metadata from Apple's servers
+    
+    // 💡 DEFINED: Your production-ready StoreKit Identifier matching App Store Connect configuration profiles
+    private let removeAdsProductID = "com.PurplOctopus.spaceTracker.removeAds"
     
     private var rewardedInterstitialAd: RewardedInterstitialAd?
-    
-    // Google AdMob test identity unit code (safe for developer hardware logging)
     private let testAdUnitID = "ca-app-pub-3940256099942544/6978759866"
+    private var updatesTask: Task<Void, Never>?
     
     override init() {
         super.init()
         checkDailyUnlockStatus()
         loadRewardedInterstitial()
+        
+        // 💡 INJECTED: Listen for remote transaction completions asynchronously on boot
+        updatesTask = listenForTransactions()
+        
+        Task {
+            await fetchStoreProduct()
+            await verifyActivePurchases()
+        }
+    }
+    
+    deinit {
+        updatesTask?.cancel()
+    }
+    
+    // MARK: - 🛍️ STOREKIT 2 MANAGEMENT SYSTEMS
+    
+    /// Pulls localized pricing currency strings directly down from Apple's servers
+    private func fetchStoreProduct() async {
+        do {
+            let products = try await Product.products(for: [removeAdsProductID])
+            self.premiumProduct = products.first
+            print("🛍️ [STOREKIT]: Safely localized currency value: \(self.premiumProduct?.displayPrice ?? "")")
+        } catch {
+            print("❌ [STOREKIT ERROR]: Failed to pull product sheet metrics: \(error)")
+        }
+    }
+    
+    /// Coordinates transaction processing window sheets natively inside the overlay prompts
+    func purchasePremium() async {
+        guard let product = premiumProduct else { return }
+        do {
+            let result = try await product.purchase()
+            switch result {
+            case .success(let verification):
+                let transaction = try verifyTransaction(verification)
+                print("✅ [STOREKIT]: Purchase verified. Granting permanent premium state.")
+                self.isPremiumUnlocked = true
+                UserDefaults.standard.set(true, forKey: "user_purchased_ad_free_forever")
+                await transaction.finish()
+            case .pending, .userCancelled:
+                break
+            @unknown default:
+                break
+            }
+        } catch {
+            print("❌ [STOREKIT ERROR]: Transaction execution fault: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Asserts historic ownership parameters on clean application boots
+    func verifyActivePurchases() async {
+        if UserDefaults.standard.bool(forKey: "user_purchased_ad_free_forever") {
+            self.isPremiumUnlocked = true
+            return
+        }
+        
+        for await result in Transaction.currentEntitlements {
+            if case .verified(let transaction) = result {
+                if transaction.productID == removeAdsProductID {
+                    self.isPremiumUnlocked = true
+                    UserDefaults.standard.set(true, forKey: "user_purchased_ad_free_forever")
+                    return
+                }
+            }
+        }
+    }
+    
+    private func verifyTransaction<T>(_ verification: VerificationResult<T>) throws -> T {
+        switch verification {
+        case .unverified(_, let error): throw error
+        case .verified(let safeSignatures): return safeSignatures
+        }
+    }
+    
+    private func listenForTransactions() -> Task<Void, Never> {
+        Task.detached {
+            for await result in Transaction.updates {
+                if case .verified(let transaction) = result {
+                    await MainActor.run {
+                        if transaction.productID == self.removeAdsProductID {
+                            self.isPremiumUnlocked = true
+                            UserDefaults.standard.set(true, forKey: "user_purchased_ad_free_forever")
+                        }
+                    }
+                    await transaction.finish()
+                }
+            }
+        }
     }
     
     // MARK: - 1. SYNCHRONIZE DATA PATHWAY TIMELINES
     func checkDailyUnlockStatus() {
+        // 💡 CRUCIAL SHIELD: If they have bought it once, they permanently skip calendar day calculations
+        if UserDefaults.standard.bool(forKey: "user_purchased_ad_free_forever") {
+            self.isPremiumUnlocked = true
+            return
+        }
+        
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         
@@ -46,7 +143,6 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     func loadRewardedInterstitial() {
         let request = Request()
         
-        // 💡 FIXED: Let Google's handler complete natively, then instantly hop onto the MainActor securely
         RewardedInterstitialAd.load(with: testAdUnitID, request: request) { ad, error in
             Task { @MainActor in
                 if let error = error {
@@ -86,7 +182,6 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     }
     
     // MARK: - FullScreenContentDelegate Event Handlers
-    // 💡 FIXED: Marked nonisolated to satisfy background framework protocol requirements under Swift 6
     nonisolated func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
         print("✅ [ADMOB]: Video closed by user. Reloading background pipeline channel...")
         Task { @MainActor in
@@ -95,4 +190,3 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
         }
     }
 }
-

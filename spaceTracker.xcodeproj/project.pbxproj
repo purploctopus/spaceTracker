@@ -8,10 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		80B0623A2FFD8C5600990CBD /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 80B062392FFD8C5600990CBD /* GoogleMobileAds */; };
+		80B062912FFEA6E700990CBD /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 80B062902FFEA6E700990CBD /* Products.storekit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		8068C9A02FE33592001E1DDE /* spaceTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = spaceTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		80B062902FFEA6E700990CBD /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -50,6 +52,7 @@
 		8068C9972FE33592001E1DDE = {
 			isa = PBXGroup;
 			children = (
+				80B062902FFEA6E700990CBD /* Products.storekit */,
 				8068C9A22FE33592001E1DDE /* spaceTracker */,
 				8068C9A12FE33592001E1DDE /* Products */,
 			);
@@ -131,6 +134,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				80B062912FFEA6E700990CBD /* Products.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -6,6 +6,8 @@
 //  MAKE AN APP COLIN LOVES
 
 import SwiftUI
+import StoreKit
+import Combine
 
 struct AdPromptOverlayView: View {
     @ObservedObject var adEngine: AdMobEngine
@@ -13,13 +15,14 @@ struct AdPromptOverlayView: View {
     let onTriggerAd: () -> Void
     let onDismiss: () -> Void
     
-    @State private var countdownTimer = 10
-    @State private var timerSubscription: Timer.TimerPublisher?
+    @State private var countdownTimer = 10 // Your 10-second warning state
     @State private var cancellable: AnyCancellable?
+    
+    // 💡 THE TIMER SHIELD: Freezes the countdown if Apple's credit card sheet is active
+    @State private var isPurchasing = false
     
     var body: some View {
         ZStack {
-            // Darkened frosted glass back-shield
             Color.black.opacity(0.85)
                 .ignoresSafeArea()
             
@@ -40,7 +43,6 @@ struct AdPromptOverlayView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
-
                 
                 Divider()
                     .background(Color.white.opacity(0.15))
@@ -55,13 +57,21 @@ struct AdPromptOverlayView: View {
                 
                 // Countdown Tracker Box
                 VStack(spacing: 4) {
-                    if countdownTimer > 0 {
+                    if isPurchasing {
+                        Text("TRANSACTION IN PROGRESS")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.yellow)
+                            .fontWeight(.bold)
+                        Text("PAUSED")
+                            .font(.system(size: 32, weight: .bold, design: .monospaced))
+                            .foregroundColor(.yellow)
+                    } else if countdownTimer > 0 {
                         Text("INITIATING DATA FEED IN")
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundColor(.orange)
                         Text("\(countdownTimer)")
                             .font(.system(size: 32, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white) 
+                            .foregroundColor(.white)
                     } else {
                         Text("TRANSMISSION FEED READY")
                             .font(.system(size: 10, design: .monospaced))
@@ -72,11 +82,42 @@ struct AdPromptOverlayView: View {
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity)
                 .background(Color.white.opacity(0.02))
-                .border(Color.white.opacity(0.08), width: 1)
+                .border(isPurchasing ? Color.yellow.opacity(0.3) : Color.white.opacity(0.08), width: 1)
+                
+                // Permanent In-App Purchase Trigger Lane
+                Button(action: {
+                    // 💡 LOCK THE TIMER: Instantly pauses the countdown pipeline
+                    isPurchasing = true
+                    
+                    Task {
+                        await adEngine.purchasePremium()
+                        
+                        if adEngine.isPremiumUnlocked {
+                            onDismiss() // Success: Tear down the overlay completely
+                        } else {
+                            // 💡 UNLOCK THE TIMER: If they cancel Apple's sheet, resume the countdown
+                            isPurchasing = false
+                        }
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "crown.fill")
+                            .foregroundColor(.yellow)
+                        Text("REMOVE ADS FOREVER — \(adEngine.premiumProduct?.displayPrice ?? "$2.99")")
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    }
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.yellow.opacity(0.15))
+                    .border(Color.yellow.opacity(0.4), width: 1)
+                    .cornerRadius(4)
+                }
+                .padding(.bottom, 4)
                 
                 // Action Control Layout Row
                 HStack(spacing: 16) {
-                    // Cancel Outbound Vector
                     Button(action: onDismiss) {
                         Text("ABORT MISSION")
                             .font(.system(.caption, design: .monospaced))
@@ -87,8 +128,8 @@ struct AdPromptOverlayView: View {
                             .background(Color.white.opacity(0.05))
                             .cornerRadius(4)
                     }
+                    .disabled(isPurchasing) // Block dismissing while buying
                     
-                    // Direct Instant Play Trigger Bypass
                     Button(action: {
                         countdownTimer = 0
                         onTriggerAd()
@@ -102,12 +143,12 @@ struct AdPromptOverlayView: View {
                             .background(adEngine.isAdReady ? Color.cyan : Color.gray.opacity(0.3))
                             .cornerRadius(4)
                     }
-                    .disabled(!adEngine.isAdReady)
+                    .disabled(!adEngine.isAdReady || isPurchasing)
                 }
             }
             .padding(24)
             .background(Color(red: 0.06, green: 0.06, blue: 0.06))
-            .border(Color.orange.opacity(0.3), width: 1)
+            .border(isPurchasing ? Color.yellow.opacity(0.3) : Color.orange.opacity(0.3), width: 1)
             .cornerRadius(8)
             .padding(.horizontal, horizontalSizeClass == .regular ? 120 : 24)
         }
@@ -124,12 +165,15 @@ struct AdPromptOverlayView: View {
     private func startCountdownLoop() {
         let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
         self.cancellable = timer.sink { _ in
+            // 💡 REFIED GUARD RULE: If buying, skip the mathematical clock calculations completely
+            guard !isPurchasing else { return }
+            
             if countdownTimer > 1 {
                 countdownTimer -= 1
             } else {
                 countdownTimer = 0
                 stopCountdownLoop()
-                onTriggerAd() // Automatically deploy ad when timer reaches zero
+                onTriggerAd()
             }
         }
     }
@@ -138,4 +182,3 @@ struct AdPromptOverlayView: View {
         cancellable?.cancel()
     }
 }
-import Combine
