@@ -470,7 +470,7 @@ struct ContentView: View {
     private func principalToolbarHeaderTitleStack(sizeClass: UserInterfaceSizeClass?) -> some View {
         HStack(alignment: .center, spacing: sizeClass == .regular ? 24 : 14) {
             
-            // 🚀 UPSCALE LEFT LOGO APERTURE
+            // 🚀 LEFT LOGO APERTURE
             Image("launch_logo")
                 .resizable()
                 .renderingMode(.template)
@@ -493,7 +493,6 @@ struct ContentView: View {
                     .tracking(sizeClass == .regular ? 6 : 3)
                 
                 HStack(spacing: 5) {
-                    // 💡 FIXED: Reads directly from your standalone connectivity manager element!
                     Circle()
                         .fill(connectivityMonitor.isSystemOnline ? Color.green : Color.red)
                         .frame(width: 6, height: 6)
@@ -507,27 +506,32 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity)
             
-            // 🚀 UPSCALE RIGHT DESCRIPTOR TEXT
+            // 🚀 RIGHT DATA DESCRIPTOR MATRIX: Left-justified grid configuration
             if sizeClass == .regular {
-                VStack(alignment: .trailing, spacing: 2) {
+                // 💡 FIXED: Changed text stack alignment to .leading to force left justification
+                VStack(alignment: .leading, spacing: 2) {
                     let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
                     Text("SYS.VER // \(appVersion)")
                     
-                    let locationPrefix: String = {
-                        let city = satViewModel.locationName.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-                        if city.isEmpty || city.contains("COMPUTING") { return "LOC-PND" }
-                        return "\(String(city.prefix(3)))-USA"
-                    }()
-                    Text("SECTOR  // \(locationPrefix)")
+                    if universalLatitude == 0.0 && universalLongitude == 0.0 {
+                        Text("RADAR//POL-PND")
+                    } else {
+                        let latStr = String(format: "%.2f°%@", abs(universalLatitude), universalLatitude >= 0 ? "N" : "S")
+                        let lngStr = String(format: "%.2f°%@", abs(universalLongitude), universalLongitude >= 0 ? "E" : "W")
+                        
+                        // Left-justified string matrix mapping layout rows
+                        Text("RADAR // \(latStr) : \(lngStr) // \(satViewModel.countryISOCode)")
+                    }
                 }
                 .font(.system(size: sizeClass == .regular ? 9 : 8, weight: .semibold, design: .monospaced))
                 .foregroundColor(.gray)
                 .opacity(0.65)
-                .frame(width: 86, alignment: .trailing)
+                .frame(width: 170, alignment: .leading) // 💡 FIXED: Changed alignment boundary frame to .leading
             } else {
                 Spacer()
                     .frame(width: 24)
             }
+
         }
         .padding(.horizontal, sizeClass == .regular ? 20 : 14)
         .padding(.vertical, sizeClass == .regular ? 18 : 14)

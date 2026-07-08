@@ -16,6 +16,7 @@ struct spaceTrackerApp: App {
                 .onAppear {
                     //UserDefaults.standard.removeObject(forKey: "user_purchased_ad_free_forever")
                     //UserDefaults.standard.removeObject(forKey: "last_successful_ad_unlock_date")
+                    //UserDefaults.standard.set(true, forKey: "user_purchased_ad_free_forever")
                     // 💡 FIXED: Updated initialization call pattern to comply with Swift 6 SDK standards
                     MobileAds.shared.start()
                 }

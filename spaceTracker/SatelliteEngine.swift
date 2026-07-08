@@ -48,6 +48,8 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published var errorMessage: String? = nil
     @Published var requiresManualSelection: Bool = false
     @Published var currentHeading: Double = 0.0
+    @Published var countryISOCode: String = "PND" // Defaults to "Pending" on boot
+
     
     private let locationManager = CLLocationManager()
     private let workerURLString = "https://sat-tracker.purploctopus.workers.dev"
@@ -64,11 +66,13 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         
         // 💡 FIXED: Make sure this structural check is nested INSIDE these initializer brackets!
         let savedCity = UserDefaults.standard.string(forKey: "cached_location_name") ?? ""
+        let savedCountry = UserDefaults.standard.string(forKey: "cached_country_iso") ?? "USA" // 💡 Read country cache [1.13]
         let savedLat = UserDefaults.standard.string(forKey: "cached_latitude") ?? ""
         let savedLng = UserDefaults.standard.string(forKey: "cached_longitude") ?? ""
         
         if !savedCity.isEmpty && !savedLat.isEmpty && !savedLng.isEmpty {
             self.locationName = savedCity
+            self.countryISOCode = savedCountry.uppercased() // 💡 Restore country instantly [1.13]
             print("📡 [CACHE hit]: Instant terminal initialization using saved footprint metrics.")
             Task { @MainActor in
                 await self.fetchPasses(latitude: savedLat, longitude: savedLng)
@@ -147,7 +151,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
 
         print("🤖 [RADAR ENGINE]: Extracted coordinates: Lat \(lat), Lng \(lng)")
         
-        // MARK: - 📡 FIXED: HIGH-DENSITY AEROSPACE ADRESS RECONSTRUCTION
+        // MARK: - 📡 FIXED: HIGH-DENSITY AEROSPACE ADDRESS RECONSTRUCTION WITH DYNAMIC ISO TRACKING
         Task {
             let geocoder = CLGeocoder()
             
@@ -155,12 +159,14 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let placemarks = try await geocoder.reverseGeocodeLocation(location)
                 
                 if let verifiedPlacemark = placemarks.first {
-                    // Extract individual street attributes natively from the Apple placemark model
+                    // Extract individual street attributes natively from the Apple placemark model [1.1]
                     let subThoroughfare = verifiedPlacemark.subThoroughfare ?? "" // e.g., "1-99"
                     let thoroughfare = verifiedPlacemark.thoroughfare ?? ""       // e.g., "Stockton St"
                     let locality = verifiedPlacemark.locality ?? "Unknown City"   // e.g., "San Francisco"
                     
-                    // Combine them into a clean string matching your original format
+                    // 💡 NEW COUNTRY ISO EXTRACTOR: Grabs "US", "GB", "JP", etc., natively from Apple's data sheets [1.1]
+                    let extractedCountryCode = verifiedPlacemark.isoCountryCode ?? "USA"
+                    
                     let streetPart = "\(subThoroughfare) \(thoroughfare)".trimmingCharacters(in: .whitespacesAndNewlines)
                     let resolvedCityName: String = {
                         if streetPart.isEmpty {
@@ -177,11 +183,13 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
                             
                             // Commit the fresh data points straight over to local system storage memory [1.13]
                             UserDefaults.standard.set(resolvedCityName, forKey: "cached_location_name")
+                            UserDefaults.standard.set(extractedCountryCode.uppercased(), forKey: "cached_country_iso") // 💡 Cache country code [1.13]
                             UserDefaults.standard.set(lat, forKey: "cached_latitude")
                             UserDefaults.standard.set(lng, forKey: "cached_longitude")
                             
                             withAnimation(.easeInOut) {
                                 self.locationName = resolvedCityName
+                                self.countryISOCode = extractedCountryCode.uppercased() // 💡 Update active layout memory state [1.13]
                             }
                         } else {
                             print("🎯 [RADAR GUARD]: Station location matches existing footprint vector fields. Aborting redundant download pipelines.")
@@ -193,11 +201,11 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
             }
         }
 
-        
         Task { @MainActor in
             await fetchPasses(latitude: lat, longitude: lng)
         }
     }
+
     
     // MARK: - CoreLocation Compass Heading Callback
     // FIXED: Separated into its own dedicated delegate function to fix the scoping error
