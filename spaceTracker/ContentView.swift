@@ -30,6 +30,8 @@ struct ContentView: View {
     @State private var selectedSpacecraftCrewName: String? = nil
     @StateObject private var weatherViewModel = StargazingWeatherViewModel()
     @State private var selectedAgencyFilter: String = "ALL OPERATIONS"
+    @State private var selectedAsteroidTarget: Asteroid? = nil
+
 
     @StateObject private var adEngine = AdMobEngine()
     @State private var showAdPromptOverlay = false
@@ -247,10 +249,34 @@ struct ContentView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(rockViewModel.asteroids) { asteroid in
-                            AsteroidCardView(asteroid: asteroid)
+                            AsteroidCardView(
+                                asteroid: asteroid,
+                                userLatitude: universalLatitude,
+                                userLongitude: universalLongitude
+                            )
+                            // 💡 FIXED: Wrapped inside your active ad monetization firewall gate!
+                            .onTapGesture {
+                                if adEngine.isPremiumUnlocked {
+                                    // 🟢 Premium Active: Skip ad layer and open sheet instantly
+                                    selectedAsteroidTarget = asteroid
+                                } else {
+                                    // 🛑 Ad Gate Active: Cache action parameters and fire intercept overlay
+                                    adInterceptActionLabel = asteroid.name
+                                    pendingAdCompletionAction = { selectedAsteroidTarget = asteroid }
+                                    showAdPromptOverlay = true
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal)
+                }
+                // The Actionable Detailed Telemetry Flyout Sheet
+                .sheet(item: $selectedAsteroidTarget) { targetAsteroid in
+                    AsteroidDetailView(
+                        asteroid: targetAsteroid,
+                        userLatitude: universalLatitude,
+                        userLongitude: universalLongitude
+                    )
                 }
             }
         }
