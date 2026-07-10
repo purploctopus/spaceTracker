@@ -3,7 +3,7 @@
 //  spaceTracker
 //
 //  Created by Ben Clary on 6/17/26.
-//
+//  MAKE AN APP THAT INSPIRES COLIN
 
 import SwiftUI
 
@@ -15,6 +15,7 @@ struct MissionSingleDetailView: View {
     
     // Environment handler binds safely at the root level of the struct to open external links
     @Environment(\.openURL) var openExternalLink
+    @Environment(\.dismiss) var dismiss
     
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -181,8 +182,20 @@ struct MissionSingleDetailView: View {
             .padding(.horizontal)
             .padding(.top, 20)
         }
+        // ... previous view code lines ...
         .navigationTitle("MISSION TELEMETRY")
         .navigationBarTitleDisplayMode(.inline)
+        // 💡 FIXED: Injected the standard gray xmark circle button right here where you wanted it!
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.gray)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
     }
     
     private func formatToLocalTime(_ isoString: String?) -> String {

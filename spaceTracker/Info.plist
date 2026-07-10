@@ -68,6 +68,8 @@
 		<string>launch_background</string>
 		<key>UIImageName</key>
 		<string>launch_logo</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<true/>
 	</dict>
 </dict>
 </plist>
