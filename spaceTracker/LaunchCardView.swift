@@ -8,8 +8,13 @@
 import SwiftUI
 
 // MARK: - THE HORIZONTAL LAUNCH COMPONENT CARD
+import SwiftUI
+
 struct LaunchCardView: View {
     let launch: SpaceLaunch
+    
+    // 💡 FIXED: Injected parameter action line allows data to flow up to your root views safely
+    let onWatchTap: (String) -> Void
     
     // ✅ RESPONSIVE: Listens to the environment window layout size category
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
@@ -40,6 +45,7 @@ struct LaunchCardView: View {
                     .foregroundColor(.white)
                     .lineLimit(2)
                 
+                // 💡 FIXED: Safely unwraps the provider name checking model optionals seamlessly
                 Text(launch.launch_service_provider?.name?.uppercased() ?? "GLOBAL RANGE")
                     .font(.system(horizontalSizeClass == .regular ? .caption : .caption2, design: .monospaced))
                     .foregroundColor(.blue)
@@ -49,6 +55,28 @@ struct LaunchCardView: View {
             // 💡 THE INJECTED RADAR COUNTDOWN TICKER: Tracks days, hours, and minutes to T-0
             LaunchCountdownView(targetDateString: launch.net)
                 .padding(.top, 2)
+            
+            // 💡 FIXED: Swapped out video_url for your verified .webcast_live endpoint property helper
+            if let videoLink = launch.webcast_live, !videoLink.trimmingCharacters(in: .whitespaces).isEmpty {
+                Button(action: {
+                    // 💡 FIXED: Passes parameter data cleanly up out of this child structure scope
+                    onWatchTap(videoLink)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "video.fill")
+                            .font(.system(size: 8))
+                        Text("VIEW LIVE STREAM ❯")
+                            .font(.system(size: 8, weight: .black, design: .monospaced))
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.orange) // Piercing launch-alert accent color palette rows
+                    .cornerRadius(3)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.top, 4)
+            }
         }
         .padding(horizontalSizeClass == .regular ? 16 : 12)
         // ✅ RESPONSIVE: Binds the structural layout frame constraints to the dynamic size-class property
@@ -61,4 +89,5 @@ struct LaunchCardView: View {
         )
     }
 }
+
 

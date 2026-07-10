@@ -9,6 +9,8 @@ import SwiftUI
 import Combine
 
 struct LaunchCountdownView: View {
+    @State private var activeLiveStreamURL: String? = nil
+    @State private var streamingLaunchName: String = ""
     let targetDateString: String?
     @State private var timeRemainingString = "T-MINUS 00:00:00:00"
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()

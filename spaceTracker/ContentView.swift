@@ -31,6 +31,11 @@ struct ContentView: View {
     @StateObject private var weatherViewModel = StargazingWeatherViewModel()
     @State private var selectedAgencyFilter: String = "ALL OPERATIONS"
     @State private var selectedAsteroidTarget: Asteroid? = nil
+    @State private var showLiveVideoTelemetrySheet = false
+    @State private var activeLiveStreamURL: String = ""
+    @State private var streamingLaunchName: String = ""
+    @State private var streamingLaunchNetDate: String? = nil
+
 
 
     @StateObject private var adEngine = AdMobEngine()
@@ -582,7 +587,6 @@ struct ContentView: View {
                 .padding(.horizontal)
             
             // MARK: - 🚀 ORBITAL PROVIDER DYNAMIC PARSER
-            // 💡 FIXED: Uses your exact model property path to extract unique sorted provider names instantly!
             let dynamicProvidersList: [String] = {
                 let extractedNames = upcomingManifest.compactMap { launch in
                     launch.launch_service_provider?.name ?? "UNKNOWN PROVIDER"
@@ -595,7 +599,7 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     ForEach(dynamicProvidersList, id: \.self) { filterName in
                         Button(action: { selectedAgencyFilter = filterName }) {
-                            Text(filterName.uppercased()) // Keeps the monospaced look consistent
+                            Text(filterName.uppercased())
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                                 .foregroundColor(selectedAgencyFilter == filterName ? .black : .gray)
                                 .padding(.horizontal, 12)
@@ -620,7 +624,6 @@ struct ContentView: View {
                     .padding(.vertical, 20)
             } else {
                 // MARK: - 🔎 ZERO-MISS FILTER MATCHING
-                // 💡 FIXED: Matches the active capsule string directly against the nested provider name property data
                 let filteredManifest = upcomingManifest.filter { launch in
                     if selectedAgencyFilter == "ALL OPERATIONS" { return true }
                     let providerName = launch.launch_service_provider?.name ?? "UNKNOWN PROVIDER"
@@ -646,16 +649,25 @@ struct ContentView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(filteredManifest) { launch in
-                                LaunchCardView(launch: launch)
-                                    .onTapGesture {
-                                        if adEngine.isPremiumUnlocked {
-                                            selectedSpaceLaunch = launch
-                                        } else {
-                                            adInterceptActionLabel = launch.name
-                                            pendingAdCompletionAction = { selectedSpaceLaunch = launch }
-                                            showAdPromptOverlay = true
-                                        }
+                                LaunchCardView(
+                                    launch: launch,
+                                    onWatchTap: { embeddedURL in
+                                        // 💡 FIXED: Simply flip the data parameters and fire the sheet visibility switch instantly! [1.1]
+                                        activeLiveStreamURL = embeddedURL
+                                        streamingLaunchName = launch.name
+                                        streamingLaunchNetDate = launch.net
+                                        showLiveVideoTelemetrySheet = true
                                     }
+                                )
+                                .onTapGesture {
+                                    if adEngine.isPremiumUnlocked {
+                                        selectedSpaceLaunch = launch
+                                    } else {
+                                        adInterceptActionLabel = launch.name
+                                        pendingAdCompletionAction = { selectedSpaceLaunch = launch }
+                                        showAdPromptOverlay = true
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal)
@@ -664,7 +676,6 @@ struct ContentView: View {
             }
         }
     }
-
 
     var body: some View {
         NavigationView {
@@ -840,6 +851,13 @@ struct ContentView: View {
                 userHeading: satViewModel.currentHeading
             )
         }
+        .sheet(isPresented: $showLiveVideoTelemetrySheet) {
+            LaunchLiveStreamPlayerView(
+                streamURLString: activeLiveStreamURL,
+                launchName: streamingLaunchName,
+                launchNetDateString: streamingLaunchNetDate
+            )
+        }
     }
 
  // Closes var body: some View
@@ -948,3 +966,9 @@ struct CrewSheetIdentifiable: Identifiable {
     var id: String { name }
     let name: String
 }
+
+struct IdentifiableStream: Identifiable {
+    let id = UUID()
+    let url: String
+}
+

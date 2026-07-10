@@ -45,6 +45,13 @@ struct SpaceLaunch: Decodable, Identifiable {
         outputFormatter.dateFormat = "MMM d 'AT' h:mm a"
         return "LAUNCH: \(outputFormatter.string(from: validDate).uppercased())"
     }
+    // 💡 LIVE STREAMING LINK EXTRACTOR: Safely grabs the first video URL from your payload array [1.13]
+    var webcast_live: String? {
+        // Checks if the array exists and has a valid entry, then extracts the url string parameter [1.1]
+        guard let firstVideoObject = vid_urls?.first else { return nil }
+        return firstVideoObject.url
+    }
+
 }
 
 // 💡 New nested structure matching the live production schema specs
