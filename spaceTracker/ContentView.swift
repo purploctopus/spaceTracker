@@ -652,13 +652,13 @@ struct ContentView: View {
                                 LaunchCardView(
                                     launch: launch,
                                     onWatchTap: { embeddedURL in
-                                        // 💡 FIXED: Simply flip the data parameters and fire the sheet visibility switch instantly! [1.1]
                                         activeLiveStreamURL = embeddedURL
                                         streamingLaunchName = launch.name
                                         streamingLaunchNetDate = launch.net
                                         showLiveVideoTelemetrySheet = true
                                     }
                                 )
+
                                 .onTapGesture {
                                     if adEngine.isPremiumUnlocked {
                                         selectedSpaceLaunch = launch

@@ -56,27 +56,28 @@ struct LaunchCardView: View {
             LaunchCountdownView(targetDateString: launch.net)
                 .padding(.top, 2)
             
-            // 💡 FIXED: Swapped out video_url for your verified .webcast_live endpoint property helper
+            // 💡 FIXED: Dynamically matches its button properties to the live countdown status window! [1.13]
             if let videoLink = launch.webcast_live, !videoLink.trimmingCharacters(in: .whitespaces).isEmpty {
                 Button(action: {
-                    // 💡 FIXED: Passes parameter data cleanly up out of this child structure scope
                     onWatchTap(videoLink)
                 }) {
                     HStack(spacing: 4) {
-                        Image(systemName: "video.fill")
+                        Image(systemName: launch.isWebcastLiveRightNow ? "play.tv.fill" : "antenna.radiowaves.left.and.right")
                             .font(.system(size: 8))
-                        Text("VIEW LIVE STREAM ❯")
+                        Text(launch.webcastButtonDescriptorString + " ❯")
                             .font(.system(size: 8, weight: .black, design: .monospaced))
                     }
-                    .foregroundColor(.black)
+                    .foregroundColor(launch.isWebcastLiveRightNow ? .white : .black)
+                    // 💡 VISUAL ANCHOR: Red alert style if broadcasting live; sleek orange/amber if in standby [1.13]
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.orange) // Piercing launch-alert accent color palette rows
+                    .background(launch.isWebcastLiveRightNow ? Color.red : Color.orange)
                     .cornerRadius(3)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .padding(.top, 4)
             }
+
         }
         .padding(horizontalSizeClass == .regular ? 16 : 12)
         // ✅ RESPONSIVE: Binds the structural layout frame constraints to the dynamic size-class property

@@ -10,6 +10,8 @@ import SwiftUI
 struct MissionSingleDetailView: View {
     let launch: SpaceLaunch
     
+    @State private var showInternalVideoSheet = false
+    
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
@@ -103,16 +105,19 @@ struct MissionSingleDetailView: View {
                 }
                 
                 // 6. Streaming Destination Actions Direct Link
-                if let videoArray = launch.vid_urls,
-                   let firstVideoString = videoArray.first?.url,
-                   let liveUrl = URL(string: firstVideoString) {
+                // 💡 FIXED: Replaced external browser logic link container with your custom video web bridge [1.13]
+                if let videoLink = launch.webcast_live, !videoLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     
-                    Link(destination: liveUrl) {
+                    Button(action: {
+                        // Sets sheet presentation trigger to live
+                        showInternalVideoSheet = true
+                    }) {
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(Color.red)
+                                .fill(launch.isWebcastLiveRightNow ? Color.red : Color.orange)
                                 .frame(width: 6, height: 6)
-                            Text("LIVE BROADCAST FEED")
+                            
+                            Text(launch.isWebcastLiveRightNow ? "LIVE BROADCAST FEED" : "LIVE BROADCAST FEED // STANDBY")
                                 .font(.system(.caption, design: .monospaced))
                                 .fontWeight(.bold)
                         }
@@ -122,7 +127,16 @@ struct MissionSingleDetailView: View {
                         .background(Color.white.opacity(0.08))
                         .cornerRadius(4)
                     }
+                    .buttonStyle(PlainButtonStyle())
                     .padding(.top, 4)
+                    // 💡 INJECTED ZONE: Slides your high-fidelity, sandboxed video overlay up straight from inside this card screen layout! [1.13]
+                    .sheet(isPresented: $showInternalVideoSheet) {
+                        LaunchLiveStreamPlayerView(
+                            streamURLString: videoLink,
+                            launchName: launch.name,
+                            launchNetDateString: launch.net
+                        )
+                    }
                 }
             }
             .padding(.horizontal)
@@ -148,3 +162,4 @@ struct MissionSingleDetailView: View {
         return outputFormatter.string(from: validDate).uppercased()
     }
 }
+

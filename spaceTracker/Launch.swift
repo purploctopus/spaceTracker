@@ -51,7 +51,37 @@ struct SpaceLaunch: Decodable, Identifiable {
         guard let firstVideoObject = vid_urls?.first else { return nil }
         return firstVideoObject.url
     }
-
+    
+    // 💡 LIVE CHANNELS TRACKER: Checks if the countdown timeline is within its active broadcast window [1.13]
+    var isWebcastLiveRightNow: Bool {
+        guard let netString = self.net else { return false }
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = formatter.date(from: netString)
+        if date == nil {
+            let backup = ISO8601DateFormatter()
+            date = backup.date(from: netString)
+        }
+        
+        guard let launchDate = date else { return false }
+        
+        // 💡 THE 30-MINUTE BROADCAST WINDOW RULE:
+        // Webcasts traditionally ignite 30 minutes (-1800s) before T-0, and stay active for 2 hours (+7200s) post-ignition [1.13]
+        let activationWindowStart = launchDate.addingTimeInterval(-1800)
+        let activationWindowEnd = launchDate.addingTimeInterval(7200)
+        let now = Date()
+        
+        return now >= activationWindowStart && now <= activationWindowEnd
+    }
+    
+    var webcastButtonDescriptorString: String {
+        if isWebcastLiveRightNow {
+            return "🟢 VIEW LIVE STREAM"
+        } else {
+            return "🚀 STREAMING SOON"
+        }
+    }
 }
 
 // 💡 New nested structure matching the live production schema specs
