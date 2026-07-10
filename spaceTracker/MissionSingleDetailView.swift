@@ -10,29 +10,45 @@ import SwiftUI
 struct MissionSingleDetailView: View {
     let launch: SpaceLaunch
     
+    // Injected sheet presenter state variable
     @State private var showInternalVideoSheet = false
+    
+    // Environment handler binds safely at the root level of the struct to open external links
+    @Environment(\.openURL) var openExternalLink
     
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
                 
-                // FULL HEIGHT RESPONSIVE STACK BOOSTER ILLUSTRATION
+                // FULL HEIGHT RESPONSIVE STACK BOOSTER ILLUSTRATION (Screen-Agnostic Layout Matrix)
                 if let imageString = launch.image?.image_url,
                    let imageUrl = URL(string: imageString) {
+                    
                     AsyncImage(url: imageUrl) { phase in
                         switch phase {
                         case .success(let image):
                             image
                                 .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxHeight: 280)
+                                .aspectRatio(contentMode: .fit) // Fits layout bounds cleanly on all devices
                                 .frame(maxWidth: .infinity, alignment: .center)
+                                .cornerRadius(4)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                )
                         case .failure:
                             Color.clear.frame(height: 0)
                         case .empty:
-                            ProgressView()
-                                .frame(height: 200)
-                                .frame(maxWidth: .infinity)
+                            // 💡 FIXED: Uses dynamic layout constraints instead of hardcoded point sizes
+                            VStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .aspectRatio(16/9, contentMode: .fit) // 💡 Forces a fluid, responsive container footprint while loading
+                            .background(Color.white.opacity(0.02))
+                            .cornerRadius(4)
                         @unknown default:
                             EmptyView()
                         }
@@ -61,10 +77,68 @@ struct MissionSingleDetailView: View {
                     }
                 }
                 
-                // 2. Real-Time Countdown Engine Track
+                // 💡 UPGRADED: 2. STREAMING DESTINATION ACTIONS (Moved to the high-priority slot row)
+                if let videoLink = launch.webcast_live, !videoLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    HStack(spacing: 12) {
+                        // 🟢 BUTTON OPTION A: Launch the full-screen internal video player sheet
+                        Button(action: {
+                            showInternalVideoSheet = true
+                        }) {
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(launch.isWebcastLiveRightNow ? Color.green : Color.orange)
+                                    .frame(width: 6, height: 6)
+                                
+                                Text(launch.isWebcastLiveRightNow ? "STREAM LIVE TRANSMISSION" : "STREAMING SOON")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .fontWeight(.bold)
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.08))
+                            .cornerRadius(4)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // 🛰️ BUTTON OPTION B: Open the webcast externally in Safari or native YouTube App!
+                        Button(action: {
+                            if let externalUrl = URL(string: videoLink) {
+                                openExternalLink(externalUrl)
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Text("OPEN EXTERNAL")
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                Image(systemName: "safari")
+                                    .font(.system(size: 10))
+                            }
+                            .foregroundColor(.cyan)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.cyan.opacity(0.05))
+                            .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(.vertical, 4)
+                    .sheet(isPresented: $showInternalVideoSheet) {
+                        LaunchLiveStreamPlayerView(
+                            streamURLString: videoLink,
+                            launchName: launch.name,
+                            launchNetDateString: launch.net
+                        )
+                    }
+                }
+                
+                // 3. Real-Time Countdown Engine Track
                 LaunchCountdownView(targetDateString: launch.net)
                 
-                // 3. Identification Configurations Block
+                // 4. Identification Configurations Block
                 VStack(alignment: .leading, spacing: 4) {
                     Text(launch.rocket?.configuration?.full_name?.uppercased() ?? "VEHICLE UNKNOWN")
                         .font(.system(.headline, design: .monospaced))
@@ -76,7 +150,7 @@ struct MissionSingleDetailView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                // 4. Trajectory Space Ranges Telemetry
+                // 5. Trajectory Space Ranges Telemetry
                 HStack(spacing: 16) {
                     if let orbit = launch.mission?.orbit?.abbrev?.uppercased() {
                         Text("ORBIT: \(orbit)")
@@ -93,7 +167,7 @@ struct MissionSingleDetailView: View {
                         .foregroundColor(.gray)
                 }
                 
-                // 5. Long-Form Objective Briefing
+                // 6. Long-Form Objective Briefing
                 if let description = launch.mission?.description {
                     Text("MISSION PROFILE:\n\(description)")
                         .font(.system(.caption, design: .monospaced))
@@ -102,41 +176,6 @@ struct MissionSingleDetailView: View {
                         .padding(14)
                         .background(Color.white.opacity(0.02))
                         .cornerRadius(4)
-                }
-                
-                // 6. Streaming Destination Actions Direct Link
-                // 💡 FIXED: Replaced external browser logic link container with your custom video web bridge [1.13]
-                if let videoLink = launch.webcast_live, !videoLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    
-                    Button(action: {
-                        // Sets sheet presentation trigger to live
-                        showInternalVideoSheet = true
-                    }) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(launch.isWebcastLiveRightNow ? Color.red : Color.orange)
-                                .frame(width: 6, height: 6)
-                            
-                            Text(launch.isWebcastLiveRightNow ? "LIVE BROADCAST FEED" : "LIVE BROADCAST FEED // STANDBY")
-                                .font(.system(.caption, design: .monospaced))
-                                .fontWeight(.bold)
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.08))
-                        .cornerRadius(4)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.top, 4)
-                    // 💡 INJECTED ZONE: Slides your high-fidelity, sandboxed video overlay up straight from inside this card screen layout! [1.13]
-                    .sheet(isPresented: $showInternalVideoSheet) {
-                        LaunchLiveStreamPlayerView(
-                            streamURLString: videoLink,
-                            launchName: launch.name,
-                            launchNetDateString: launch.net
-                        )
-                    }
                 }
             }
             .padding(.horizontal)
@@ -162,4 +201,3 @@ struct MissionSingleDetailView: View {
         return outputFormatter.string(from: validDate).uppercased()
     }
 }
-
