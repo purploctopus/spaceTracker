@@ -9,36 +9,55 @@ import Foundation
 import SwiftUI
 import Combine
 
-// MARK: - 1. OPEN NOTIFY DECODER MODELS
-struct OpenNotifyRosterResponse: Decodable {
-    let number: Int
-    let people: [Astronaut]
-    let message: String
+// 💡 THE FIX: Maps the expected view type directly to your new database record format
+typealias Astronaut = AstronautRecord
+
+// MARK: - PRODUCTION DATA MODELS
+struct AstronautsResponse: Decodable {
+    let count: Int
+    let results: [AstronautRecord]
 }
 
-struct Astronaut: Decodable, Identifiable {
-    var id: String { name } // Uses the name as a unique identifier string token
+struct AstronautRecord: Decodable, Identifiable {
+    let id: Int
     let name: String
-    let craft: String
+    let bio: String
+    let nationality: [NationalityInfo]
+    let agency: AgencyInfo?
+    let launch_designator: String?
+}
+
+struct NationalityInfo: Decodable {
+    let id: Int
+    let name: String
+    let alpha_2_code: String
+}
+
+struct AgencyInfo: Decodable {
+    let id: Int
+    let name: String
+    let abbrev: String
 }
 
 // MARK: - 2. THE OPEN-NOTIFY VIEW MODEL
 @MainActor
 class AstronautViewModel: ObservableObject {
     @Published var totalHumansInOrbit: Int = 0
+    
+    // Now these arrays perfectly satisfy lines 90 and 145 in your views!
     @Published var issCrew: [Astronaut] = []
     @Published var tiangongCrew: [Astronaut] = []
     @Published var otherCrew: [Astronaut] = []
+    
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
     
-    // 💡 DIRECT ACCESS: Points directly to the open public json endpoint with the correct hyphen
-    private let openNotifyURLString = "http://api.open-notify.org/astros.json"
+    private let openNotifyURLString = "https://purploctopus.github.io/astronauts.json"
     
     func fetchAstronautRoster() async {
         isLoading = true
         errorMessage = nil
-        print (openNotifyURLString)
+        print(openNotifyURLString)
         guard let url = URL(string: openNotifyURLString) else { return }
         
         do {
@@ -49,14 +68,31 @@ class AstronautViewModel: ObservableObject {
                 return
             }
             
-            let decoded = try JSONDecoder().decode(OpenNotifyRosterResponse.self, from: data)
+            let decoded = try JSONDecoder().decode(AstronautsResponse.self, from: data)
             
-            self.totalHumansInOrbit = decoded.number
+            let livingHumans = decoded.results.filter { astronaut in
+                let normalizedName = astronaut.name.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                return normalizedName != "STARMAN"
+            }
             
-            // 💡 DYNAMIC GROUPING: Sort the flat roster array into distinct spacecraft bins on the fly
-            self.issCrew = decoded.people.filter { $0.craft.uppercased().contains("ISS") }
-            self.tiangongCrew = decoded.people.filter { $0.craft.uppercased().contains("TIANGONG") || $0.craft.uppercased().contains("CSS") }
-            self.otherCrew = decoded.people.filter { !$0.craft.uppercased().contains("ISS") && !$0.craft.uppercased().contains("TIANGONG") && !$0.craft.uppercased().contains("CSS") }
+            self.totalHumansInOrbit = livingHumans.count
+            
+            self.issCrew = livingHumans.filter { astronaut in
+                let agency = astronaut.agency?.abbrev.uppercased() ?? ""
+                return agency == "NASA" || agency == "ESA" || agency == "JAXA" || agency == "RFSA"
+            }
+            
+            // 💡 FIXED: Changed filter from CMSA to CNSA to match your active JSON feed data
+            self.tiangongCrew = livingHumans.filter { astronaut in
+                let agency = astronaut.agency?.abbrev.uppercased() ?? ""
+                return agency == "CNSA"
+            }
+            
+            // Evaluates correctly now that CNSA matches the Tiangong crew array
+            self.otherCrew = livingHumans.filter { human in
+                let agency = human.agency?.abbrev.uppercased() ?? ""
+                return agency != "NASA" && agency != "ESA" && agency != "JAXA" && agency != "RFSA" && agency != "CNSA"
+            }
             
             self.isLoading = false
         } catch {
@@ -64,6 +100,7 @@ class AstronautViewModel: ObservableObject {
             self.isLoading = false
         }
     }
+
 }
 
 // MARK: - 3. UI DISPLAY COMPONENT: SPACECRAFT ROSTER CARD

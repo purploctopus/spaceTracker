@@ -529,7 +529,7 @@ struct ContentView: View {
                         .frame(width: 6, height: 6)
                         .shadow(color: connectivityMonitor.isSystemOnline ? Color.green.opacity(0.5) : Color.red.opacity(0.5), radius: 3)
                     
-                    Text(connectivityMonitor.isSystemOnline ? "ORBITAL LINK OPERATIONAL" : "TELEMETRY DISCONNECTED")
+                    Text(connectivityMonitor.isSystemOnline ? "ORBITLOG LINK OPERATIONAL" : "ORBITLOG DISCONNECTED")
                         .font(.system(size: sizeClass == .regular ? 9 : 8, weight: .bold, design: .monospaced))
                         .foregroundColor(connectivityMonitor.isSystemOnline ? .gray : .red)
                         .tracking(1.5)
