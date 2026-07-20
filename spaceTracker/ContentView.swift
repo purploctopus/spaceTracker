@@ -853,8 +853,8 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showLiveVideoTelemetrySheet) {
             LaunchLiveStreamPlayerView(
-                streamURLString: "https://www.youtube.com/watch?v=awQzjn72bI0",
-    //            streamURLString: activeLiveStreamURL,
+    //            streamURLString: "https://www.youtube.com/watch?v=awQzjn72bI0",
+                streamURLString: activeLiveStreamURL,
                 launchName: streamingLaunchName,
                 launchNetDateString: streamingLaunchNetDate
             )
