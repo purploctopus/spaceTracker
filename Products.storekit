@@ -25,7 +25,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.PurplOctopus.spaceTracker.removeAds",
+      "productID" : "RemoveAdsOrbitLog",
       "referenceName" : "Remove Ads Forever",
       "type" : "NonConsumable"
     }

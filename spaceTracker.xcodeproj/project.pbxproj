@@ -7,11 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8052EF133017A10600CA4AE8 /* StoreKitTestCertificate.cer in Resources */ = {isa = PBXBuildFile; fileRef = 8052EF123017A10600CA4AE8 /* StoreKitTestCertificate.cer */; };
 		80B0623A2FFD8C5600990CBD /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 80B062392FFD8C5600990CBD /* GoogleMobileAds */; };
 		80B062912FFEA6E700990CBD /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 80B062902FFEA6E700990CBD /* Products.storekit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		8052EF123017A10600CA4AE8 /* StoreKitTestCertificate.cer */ = {isa = PBXFileReference; lastKnownFileType = file; path = StoreKitTestCertificate.cer; sourceTree = "<group>"; };
 		8068C9A02FE33592001E1DDE /* spaceTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = spaceTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		80B062902FFEA6E700990CBD /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -53,6 +55,7 @@
 			isa = PBXGroup;
 			children = (
 				80B062902FFEA6E700990CBD /* Products.storekit */,
+				8052EF123017A10600CA4AE8 /* StoreKitTestCertificate.cer */,
 				8068C9A22FE33592001E1DDE /* spaceTracker */,
 				8068C9A12FE33592001E1DDE /* Products */,
 			);
@@ -135,6 +138,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				80B062912FFEA6E700990CBD /* Products.storekit in Resources */,
+				8052EF133017A10600CA4AE8 /* StoreKitTestCertificate.cer in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
