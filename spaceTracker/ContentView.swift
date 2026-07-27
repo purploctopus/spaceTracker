@@ -83,6 +83,22 @@ struct ContentView: View {
                 Text(weatherViewModel.observationRating.replacingOccurrences(of: " // ", with: ": "))
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(weatherViewModel.cloudCoverPercent > 50 ? .orange : .green)
+                
+                // 💡 FIXED: Positions the mandatory WeatherKit elements directly to the right of the status pill
+                HStack(spacing: 6) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "apple.logo")
+                            .font(.system(size: 9))
+                        Text("Weather")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundColor(.secondary)
+                    
+                    Link("Data Sources", destination: URL(string: "https://weatherkit.apple.com/legal-attribution.html")!)
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(.blue)
+                }
+                .padding(.leading, 4) // Tiny buffer to separate it cleanly from the status pill border
             }
             .padding(12)
             .background(Color.white.opacity(0.04))

@@ -8,24 +8,18 @@
 // test     private let testAdUnitID = "ca-app-pub-3940256099942544/6978759866"
 // prod     private let liveAdUnitID = "ca-app-pub-1070603260872166/4282670561"
 
-  
 import Foundation
 import StoreKit
 import GoogleMobileAds
 import Combine
 
-@MainActor
 class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     @Published var isPremiumUnlocked = false
     @Published var isAdReady = false
     @Published var premiumProduct: Product?
     
-    // 💡 DEFINED: Verified App Store Connect product identifier matching your configuration dashboard
     private let removeAdsProductID = "RemoveAdsOrbitLog"
-    
     private var rewardedInterstitialAd: RewardedInterstitialAd?
-    
-    // 💡 PRODUCTION SWAP: Updated to use your live, revenue-generating AdMob ID placement
     private let liveAdUnitID = "ca-app-pub-1070603260872166/4282670561"
     private var updatesTask: Task<Void, Never>?
     
@@ -36,6 +30,7 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
         
         updatesTask = listenForTransactions()
         
+        // 💡 FIXED: Standard background task handles data fetching smoothly away from the main thread
         Task {
             await fetchStoreProduct()
             await verifyActivePurchases()
@@ -51,15 +46,29 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     private func fetchStoreProduct() async {
         do {
             let products = try await Product.products(for: [removeAdsProductID])
-            self.premiumProduct = products.first
-            print("🛍️ [STOREKIT]: Safely localized currency value: \(self.premiumProduct?.displayPrice ?? "")")
+            let foundProduct = products.first
+            
+            // 💡 FIXED: Explicitly hop to MainActor only when updating the UI published properties
+            await MainActor.run {
+                self.premiumProduct = foundProduct
+                print("🛍️ [STOREKIT]: Safely localized currency value: \(self.premiumProduct?.displayPrice ?? "")")
+            }
         } catch {
             print("❌ [STOREKIT ERROR]: Failed to pull product sheet metrics: \(error)")
         }
     }
     
     func purchasePremium() async {
-        guard let product = premiumProduct else { return }
+        if premiumProduct == nil {
+            print("⚠️ [STOREKIT]: Product missing from memory cache. Attempting immediate refresh...")
+            await fetchStoreProduct()
+        }
+        
+        guard let product = premiumProduct else {
+            print("❌ [STOREKIT ERROR]: Aborted. Apple servers failed to return product metadata.")
+            return
+        }
+        
         do {
             let result = try await product.purchase()
             switch result {
@@ -67,7 +76,6 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
                 let transaction = try verifyTransaction(verification)
                 print("✅ [STOREKIT]: Purchase verified. Granting permanent premium state.")
                 
-                // 💡 THREAD SAFETY FIX: Safely route property updates back to the Main UI Thread
                 await MainActor.run {
                     self.isPremiumUnlocked = true
                     UserDefaults.standard.set(true, forKey: "user_purchased_ad_free_forever")
@@ -85,14 +93,13 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     
     func verifyActivePurchases() async {
         if UserDefaults.standard.bool(forKey: "user_purchased_ad_free_forever") {
-            self.isPremiumUnlocked = true
+            await MainActor.run { self.isPremiumUnlocked = true }
             return
         }
         
         for await result in Transaction.currentEntitlements {
             if case .verified(let transaction) = result {
                 if transaction.productID == removeAdsProductID {
-                    // 💡 THREAD SAFETY FIX: Safely route historic entitlement state changes back to Main Actor
                     await MainActor.run {
                         self.isPremiumUnlocked = true
                         UserDefaults.standard.set(true, forKey: "user_purchased_ad_free_forever")
@@ -150,7 +157,6 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     func loadRewardedInterstitial() {
         let request = Request()
         
-        // Target your live production ad unit placement path
         RewardedInterstitialAd.load(with: liveAdUnitID, request: request) { ad, error in
             Task { @MainActor in
                 if let error = error {
@@ -196,3 +202,4 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
         }
     }
 }
+
