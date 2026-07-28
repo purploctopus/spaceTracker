@@ -133,6 +133,27 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
         }
     }
     
+    // 💡 MANDATORY FOR GUIDELINE 3.1.1: Explicitly triggers a manual look up of historical purchases
+    func manualRestorePurchases() async {
+        print("🛍️ [STOREKIT]: Manual restore requested by user. Syncing entitlements...")
+        
+        // Loop through all historically verified purchases associated with the user's Apple ID
+        for await result in Transaction.currentEntitlements {
+            if case .verified(let transaction) = result {
+                if transaction.productID == removeAdsProductID {
+                    // Update the UI state safely on the Main Actor
+                    await MainActor.run {
+                        self.isPremiumUnlocked = true
+                        UserDefaults.standard.set(true, forKey: "user_purchased_ad_free_forever")
+                    }
+                    print("✅ [STOREKIT]: Historical entitlement found and restored successfully.")
+                    return
+                }
+            }
+        }
+        print("ℹ️ [STOREKIT]: Manual restore complete. No historical active entitlements discovered.")
+    }
+    
     // MARK: - ADMOB INTEGRATION LOGIC
     
     func checkDailyUnlockStatus() {

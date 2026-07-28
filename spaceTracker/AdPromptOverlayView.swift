@@ -116,6 +116,27 @@ struct AdPromptOverlayView: View {
                 }
                 .padding(.bottom, 4)
                 
+                Button(action: {
+                    // Lock the timer if needed, then fire the manual check
+                    isPurchasing = true
+                    Task {
+                        await adEngine.manualRestorePurchases()
+                        if adEngine.isPremiumUnlocked {
+                            onDismiss() // Close the paywall completely on success
+                        } else {
+                            isPurchasing = false // Resume normal operation if no purchase found
+                        }
+                    }
+                }) {
+                    Text("Restore Purchases")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.gray)
+                        .underline()
+                        .padding(.vertical, 4)
+                }
+                .disabled(isPurchasing) // Prevent multiple concurrent taps while processing
+
+                
                 // Action Control Layout Row
                 HStack(spacing: 16) {
                     Button(action: onDismiss) {
