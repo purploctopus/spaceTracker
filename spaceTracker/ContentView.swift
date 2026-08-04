@@ -38,78 +38,136 @@ struct ContentView: View {
     @State private var globalTapCount = 0
     @StateObject private var adEngine = AdMobEngine()
     @State private var showAdPromptOverlay = false
+    @State private var showConditionsExplainer = false
     @State private var adInterceptActionLabel = ""
     @State private var pendingAdCompletionAction: (() -> Void)? = nil
     
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
 
 
-    // 💡 THE COMPILER GATEKEEPER: Standalone modular components prevents type-check freeze loops
+    // 💡 THE TERMINAL MONITOR CARD: The entire panel acts as a unified button link to trigger your full explainer overlay mesh
     private var stargazingConditionsHeaderBar: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("LOCAL ATMOSPHERIC RECON")
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundColor(.secondary)
-                .tracking(2)
-            
-            HStack(spacing: 16) {
-                // Cloud Cover Readout Block
-                HStack(spacing: 6) {
-                    Image(systemName: "cloud.fill")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
-                        .font(.system(.caption, design: .monospaced))
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                }
+        let shortTermAlert = weatherViewModel.kpIndex >= 5.0 ? "STORM ACTIVE" : weatherViewModel.kpIndex >= 4.0 ? "MODERATE WATCH" : "QUIET"
+        
+        return Button(action: { showConditionsExplainer = true }) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("LOCAL ATMOSPHERIC RECON // TAP FOR FIELD BRIEFING ❯")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundColor(.cyan) // Color indicator signals it can be clicked
+                    .tracking(1)
                 
-                // Humidity Readout Block
-                HStack(spacing: 6) {
-                    Image(systemName: "humidity.fill")
-                        .font(.caption)
-                        .foregroundColor(.cyan)
-                    Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
-                        .font(.system(.caption, design: .monospaced))
-                        .fontWeight(.bold)
-                        .foregroundColor(.cyan)
-                }
-                
-                Spacer()
-                
-                // Operational Sky Status Pill Tag
-                Text(weatherViewModel.observationRating.replacingOccurrences(of: " // ", with: ": "))
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(weatherViewModel.cloudCoverPercent > 50 ? .orange : .green)
-                
-                // 💡 FIXED: Positions the mandatory WeatherKit elements directly to the right of the status pill
-                HStack(spacing: 6) {
-                    HStack(spacing: 2) {
+                HStack(spacing: 16) {
+                    // Cloud Cover Readout
+                    HStack(spacing: 6) {
+                        Image(systemName: "cloud.fill")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    }
+                    
+                    // Humidity Readout
+                    HStack(spacing: 6) {
+                        Image(systemName: "humidity.fill")
+                            .font(.caption)
+                            .foregroundColor(.cyan)
+                        Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.cyan)
+                    }
+                    
+                    Spacer()
+                    
+                    // Live Kp Score Display
+                    HStack(spacing: 6) {
+                        Text("KP: \(String(format: "%.1f", weatherViewModel.kpIndex))")
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        Text("• 3-DAY WATCH: \(shortTermAlert)")
+                            .foregroundColor(.secondary)
+                    }
+                    .font(.system(.caption, design: .monospaced))
+                    
+                    // Required Apple Logo and Link to clear App Review Guideline 5.2.5 [USER_CONTEXT]
+                    HStack(spacing: 4) {
                         Image(systemName: "apple.logo")
                             .font(.system(size: 9))
                         Text("Weather")
                             .font(.system(size: 9, weight: .semibold))
+                        
+                        Link("Data", destination: URL(string: "https://apple.com")!)
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundColor(.blue)
+                            .underline()
                     }
                     .foregroundColor(.secondary)
-                    
-                    Link("Data Sources", destination: URL(string: "https://weatherkit.apple.com/legal-attribution.html")!)
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundColor(.blue)
                 }
-                .padding(.leading, 4) // Tiny buffer to separate it cleanly from the status pill border
+                .padding(12)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
             }
-            .padding(12)
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(4)
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            )
         }
+        .buttonStyle(PlainButtonStyle())
         .padding(.horizontal)
-        .padding(.bottom, 8)
+        .padding(.top, 16)
+      //  .padding(.bottom, 8)
     }
     
+    // 💡 THE DYNAMIC BRIEFING ENGINE: Translates our physical scenario grid into plain-English field intelligence
+    private var dynamicMissionBriefingText: String {
+        let clouds = weatherViewModel.cloudCoverPercent
+        let kp = weatherViewModel.kpIndex
+        
+        // Define exact weather threshold brackets
+        let isOvercast = clouds > 70
+        let isPartlyCloudy = clouds > 30 && clouds <= 70
+        let isClear = clouds <= 30
+        
+        // Define exact solar alert threshold brackets
+        let isExtremeStorm = kp >= 7.0
+        let isMinorStorm = kp >= 5.0 && kp < 7.0
+        
+        // --- 1. THE OVERCAST BRACKET: Thick clouds block 100% of light ---
+        if isOvercast {
+            if isExtremeStorm || isMinorStorm {
+                return "VISUAL BLOCKED: A solar storm is active right now (KP \(String(format: "%.1f", kp))), but heavy cloud cover (\(clouds)%) completely blocks your view. You will not see anything until the weather layer breaks."
+            } else {
+                return "TERMINAL BLOCKED: Total cloud cover (\(clouds)%) is blocking the sky, and solar activity is completely quiet. Conditions are poor for all forms of visual astronomy."
+            }
+        }
+        
+        // --- 2. THE PARTLY CLOUDY BRACKET: Fragmented sky windows ---
+        if isPartlyCloudy {
+            if isExtremeStorm {
+                return "PARTIAL SIGHTING: An extreme solar storm is active (KP \(String(format: "%.1f", kp))). Passing cloud gaps (\(clouds)% cover) may allow you to catch bright aurora pillars if you scan clear patches of the sky."
+            } else if isMinorStorm {
+                return "HIGH FRICTION: Minor solar activity detected (KP \(String(format: "%.1f", kp))), but scattered clouds (\(clouds)%) make observation difficult. Horizon glow will be tough to distinguish from light pollution."
+            } else {
+                return "STANDBY: Skies are partially broken, but solar activity is quiet. You can try tracking brighter satellite crossings through the clear gaps, but there is no aurora risk."
+            }
+        }
+        
+        // --- 3. THE CLEAR SKIES BRACKET: Crisp, unobstructed viewports ---
+        if isClear {
+            if isExtremeStorm {
+                return "MAXIMUM ALERT: Perfect tracking window. Local skies are beautifully clear and an extreme solar storm is peaking (KP \(String(format: "%.1f", kp))). Step outside immediately—vivid auroras are highly likely overhead."
+            } else if isMinorStorm {
+                return "ACTIVE OUTLOOK: Clear skies provide great viewing parameters. A minor solar storm is active (KP \(String(format: "%.1f", kp))). Look toward your northern horizon for visible light glows."
+            } else {
+                return "PRIME SATELLITE WINDOW: The solar shield is quiet (KP \(String(format: "%.1f", kp))), meaning zero aurora chance. However, because your skies are completely clear, you have the absolute perfect, light-pollution-free window to track satellite crossings, rocket launches, and space stations!"
+            }
+        }
+        
+        return "STANDBY // POLLING METRIC DATA..."
+    }
+
     private var toolbarLogoSize: CGFloat {
         // ✅ RESPONSIVE FRACTION: Scales dynamically by measuring the typographic base font profile line height
         let bodyFontMetric = UIFont.preferredFont(forTextStyle: .body).lineHeight
@@ -432,8 +490,6 @@ struct ContentView: View {
     // Safely unloads complex view logic from the main layout tree
     private var visibleSatellitesChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Divider()
-                .background(Color.white.opacity(0.1))
             Text("OVERHEAD VISUAL TRACKS (48H)")
                 .font(.system(.caption, design: .monospaced))
                 .foregroundColor(.secondary)
@@ -731,24 +787,21 @@ struct ContentView: View {
                 TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
                 
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 32) {
+                    VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
                         stargazingConditionsHeaderBar
-                        // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL
+                            .padding(.top, 16) // 💡 Clears the frame constraints of the absolutely positioned Daily Command header box
+                        
+                        // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL (Includes your company filter buttons and horizontal cards)
                         upcoming7DayMissionsChannelBlock
                             .toolbar {
                                 ToolbarItem(placement: .principal) {
                                     principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
                                 }
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Clamps the block layout width
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         
-                        // 3. MASTER ACCESS CHANNEL ROADWAY LINK
-                        VStack(alignment: .leading, spacing: 12) {
-                            Divider()
-                                .background(Color.white.opacity(0.15))
-                                .padding(.horizontal)
-                                .padding(.bottom, 10)
-                            
+                        // 3. MASTER ACCESS CHANNEL ROADWAY LINK (Pulls tight under the launch tracks thanks to parent spacing: 8)
+                        VStack(alignment: .leading, spacing: 2) {
                             // 💡 THE DIRECT REIFIED CHECK:
                             if adEngine.isPremiumUnlocked || globalTapCount < 3 {
                                 // YES OK -> Just wrap the card in a standard, direct NavigationLink push
@@ -779,21 +832,25 @@ struct ContentView: View {
 
                         // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
                         visibleSatellitesChannelBlock
-                            .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Binds the tracking system module bounds safely
-                        
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 24) // 💡 Spacers separate distinct tracking channels cleanly without cluttering the screen with dividers
+
                         // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
                         nasaAsteroidRadarChannelBlock
-                            .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals asteroid section horizontal container
-                        
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 24) // 💡 Pushes the title text down away from the satellite cards above it so it matches its cards
+
                         // 🛰️ 4. ANNUAL METEOR SHOWER LOOKAHEAD MANIFEST CHANNEL
                         annualMeteorShowerChannelBlock
-                            .frame(maxWidth: .infinity, alignment: .leading) // ✅ FIXED: Seals meteor section horizontal container
-                        
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 24) // 💡 Separates the meteor timelines from the asteroid radar matrix above it
+
                         // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
                         liveHumansInSpaceChannelBlock
+                            .padding(.top, 24) // 💡 Balances the final telemetry grid segment
                     } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
-                    .padding(.bottom, 60)
+                    .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
                 } // Closes ScrollView
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(.hidden, for: .navigationBar)
@@ -833,6 +890,55 @@ struct ContentView: View {
                     )
                     .transition(.opacity.animation(.easeInOut))
                 }
+                // 💡 THE CONDITIONS BRIEFING POPUP: Dimmed backdrop with a clean, centralized terminal box
+                if showConditionsExplainer {
+                    ZStack {
+                        Color.black.opacity(0.85)
+                            .ignoresSafeArea()
+                            .onTapGesture { showConditionsExplainer = false } // Dismiss when background is tapped
+                        
+                        VStack(alignment: .leading, spacing: 20) {
+                            // Header Row
+                            HStack {
+                                Text("FIELD BRIEFING: WEATHER STATUS")
+                                    .font(.system(.subheadline, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.cyan)
+                                Spacer()
+                                Button(action: { showConditionsExplainer = false }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                            
+                            Divider()
+                                .background(Color.white.opacity(0.15))
+                            
+                            // Human-Readable Telemetry Breakdown
+                            VStack(alignment: .leading, spacing: 14) {
+                                // 💡 THE COMPLIANT TARGET INSIGHT ROW: Renders our exact dynamic string matrix text flawlessly
+                                Text(dynamicMissionBriefingText)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(weatherViewModel.cloudCoverPercent <= 30 ? .green : (weatherViewModel.cloudCoverPercent > 70 ? .orange : .yellow))
+                                Text("• CLOUDS & HUMIDITY: This dictates your visual visibility vector. Low cloud cover (< 30%) and low humidity mean crisp, high-clarity viewing conditions through your local atmospheric path.")
+                                
+                                Text("• KP-INDEX: This tracks geomagnetic solar storms in the upper atmosphere on a scale of 0 to 9. High scores (5+) trigger aurora displays.")
+                                
+                            }
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .lineSpacing(4)
+                        }
+                        .padding(24)
+                        .background(Color(red: 0.06, green: 0.06, blue: 0.06))
+                        .border(Color.white.opacity(0.1), width: 1)
+                        .cornerRadius(6)
+                        .padding(.horizontal, horizontalSizeClass == .regular ? 140 : 24)
+                    }
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                }
+
 
             } // Closes ZStack
             .onAppear {
@@ -860,7 +966,8 @@ struct ContentView: View {
                 // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
                 let currentISOString = ISO8601DateFormatter().string(from: Date())
                 await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
-                
+                await weatherViewModel.fetchGeomagneticRadar()
+
                 // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
                 notificationEngine.scheduleDailyBriefing(
                     launches: viewModel.launches,

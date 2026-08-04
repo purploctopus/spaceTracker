@@ -18,7 +18,47 @@ class StargazingWeatherViewModel: ObservableObject {
     @Published var observationRating: String = "POLLING COMPASS DATA..."
     @Published var isLoading = false
     
+    // 💡 INJECTED GEOMAGNETIC AURORA VARIABLES
+    @Published var kpIndex: Double = 0.0
+    @Published var auroraStormActive: Bool = false
+    @Published var geomagneticStatusText: String = "QUIET CONDITIONS"
+    
     private let weatherService = WeatherService.shared
+    
+    // 💡 INJECTED SPACE WEATHER ENGINE: Pulls live global solar storm telemetry from NOAA
+    func fetchGeomagneticRadar() async {
+        guard let url = URL(string: "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json") else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+               let latestReading = jsonArray.last,
+               let kpString = latestReading["kp_index"] as? String,
+               let kpParsed = Double(kpString) {
+                
+                self.kpIndex = kpParsed
+                
+                // Kp Scale: >= 5.0 is G1 (Minor Storm), >= 7.0 is G3 (Severe Storm)
+                if kpParsed >= 7.0 {
+                    self.auroraStormActive = true
+                    self.geomagneticStatusText = "G3+ SEVERE STORM // AURORA ACTIVE"
+                } else if kpParsed >= 5.0 {
+                    self.auroraStormActive = true
+                    self.geomagneticStatusText = "G1-G2 MINOR STORM // HORIZON GLOW"
+                } else if kpParsed >= 4.0 {
+                    self.auroraStormActive = false
+                    self.geomagneticStatusText = "UNSETTLED GEOMAGNETIC SHIELD"
+                } else {
+                    self.auroraStormActive = false
+                    self.geomagneticStatusText = "QUIET IONOSPHERE METRICS"
+                }
+                print("📡 [SPACE WEATHER]: Successfully processed Kp-Index: \(kpParsed)")
+            }
+        } catch {
+            print("❌ [SPACE WEATHER ERROR]: Failed to decode planetary K-index logs: \(error)")
+        }
+    }
     
     func fetchStargazingWeather(lat: Double, lng: Double, targetISO8601Date: String) async {
         isLoading = true
@@ -43,10 +83,8 @@ class StargazingWeatherViewModel: ObservableObject {
         do {
             print("📡 [WEATHERKIT]: Dispatching secure telemetry request to Apple edge servers...")
             
-            // Pulls the precise hourly forecast block natively from the iOS database
             let weatherData = try await weatherService.weather(for: location, including: .hourly)
             
-            // Match the precise hour of the satellite pass crossing event frame
             if let matchedHour = weatherData.first(where: { hour in
                 Calendar.current.isDate(hour.date, equalTo: validDate, toGranularity: .hour)
             }) {
@@ -78,4 +116,33 @@ class StargazingWeatherViewModel: ObservableObject {
             self.isLoading = false
         }
     }
+    
+    // 💡 INJECT THIS INTO YOUR StargazingWeatherViewModel CLASS
+    func calculateNextVisualPrediction(userLatitude: Double) -> (targetKp: Double, urgencyText: String, isPossibleNow: Bool) {
+        let absLat = abs(userLatitude) // Handles northern and southern hemisphere limits
+        let targetRequiredKp: Double
+        
+        // NOAA Geomagnetic Latitude to Kp Translation Matrix
+        if absLat >= 65.0 { targetRequiredKp = 1.0 }       // Alaska, Northern Scandinavia
+        else if absLat >= 60.0 { targetRequiredKp = 3.0 }  // Southern Canada, Scotland
+        else if absLat >= 54.0 { targetRequiredKp = 5.0 }  // Northern US Border (WA, ND, MN, ME)
+        else if absLat >= 50.0 { targetRequiredKp = 6.0 }  // Central US (OR, IL, NY) / Northern Europe
+        else if absLat >= 44.0 { targetRequiredKp = 7.0 }  // Mid-US (CA, NE, PA, OH)
+        else if absLat >= 38.0 { targetRequiredKp = 8.0 }  // Southern US (TX, FL) / Southern Europe
+        else { targetRequiredKp = 9.0 }                    // Equatorial / Deep Space Boundary
+        
+        // Core Comparison Check
+        if self.kpIndex >= targetRequiredKp {
+            return (targetRequiredKp, "🚨 ACTIVE VISUAL DETECTED // LOOK UP NOW", true)
+        } else {
+            // Determine structural distance gap to predict the active threat profile
+            let gap = targetRequiredKp - self.kpIndex
+            if gap <= 1.5 {
+                return (targetRequiredKp, "⚠️ GEOMAGNETIC UNREST // HIGH THREAT EVENT PENDING", false)
+            } else {
+                return (targetRequiredKp, "STANDBY // RECON ACCELERATION DEMANDS KP \(String(format: "%.0f", targetRequiredKp))+", false)
+            }
+        }
+    }
+
 }
