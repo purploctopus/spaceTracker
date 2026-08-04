@@ -45,7 +45,7 @@ struct ContentView: View {
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
 
 
-    // 💡 THE TERMINAL MONITOR CARD: The entire panel acts as a unified button link to trigger your full explainer overlay mesh
+    // 💡 RESPONSIVE ATMOSPHERIC CELL MATRIX: Stacks vertically on iPhone, aligns horizontally on iPad
     private var stargazingConditionsHeaderBar: some View {
         let shortTermAlert = weatherViewModel.kpIndex >= 5.0 ? "STORM ACTIVE" : weatherViewModel.kpIndex >= 4.0 ? "MODERATE WATCH" : "QUIET"
         
@@ -53,57 +53,109 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("LOCAL ATMOSPHERIC RECON // TAP FOR FIELD BRIEFING ❯")
                     .font(.system(.caption2, design: .monospaced))
-                    .foregroundColor(.cyan) // Color indicator signals it can be clicked
+                    .foregroundColor(.cyan)
                     .tracking(1)
                 
-                HStack(spacing: 16) {
-                    // Cloud Cover Readout
-                    HStack(spacing: 6) {
-                        Image(systemName: "cloud.fill")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
-                            .font(.system(.caption, design: .monospaced))
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                    }
-                    
-                    // Humidity Readout
-                    HStack(spacing: 6) {
-                        Image(systemName: "humidity.fill")
-                            .font(.caption)
-                            .foregroundColor(.cyan)
-                        Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
-                            .font(.system(.caption, design: .monospaced))
-                            .fontWeight(.bold)
-                            .foregroundColor(.cyan)
-                    }
-                    
-                    Spacer()
-                    
-                    // Live Kp Score Display
-                    HStack(spacing: 6) {
-                        Text("KP: \(String(format: "%.1f", weatherViewModel.kpIndex))")
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        Text("• 3-DAY WATCH: \(shortTermAlert)")
-                            .foregroundColor(.secondary)
-                    }
-                    .font(.system(.caption, design: .monospaced))
-                    
-                    // Required Apple Logo and Link to clear App Review Guideline 5.2.5 [USER_CONTEXT]
-                    HStack(spacing: 4) {
-                        Image(systemName: "apple.logo")
-                            .font(.system(size: 9))
-                        Text("Weather")
-                            .font(.system(size: 9, weight: .semibold))
+                VStack(alignment: .leading, spacing: 12) {
+                    if horizontalSizeClass == .compact {
+                        // 📱 IPHONE MATRIX: Stacks neatly into 3 distinct, uncluttered layout rows
                         
-                        Link("Data", destination: URL(string: "https://apple.com")!)
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .foregroundColor(.blue)
-                            .underline()
+                        // ROW 1: Ground-Level Weather Readouts
+                        HStack(spacing: 20) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "cloud.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
+                                    .fontWeight(.bold)
+                            }
+                            
+                            HStack(spacing: 6) {
+                                Image(systemName: "humidity.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.cyan)
+                                Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.cyan)
+                            }
+                            Spacer()
+                        }
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.white)
+                        
+                        // ROW 2: Geomagnetic Solar Tracking Readouts
+                        HStack(spacing: 6) {
+                            Text("KP: \(String(format: "%.1f", weatherViewModel.kpIndex))")
+                                .fontWeight(.bold)
+                            Text("• 3-DAY WATCH: \(shortTermAlert)")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.white)
+                        
+                        // ROW 3: Mandatory Legal Attribution Footer (Aligned cleanly to the right edge)
+                        HStack {
+                            Spacer()
+                            HStack(spacing: 4) {
+                                Image(systemName: "apple.logo")
+                                    .font(.system(size: 9))
+                                Text("Weather")
+                                    .font(.system(size: 9, weight: .semibold))
+                                
+                                Link("Data", destination: URL(string: "https://apple.com")!)
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.blue)
+                                    .underline()
+                            }
+                            .foregroundColor(.secondary)
+                        }
+                        
+                    } else {
+                        // 🖥️ IPAD PAD LAYOUT: Retains your original single horizontal instruments string line row
+                        HStack(spacing: 16) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "cloud.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            }
+                            
+                            HStack(spacing: 6) {
+                                Image(systemName: "humidity.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.cyan)
+                                Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.cyan)
+                            }
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 6) {
+                                Text("KP: \(String(format: "%.1f", weatherViewModel.kpIndex))")
+                                    .fontWeight(.bold)
+                                Text("• 3-DAY WATCH: \(shortTermAlert)")
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "apple.logo")
+                                    .font(.system(size: 9))
+                                Text("Weather")
+                                    .font(.system(size: 9, weight: .semibold))
+                                
+                                Link("Data", destination: URL(string: "https://apple.com")!)
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.blue)
+                                    .underline()
+                            }
+                            .foregroundColor(.secondary)
+                        }
+                        .font(.system(.caption, design: .monospaced))
                     }
-                    .foregroundColor(.secondary)
                 }
                 .padding(12)
                 .background(Color.white.opacity(0.04))
@@ -116,8 +168,7 @@ struct ContentView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .padding(.horizontal)
-        .padding(.top, 16)
-      //  .padding(.bottom, 8)
+        .padding(.bottom, 8)
     }
     
     // 💡 THE DYNAMIC BRIEFING ENGINE: Translates our physical scenario grid into plain-English field intelligence
@@ -602,13 +653,13 @@ struct ContentView: View {
         HStack(alignment: .center, spacing: sizeClass == .regular ? 24 : 14) {
             
             // 🚀 LEFT LOGO APERTURE
-            Image("launch_logo")
+            Image("logo_transparent")
                 .resizable()
                 .renderingMode(.template)
                 .aspectRatio(contentMode: .fit)
-                .frame(width: sizeClass == .regular ? 38 : 28, height: sizeClass == .regular ? 38 : 28)
+                .frame(width: sizeClass == .regular ? 48 : 38, height: sizeClass == .regular ? 48 : 38)
                 .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
-                .padding(sizeClass == .regular ? 10 : 8)
+                .padding(sizeClass == .regular ? 6 : 4)
                 .background(Color.init(red: 0.4, green: 0.8, blue: 0.9).opacity(0.05))
                 .cornerRadius(4)
                 .overlay(
