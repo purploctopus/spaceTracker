@@ -35,9 +35,7 @@ struct ContentView: View {
     @State private var activeLiveStreamURL: String = ""
     @State private var streamingLaunchName: String = ""
     @State private var streamingLaunchNetDate: String? = nil
-
-
-
+    @State private var globalTapCount = 0
     @StateObject private var adEngine = AdMobEngine()
     @State private var showAdPromptOverlay = false
     @State private var adInterceptActionLabel = ""
@@ -220,11 +218,16 @@ struct ContentView: View {
                         ForEach(meteorViewModel.upcomingShowers) { shower in
                             MeteorShowerCardView(shower: shower, userLatitude: universalLatitude)
                                 .onTapGesture {
-                                    if adEngine.isPremiumUnlocked {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                        globalTapCount += 1
+                                        print("🎯 [METEOR TAP]: Meteor shower clicked. Total Taps: \(globalTapCount)/3")
                                         selectedMeteorShower = shower
                                     } else {
                                         adInterceptActionLabel = shower.name
-                                        pendingAdCompletionAction = { selectedMeteorShower = shower }
+                                        pendingAdCompletionAction = {
+                                            globalTapCount = 0 // Reset counter to 0 on ad success
+                                            selectedMeteorShower = shower
+                                        }
                                         showAdPromptOverlay = true
                                     }
                                 }
@@ -275,15 +278,19 @@ struct ContentView: View {
                                 userLatitude: universalLatitude,
                                 userLongitude: universalLongitude
                             )
-                            // 💡 FIXED: Wrapped inside your active ad monetization firewall gate!
                             .onTapGesture {
-                                if adEngine.isPremiumUnlocked {
+                                if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                    globalTapCount += 1
+                                    print("🎯 [ASTEROID TAP]: Asteroid clicked. Total Taps: \(globalTapCount)/3")
                                     // 🟢 Premium Active: Skip ad layer and open sheet instantly
                                     selectedAsteroidTarget = asteroid
                                 } else {
                                     // 🛑 Ad Gate Active: Cache action parameters and fire intercept overlay
                                     adInterceptActionLabel = asteroid.name
-                                    pendingAdCompletionAction = { selectedAsteroidTarget = asteroid }
+                                    pendingAdCompletionAction = {
+                                        globalTapCount = 0 // Reset counter to 0 on ad success
+                                        selectedAsteroidTarget = asteroid
+                                    }
                                     showAdPromptOverlay = true
                                 }
                             }
@@ -329,11 +336,16 @@ struct ContentView: View {
                             SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
                                 // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
                                 .onTapGesture {
-                                    if adEngine.isPremiumUnlocked {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                        globalTapCount += 1
+                                        print("🎯 [CREW TAP]: ISS clicked. Total Taps: \(globalTapCount)/3")
                                         selectedSpacecraftCrewName = "International Space Station"
                                     } else {
                                         adInterceptActionLabel = "International Space Station Crew"
-                                        pendingAdCompletionAction = { selectedSpacecraftCrewName = "International Space Station" }
+                                        pendingAdCompletionAction = {
+                                            globalTapCount = 0
+                                            selectedSpacecraftCrewName = "International Space Station"
+                                        }
                                         showAdPromptOverlay = true
                                     }
                                 }
@@ -343,11 +355,16 @@ struct ContentView: View {
                             SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
                                 // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
                                 .onTapGesture {
-                                    if adEngine.isPremiumUnlocked {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                        globalTapCount += 1
+                                        print("🎯 [CREW TAP]: Tiangong clicked. Total Taps: \(globalTapCount)/3")
                                         selectedSpacecraftCrewName = "Tiangong Space Station"
                                     } else {
                                         adInterceptActionLabel = "Tiangong Space Station Crew"
-                                        pendingAdCompletionAction = { selectedSpacecraftCrewName = "Tiangong Space Station" }
+                                        pendingAdCompletionAction = {
+                                            globalTapCount = 0
+                                            selectedSpacecraftCrewName = "Tiangong Space Station"
+                                        }
                                         showAdPromptOverlay = true
                                     }
                                 }
@@ -355,16 +372,21 @@ struct ContentView: View {
                         
                         if !crewViewModel.otherCrew.isEmpty {
                             SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
-                                // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
-                                .onTapGesture {
-                                    if adEngine.isPremiumUnlocked {
+                            // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
+                            .onTapGesture {
+                                if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                    globalTapCount += 1 // Increment local state counter
+                                    print("🎯 [CREW TAP]: Crew clicked. Total Taps: \(globalTapCount)/3")
+                                    selectedSpacecraftCrewName = "Experimental Transits"
+                                } else {
+                                    adInterceptActionLabel = "Experimental Transit Crew"
+                                    pendingAdCompletionAction = {
+                                        globalTapCount = 0 // Reset counter to 0 on ad success
                                         selectedSpacecraftCrewName = "Experimental Transits"
-                                    } else {
-                                        adInterceptActionLabel = "Experimental Transit Crew"
-                                        pendingAdCompletionAction = { selectedSpacecraftCrewName = "Experimental Transits" }
-                                        showAdPromptOverlay = true
                                     }
+                                    showAdPromptOverlay = true
                                 }
+                            }
                         }
                     }
                     .fixedSize(horizontal: false, vertical: true)
@@ -496,12 +518,18 @@ struct ContentView: View {
                         ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { (sat: SatellitePass) in
                             SatelliteCardView(sat: sat, location: satViewModel.locationName)
                                 .onTapGesture {
-                                    // 💡 INTERCEPT GATEKEEPER: Checks if the user has already unlocked access for today
-                                    if adEngine.isPremiumUnlocked {
+                                    // 💡 Checks local view state directly. First 3 taps go through anywhere.
+                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                        globalTapCount += 1 // Increment locally
+                                        print("🎯 [CARD TAP]: Satellite clicked. Total Taps: \(globalTapCount)/3")
                                         selectedSatellitePass = sat
                                     } else {
+                                        // 4th tap triggers the ad overlay. Reset to 0 when ad finishes.
                                         adInterceptActionLabel = sat.name
-                                        pendingAdCompletionAction = { selectedSatellitePass = sat }
+                                        pendingAdCompletionAction = {
+                                            globalTapCount = 0
+                                            selectedSatellitePass = sat
+                                        }
                                         showAdPromptOverlay = true
                                     }
                                 }
@@ -674,13 +702,17 @@ struct ContentView: View {
                                         showLiveVideoTelemetrySheet = true
                                     }
                                 )
-
                                 .onTapGesture {
-                                    if adEngine.isPremiumUnlocked {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                        globalTapCount += 1
+                                        print("🎯 [LAUNCH TAP]: Space launch clicked. Total Taps: \(globalTapCount)/3")
                                         selectedSpaceLaunch = launch
                                     } else {
                                         adInterceptActionLabel = launch.name
-                                        pendingAdCompletionAction = { selectedSpaceLaunch = launch }
+                                        pendingAdCompletionAction = {
+                                            globalTapCount = 0 // Reset counter to 0 on ad success
+                                            selectedSpaceLaunch = launch
+                                        }
                                         showAdPromptOverlay = true
                                     }
                                 }
@@ -718,18 +750,24 @@ struct ContentView: View {
                                 .padding(.bottom, 10)
                             
                             // 💡 THE DIRECT REIFIED CHECK:
-                            if adEngine.isPremiumUnlocked {
+                            if adEngine.isPremiumUnlocked || globalTapCount < 3 {
                                 // YES OK -> Just wrap the card in a standard, direct NavigationLink push
                                 NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
                                     MasterAccessChannelRowView(launches: viewModel.launches)
                                 }
                                 .buttonStyle(PlainButtonStyle())
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    globalTapCount += 1
+                                    print("🎯 [LINK TAP]: Master Link clicked. Total Taps: \(globalTapCount)/3")
+                                })
                                 
                             } else {
                                 // NO -> Freeze navigation and show your standard ad prompt overlay grid
                                 Button(action: {
                                     adInterceptActionLabel = "Global Orbital Providers Directory"
-                                    pendingAdCompletionAction = { } // Clears out on video close
+                                    pendingAdCompletionAction = {
+                                        globalTapCount = 0 // Reset counter to 0 on ad success
+                                    }
                                     showAdPromptOverlay = true
                                 }) {
                                     MasterAccessChannelRowView(launches: viewModel.launches)
