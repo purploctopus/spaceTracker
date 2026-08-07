@@ -103,7 +103,7 @@ struct ContentView: View {
                                 Text("Weather")
                                     .font(.system(size: 9, weight: .semibold))
                                 
-                                Link("Data", destination: URL(string: "https://apple.com")!)
+                                Link("Data", destination: URL(string: "https://weather-data.apple.com/legal-attribution.html")!)
                                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                                     .foregroundColor(.blue)
                                     .underline()
@@ -885,7 +885,9 @@ struct ContentView: View {
                         visibleSatellitesChannelBlock
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 24) // 💡 Spacers separate distinct tracking channels cleanly without cluttering the screen with dividers
-
+                        // 💡 NEW DEPLOYMENT: THE 3D ORBITAL INTERCEPT RADAR MAP CONTAINER
+                        SpaceStationRadarChannelView()
+                            .padding(.top, 24)
                         // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
                         nasaAsteroidRadarChannelBlock
                             .frame(maxWidth: .infinity, alignment: .leading)
