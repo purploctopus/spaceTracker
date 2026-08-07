@@ -13,8 +13,8 @@ struct SpaceStationRadarChannelView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("ORBITAL INTERCEPT RADAR // REAL-TIME LIVE COCKPIT")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+            Text("SPACE STATION TRACKER // LIVE ORBITAL POSITION")
+                .font(.system(.caption, design: .monospaced).weight(.bold))
                 .foregroundColor(.cyan)
                 .tracking(1)
             

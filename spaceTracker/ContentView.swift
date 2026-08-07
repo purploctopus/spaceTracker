@@ -51,8 +51,8 @@ struct ContentView: View {
         
         return Button(action: { showConditionsExplainer = true }) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("LOCAL ATMOSPHERIC RECON // TAP FOR FIELD BRIEFING ❯")
-                    .font(.system(.caption2, design: .monospaced))
+                Text("LOCAL ATMOSPHERIC DATA // TAP FOR FIELD BRIEFING ❯")
+                    .font(.system(.caption, design: .monospaced).weight(.bold))
                     .foregroundColor(.cyan)
                     .tracking(1)
                 
@@ -310,8 +310,8 @@ struct ContentView: View {
     private var annualMeteorShowerChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("ANNUAL METEOR SHOWER OUTLOOK")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.secondary)
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .foregroundColor(.cyan)
                 .tracking(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -351,9 +351,9 @@ struct ContentView: View {
     // Isolates the asteroid calculations to fully stabilize the compiler
     private var nasaAsteroidRadarChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("NEAR-EARTH OBJECTS RADAR (7-DAY)")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.secondary)
+            Text("NEAR-EARTH ASTEROIDS (7-DAY)")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundColor(.cyan)
                 .tracking(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -422,9 +422,9 @@ struct ContentView: View {
     // Isolates human crew rendering to guarantee swift compiling
     private var liveHumansInSpaceChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("ACTIVE ORBITAL CREW RECON (\(crewViewModel.totalHumansInOrbit) ACTIVE)")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.secondary)
+            Text("CURRENT HUMANS IN SPACE (\(crewViewModel.totalHumansInOrbit) ACTIVE)")
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .foregroundColor(.cyan)
                 .tracking(2)
                 .padding(.horizontal)
             
@@ -541,9 +541,9 @@ struct ContentView: View {
     // Safely unloads complex view logic from the main layout tree
     private var visibleSatellitesChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("OVERHEAD VISUAL TRACKS (48H)")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.secondary)
+            Text("UPCOMING SATELLITE PASSES")
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .foregroundColor(.cyan)
                 .tracking(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -731,9 +731,9 @@ struct ContentView: View {
 
     private var upcoming7DayMissionsChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("UPCOMING 7-DAY MISSIONS")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.secondary)
+            Text("UPCOMING 7-DAY LAUNCHES")
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .foregroundColor(.cyan)
                 .tracking(2)
                 .padding(.horizontal)
             
@@ -841,7 +841,8 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
                         stargazingConditionsHeaderBar
                             .padding(.top, 16) // 💡 Clears the frame constraints of the absolutely positioned Daily Command header box
-                        
+                        Divider()
+                            .background(Color.cyan)
                         // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL (Includes your company filter buttons and horizontal cards)
                         upcoming7DayMissionsChannelBlock
                             .toolbar {
@@ -880,24 +881,30 @@ struct ContentView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        Divider()
+                            .background(Color.cyan)
 
                         // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
                         visibleSatellitesChannelBlock
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 24) // 💡 Spacers separate distinct tracking channels cleanly without cluttering the screen with dividers
-                        // 💡 NEW DEPLOYMENT: THE 3D ORBITAL INTERCEPT RADAR MAP CONTAINER
-                        SpaceStationRadarChannelView()
                             .padding(.top, 24)
+                        Divider()
+                            .background(Color.cyan)
                         // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
                         nasaAsteroidRadarChannelBlock
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 24) // 💡 Pushes the title text down away from the satellite cards above it so it matches its cards
-
+                        Divider()
+                            .background(Color.cyan)
                         // 🛰️ 4. ANNUAL METEOR SHOWER LOOKAHEAD MANIFEST CHANNEL
                         annualMeteorShowerChannelBlock
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 24) // 💡 Separates the meteor timelines from the asteroid radar matrix above it
-
+                        Divider()
+                            .background(Color.cyan)
+                        // THE 3D ORBITAL INTERCEPT RADAR MAP CONTAINER
+                        SpaceStationRadarChannelView()
+                            .padding(.top, 24)
                         // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
                         liveHumansInSpaceChannelBlock
                             .padding(.top, 24) // 💡 Balances the final telemetry grid segment
