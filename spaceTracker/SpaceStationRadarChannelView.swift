@@ -25,7 +25,7 @@ struct SpaceStationRadarChannelView: View {
                     .background(Color.white.opacity(0.12))
                 
                 // 🌍 INTERACTIVE RENDER INTERCEPT AREA
-                ZStack(alignment: .bottomLeading) {
+                ZStack(alignment: .bottomTrailing) {
                     OrbitalGlobeView(
                         issCoordinate: $trackingViewModel.stationState.issCoordinate,
                         tiangongCoordinate: $trackingViewModel.stationState.tiangongCoordinate,
