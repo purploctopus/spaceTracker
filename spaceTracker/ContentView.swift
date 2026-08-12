@@ -734,7 +734,7 @@ struct ContentView: View {
     }
     
     // ==============================================================================
-    // 📰 6. SPACEFLIGHT NEWS API INFOTAINMENT STREAM CHANNEL BLOCK
+    // 📰 6. SPACEFLIGHT NEWS CHANNEL BLOCK (PAGINATED INFINITE SCROLL)
     // ==============================================================================
     private var spaceflightNewsChannelBlock: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -743,10 +743,12 @@ struct ContentView: View {
                 .font(.system(.caption, design: .monospaced).weight(.bold))
                 .foregroundColor(.cyan)
                 .tracking(2)
-                .padding(.horizontal)
+                .padding(.vertical, 8)
             
             if newsViewModel.newsState.isNewsLoaded {
-                VStack(alignment: .leading, spacing: 0) {
+                // 💡 THE LAZY LAYER FIX: Swapped VStack for LazyVStack to recycle
+                // device image memory automatically as the user scrolls!
+                LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(newsViewModel.newsState.topStories) { article in
                         Button(action: {
                             // Open up the details summary presentation sheets layout cards popup
@@ -762,7 +764,33 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        .buttonStyle(PlainButtonStyle()) // Eliminates the default SwiftUI button cell tap flash
+                        .buttonStyle(PlainButtonStyle())
+                        // 💡 THE SCROLL TRIGGER FIX: Evaluates the item index against the array count!
+                        // This prevents the trigger from firing early on boot setup passes.
+                        .onAppear {
+                            let totalItems = newsViewModel.newsState.topStories.count
+                            if totalItems > 0 && article.id == newsViewModel.newsState.topStories[totalItems - 1].id {
+                                Task {
+                                    print("🏁 [TRUE SCROLL BOTTOM]: Fetching next page data segment frame...")
+                                    await newsViewModel.fetchNextPagePayload()
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 🔄 SPINNER FOOTER TRAY: Displays a tiny loading ring at the bottom while page 2-10 loads
+                    if newsViewModel.newsState.isFetchingNextPage {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("LOADING MORE STORIES...")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .padding(.leading, 4)
+                            Spacer()
+                        }
+                        .padding(.vertical, 16)
                     }
                 }
                 .padding()
@@ -770,7 +798,7 @@ struct ContentView: View {
                 .cornerRadius(12)
                 .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
             } else {
-                // Inline loading tray if network is synchronization state checks are lagging
+                // Inline loading tray if network synchronization state checks are lagging on boot
                 HStack {
                     Spacer()
                     ProgressView()
@@ -786,7 +814,6 @@ struct ContentView: View {
             }
         }
     }
-
 
     private var upcoming7DayMissionsChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -970,9 +997,9 @@ struct ContentView: View {
                         Divider()
                             .background(Color.cyan)
                              // 🛰️ 6. SPACEFLIGHT NEWS API INFOTAINMENT STREAM CHANNEL BLOCK
-                             spaceflightNewsChannelBlock
-                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                 .padding(.top, 24)// 💡 Balances the final telemetry grid segment
+                         spaceflightNewsChannelBlock
+                             .frame(maxWidth: .infinity, alignment: .leading)
+                             .padding(.top, 24)// 💡 Balances the final telemetry grid segment
                     } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
                     .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
