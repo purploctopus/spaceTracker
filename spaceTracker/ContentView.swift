@@ -36,6 +36,7 @@ struct ContentView: View {
     @State private var streamingLaunchName: String = ""
     @State private var streamingLaunchNetDate: String? = nil
     @State private var globalTapCount = 0
+    let tapCount = 2
     @StateObject private var adEngine = AdMobEngine()
     @State private var showAdPromptOverlay = false
     @State private var showConditionsExplainer = false
@@ -327,7 +328,7 @@ struct ContentView: View {
                         ForEach(meteorViewModel.upcomingShowers) { shower in
                             MeteorShowerCardView(shower: shower, userLatitude: universalLatitude)
                                 .onTapGesture {
-                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
                                         globalTapCount += 1
                                         print("🎯 [METEOR TAP]: Meteor shower clicked. Total Taps: \(globalTapCount)/3")
                                         selectedMeteorShower = shower
@@ -388,7 +389,7 @@ struct ContentView: View {
                                 userLongitude: universalLongitude
                             )
                             .onTapGesture {
-                                if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
                                     globalTapCount += 1
                                     print("🎯 [ASTEROID TAP]: Asteroid clicked. Total Taps: \(globalTapCount)/3")
                                     // 🟢 Premium Active: Skip ad layer and open sheet instantly
@@ -445,7 +446,7 @@ struct ContentView: View {
                             SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
                                 // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
                                 .onTapGesture {
-                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
                                         globalTapCount += 1
                                         print("🎯 [CREW TAP]: ISS clicked. Total Taps: \(globalTapCount)/3")
                                         selectedSpacecraftCrewName = "International Space Station"
@@ -464,7 +465,7 @@ struct ContentView: View {
                             SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
                                 // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
                                 .onTapGesture {
-                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
                                         globalTapCount += 1
                                         print("🎯 [CREW TAP]: Tiangong clicked. Total Taps: \(globalTapCount)/3")
                                         selectedSpacecraftCrewName = "Tiangong Space Station"
@@ -483,7 +484,7 @@ struct ContentView: View {
                             SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
                             // 💡 FIXED: Wrapped inside the active ad monetization firewall gate
                             .onTapGesture {
-                                if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
                                     globalTapCount += 1 // Increment local state counter
                                     print("🎯 [CREW TAP]: Crew clicked. Total Taps: \(globalTapCount)/3")
                                     selectedSpacecraftCrewName = "Experimental Transits"
@@ -626,7 +627,7 @@ struct ContentView: View {
                             SatelliteCardView(sat: sat, location: satViewModel.locationName)
                                 .onTapGesture {
                                     // 💡 Checks local view state directly. First 3 taps go through anywhere.
-                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
                                         globalTapCount += 1 // Increment locally
                                         print("🎯 [CARD TAP]: Satellite clicked. Total Taps: \(globalTapCount)/3")
                                         selectedSatellitePass = sat
@@ -810,7 +811,7 @@ struct ContentView: View {
                                     }
                                 )
                                 .onTapGesture {
-                                    if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                                    if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
                                         globalTapCount += 1
                                         print("🎯 [LAUNCH TAP]: Space launch clicked. Total Taps: \(globalTapCount)/3")
                                         selectedSpaceLaunch = launch
@@ -855,7 +856,7 @@ struct ContentView: View {
                         // 3. MASTER ACCESS CHANNEL ROADWAY LINK (Pulls tight under the launch tracks thanks to parent spacing: 8)
                         VStack(alignment: .leading, spacing: 2) {
                             // 💡 THE DIRECT REIFIED CHECK:
-                            if adEngine.isPremiumUnlocked || globalTapCount < 3 {
+                            if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
                                 // YES OK -> Just wrap the card in a standard, direct NavigationLink push
                                 NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
                                     MasterAccessChannelRowView(launches: viewModel.launches)
