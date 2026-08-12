@@ -42,6 +42,9 @@ struct ContentView: View {
     @State private var showConditionsExplainer = false
     @State private var adInterceptActionLabel = ""
     @State private var pendingAdCompletionAction: (() -> Void)? = nil
+    @StateObject private var newsViewModel = SpaceNewsViewModel()
+    @State private var selectedArticle: SpaceNewsArticle? = nil
+
     
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
 
@@ -729,6 +732,61 @@ struct ContentView: View {
         .padding(.horizontal)
         .padding(.top, sizeClass == .regular ? 16 : 10)
     }
+    
+    // ==============================================================================
+    // 📰 6. SPACEFLIGHT NEWS API INFOTAINMENT STREAM CHANNEL BLOCK
+    // ==============================================================================
+    private var spaceflightNewsChannelBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header Label Ticker
+            Text("LATEST SPACE NEWS")
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .foregroundColor(.cyan)
+                .tracking(2)
+                .padding(.horizontal)
+            
+            if newsViewModel.newsState.isNewsLoaded {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(newsViewModel.newsState.topStories) { article in
+                        Button(action: {
+                            // Open up the details summary presentation sheets layout cards popup
+                            selectedArticle = article
+                        }) {
+                            VStack(spacing: 0) {
+                                SpaceNewsCardView(article: article)
+                                
+                                // Clean layout separation line partitions between article rows
+                                if article.id != newsViewModel.newsState.topStories.last?.id {
+                                    Divider()
+                                        .padding(.leading, 92) // Clean offset boundary next to thumbnails
+                                }
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle()) // Eliminates the default SwiftUI button cell tap flash
+                    }
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
+            } else {
+                // Inline loading tray if network is synchronization state checks are lagging
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding(.trailing, 8)
+                    Text("SYNCHRONIZING NEWS FEEDS...")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.vertical, 32)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+            }
+        }
+    }
+
 
     private var upcoming7DayMissionsChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -908,7 +966,13 @@ struct ContentView: View {
                             .padding(.top, 24)
                         // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
                         liveHumansInSpaceChannelBlock
-                            .padding(.top, 24) // 💡 Balances the final telemetry grid segment
+                            .padding(.top, 24)
+                        Divider()
+                            .background(Color.cyan)
+                             // 🛰️ 6. SPACEFLIGHT NEWS API INFOTAINMENT STREAM CHANNEL BLOCK
+                             spaceflightNewsChannelBlock
+                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                 .padding(.top, 24)// 💡 Balances the final telemetry grid segment
                     } // Closes the outermost VStack inside ScrollView
                     .padding(.top, 24)
                     .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
@@ -1081,6 +1145,13 @@ struct ContentView: View {
                 launchNetDateString: streamingLaunchNetDate
             )
         }
+        .sheet(item: $selectedArticle) { article in
+            SpaceNewsDetailSheet(article: article)
+        }
+        .task {
+            await newsViewModel.loadLatestSpaceNews()
+        }
+
     }
 
  // Closes var body: some View
