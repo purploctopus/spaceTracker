@@ -751,8 +751,24 @@ struct ContentView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(newsViewModel.newsState.topStories) { article in
                         Button(action: {
-                            // Open up the details summary presentation sheets layout cards popup
-                            selectedArticle = article
+                            // 💡 THE AD INTERCEPT ENGINE ACTION BLOCK:
+                            // Checks your global system limits before opening the detail popup card cell!
+                            if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
+                                globalTapCount += 1
+                                print("🎯 [NEWS TAP]: Space article clicked. Global Dashboard Taps: \(globalTapCount)/3")
+                                
+                                // Open up the details summary sheet natively
+                                selectedArticle = article
+                            } else {
+                                print("⚠️ [AD TRIGGER]: Global intercept limit hit. Initializing promo prompt overlay...")
+                                adInterceptActionLabel = article.title
+                                
+                                pendingAdCompletionAction = {
+                                    globalTapCount = 0 // Reset counter to 0 on ad success check pass
+                                    selectedArticle = article
+                                }
+                                showAdPromptOverlay = true
+                            }
                         }) {
                             VStack(spacing: 0) {
                                 SpaceNewsCardView(article: article)
@@ -764,7 +780,7 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(PlainButtonStyle()) // Eliminates the default SwiftUI button cell tap flash
                         // 💡 THE SCROLL TRIGGER FIX: Evaluates the item index against the array count!
                         // This prevents the trigger from firing early on boot setup passes.
                         .onAppear {
@@ -1178,7 +1194,6 @@ struct ContentView: View {
         .task {
             await newsViewModel.loadLatestSpaceNews()
         }
-
     }
 
  // Closes var body: some View
