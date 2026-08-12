@@ -37,7 +37,7 @@ struct AdPromptOverlayView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                         .tracking(1)
-                    Text("SUPPORT THE TERMINAL // WATCH AN AD TO UNLOCK ALL DATA")
+                    Text("SUPPORT OrbitLog // WATCH AN AD TO UNLOCK ALL DATA")
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundColor(.orange)
                         .multilineTextAlignment(.center)
@@ -48,7 +48,7 @@ struct AdPromptOverlayView: View {
                     .background(Color.white.opacity(0.15))
                 
                 // Content Description
-                Text("Watch a brief network briefing transmission to unlock unlimited access to all system detail modules until midnight.")
+                Text("Watch a brief Ad to unlock unlimited access free until midnight.")
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(.secondary)
                     .lineSpacing(4)
@@ -66,14 +66,14 @@ struct AdPromptOverlayView: View {
                             .font(.system(size: 32, weight: .bold, design: .monospaced))
                             .foregroundColor(.yellow)
                     } else if countdownTimer > 0 {
-                        Text("INITIATING DATA FEED IN")
+                        Text("Ad PLAYS IN")
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundColor(.orange)
                         Text("\(countdownTimer)")
                             .font(.system(size: 32, weight: .bold, design: .monospaced))
                             .foregroundColor(.white)
                     } else {
-                        Text("TRANSMISSION FEED READY")
+                        Text("Ad READY")
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(.green)
                             .fontWeight(.bold)
@@ -101,8 +101,8 @@ struct AdPromptOverlayView: View {
                     }
                 }) {
                     HStack {
-                        Image(systemName: "crown.fill")
-                            .foregroundColor(.yellow)
+                        Image(systemName: "tv.slash.fill")
+                            .foregroundColor(.red)
                         Text("REMOVE ADS FOREVER — \(adEngine.premiumProduct?.displayPrice ?? "$2.99")")
                             .font(.system(.caption, design: .monospaced))
                             .fontWeight(.bold)
@@ -140,7 +140,7 @@ struct AdPromptOverlayView: View {
                 // Action Control Layout Row
                 HStack(spacing: 16) {
                     Button(action: onDismiss) {
-                        Text("ABORT MISSION")
+                        Text("CANCEL")
                             .font(.system(.caption, design: .monospaced))
                             .fontWeight(.bold)
                             .foregroundColor(.gray)
@@ -155,7 +155,7 @@ struct AdPromptOverlayView: View {
                         countdownTimer = 0
                         onTriggerAd()
                     }) {
-                        Text(adEngine.isAdReady ? "WATCH NOW" : "LOADING INTEL...")
+                        Text(adEngine.isAdReady ? "WATCH Ad 24-Hours FREE" : "LOADING Ad...")
                             .font(.system(.caption, design: .monospaced))
                             .fontWeight(.bold)
                             .foregroundColor(.black)
