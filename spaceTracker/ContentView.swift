@@ -730,7 +730,7 @@ struct ContentView: View {
             }
         )
         .padding(.horizontal)
-        .padding(.top, sizeClass == .regular ? 16 : 10)
+        .padding(.top, sizeClass == .regular ? 26 : 20)
     }
     
     // ==============================================================================
@@ -751,24 +751,9 @@ struct ContentView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(newsViewModel.newsState.topStories) { article in
                         Button(action: {
-                            // 💡 THE AD INTERCEPT ENGINE ACTION BLOCK:
-                            // Checks your global system limits before opening the detail popup card cell!
-                            if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
-                                globalTapCount += 1
-                                print("🎯 [NEWS TAP]: Space article clicked. Global Dashboard Taps: \(globalTapCount)/3")
-                                
+                               
                                 // Open up the details summary sheet natively
                                 selectedArticle = article
-                            } else {
-                                print("⚠️ [AD TRIGGER]: Global intercept limit hit. Initializing promo prompt overlay...")
-                                adInterceptActionLabel = article.title
-                                
-                                pendingAdCompletionAction = {
-                                    globalTapCount = 0 // Reset counter to 0 on ad success check pass
-                                    selectedArticle = article
-                                }
-                                showAdPromptOverlay = true
-                            }
                         }) {
                             VStack(spacing: 0) {
                                 SpaceNewsCardView(article: article)
@@ -935,264 +920,280 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
-                
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
-                        stargazingConditionsHeaderBar
-                            .padding(.top, 16) // 💡 Clears the frame constraints of the absolutely positioned Daily Command header box
-                        Divider()
-                            .background(Color.cyan)
-                        // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL (Includes your company filter buttons and horizontal cards)
-                        upcoming7DayMissionsChannelBlock
-                            .toolbar {
-                                ToolbarItem(placement: .principal) {
-                                    principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        // 3. MASTER ACCESS CHANNEL ROADWAY LINK (Pulls tight under the launch tracks thanks to parent spacing: 8)
-                        VStack(alignment: .leading, spacing: 2) {
-                            // 💡 THE DIRECT REIFIED CHECK:
-                            if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
-                                // YES OK -> Just wrap the card in a standard, direct NavigationLink push
-                                NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
-                                    MasterAccessChannelRowView(launches: viewModel.launches)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .simultaneousGesture(TapGesture().onEnded {
-                                    globalTapCount += 1
-                                    print("🎯 [LINK TAP]: Master Link clicked. Total Taps: \(globalTapCount)/3")
-                                })
-                                
-                            } else {
-                                // NO -> Freeze navigation and show your standard ad prompt overlay grid
-                                Button(action: {
-                                    adInterceptActionLabel = "Global Orbital Providers Directory"
-                                    pendingAdCompletionAction = {
-                                        globalTapCount = 0 // Reset counter to 0 on ad success
-                                    }
-                                    showAdPromptOverlay = true
-                                }) {
-                                    MasterAccessChannelRowView(launches: viewModel.launches)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Divider()
-                            .background(Color.cyan)
-
-                        // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
-                        visibleSatellitesChannelBlock
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 24)
-                        Divider()
-                            .background(Color.cyan)
-                        // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
-                        nasaAsteroidRadarChannelBlock
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 24) // 💡 Pushes the title text down away from the satellite cards above it so it matches its cards
-                        Divider()
-                            .background(Color.cyan)
-                        // 🛰️ 4. ANNUAL METEOR SHOWER LOOKAHEAD MANIFEST CHANNEL
-                        annualMeteorShowerChannelBlock
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 24) // 💡 Separates the meteor timelines from the asteroid radar matrix above it
-                        Divider()
-                            .background(Color.cyan)
-                        // THE 3D ORBITAL INTERCEPT RADAR MAP CONTAINER
-                        SpaceStationRadarChannelView()
-                            .padding(.top, 24)
-                        // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
-                        liveHumansInSpaceChannelBlock
-                            .padding(.top, 24)
-                        Divider()
-                            .background(Color.cyan)
-                             // 🛰️ 6. SPACEFLIGHT NEWS API INFOTAINMENT STREAM CHANNEL BLOCK
-                         spaceflightNewsChannelBlock
-                             .frame(maxWidth: .infinity, alignment: .leading)
-                             .padding(.top, 24)// 💡 Balances the final telemetry grid segment
-                    } // Closes the outermost VStack inside ScrollView
-                    .padding(.top, 24)
-                    .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
-                } // Closes ScrollView
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(.hidden, for: .navigationBar)
-                
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        nasaApodButton
-                    }
-                }
-                .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
-
-                // 💡 INJECTED PRE-PRESENTATION GATEWAY OVERLAY MESH
-                if showAdPromptOverlay {
-                    AdPromptOverlayView(
-                        adEngine: adEngine,
-                        actionLabel: adInterceptActionLabel,
-                        onTriggerAd: {
-                            // Extract active key controller windows to handle full screen Google rendering
-                            if let rootVC = UIApplication.shared.connectedScenes
-                                .compactMap({ $0 as? UIWindowScene })
-                                .flatMap({ $0.windows })
-                                .first(where: { $0.isKeyWindow })?.rootViewController {
-                                
-                                adEngine.showAd(from: rootVC) {
-                                    // Ad completed! Fire the pending state change and tear down the prompt
-                                    showAdPromptOverlay = false
-                                    pendingAdCompletionAction?()
-                                }
-                            }
-                        },
-                        onDismiss: {
-                            showAdPromptOverlay = false
-                            pendingAdCompletionAction = nil
-                        }
-                    )
-                    .transition(.opacity.animation(.easeInOut))
-                }
-                // 💡 THE CONDITIONS BRIEFING POPUP: Dimmed backdrop with a clean, centralized terminal box
-                if showConditionsExplainer {
-                    ZStack {
-                        Color.black.opacity(0.85)
-                            .ignoresSafeArea()
-                            .onTapGesture { showConditionsExplainer = false } // Dismiss when background is tapped
-                        
-                        VStack(alignment: .leading, spacing: 20) {
-                            // Header Row
-                            HStack {
-                                Text("FIELD BRIEFING: WEATHER STATUS")
-                                    .font(.system(.subheadline, design: .monospaced))
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.cyan)
-                                Spacer()
-                                Button(action: { showConditionsExplainer = false }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.gray)
-                                }
-                            }
-                            
+        TabView {
+            NavigationView {
+                ZStack {
+                    TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
+                    
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
+                            stargazingConditionsHeaderBar
+                                .padding(.top, 16) // 💡 Clears the frame constraints of the absolutely positioned Daily Command header box
                             Divider()
-                                .background(Color.white.opacity(0.15))
+                                .background(Color.cyan)
+                            // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL (Includes your company filter buttons and horizontal cards)
+                            upcoming7DayMissionsChannelBlock
+                                .toolbar {
+                                    ToolbarItem(placement: .principal) {
+                                        principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             
-                            // Human-Readable Telemetry Breakdown
-                            VStack(alignment: .leading, spacing: 14) {
-                                // 💡 THE COMPLIANT TARGET INSIGHT ROW: Renders our exact dynamic string matrix text flawlessly
-                                Text(dynamicMissionBriefingText)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(weatherViewModel.cloudCoverPercent <= 30 ? .green : (weatherViewModel.cloudCoverPercent > 70 ? .orange : .yellow))
-                                Text("• CLOUDS & HUMIDITY: This dictates your visual visibility vector. Low cloud cover (< 30%) and low humidity mean crisp, high-clarity viewing conditions through your local atmospheric path.")
-                                
-                                Text("• KP-INDEX: This tracks geomagnetic solar storms in the upper atmosphere on a scale of 0 to 9. High scores (5+) trigger aurora displays.")
-                                
+                            // 3. MASTER ACCESS CHANNEL ROADWAY LINK (Pulls tight under the launch tracks thanks to parent spacing: 8)
+                            VStack(alignment: .leading, spacing: 2) {
+                                // 💡 THE DIRECT REIFIED CHECK:
+                                if adEngine.isPremiumUnlocked || globalTapCount < tapCount {
+                                    // YES OK -> Just wrap the card in a standard, direct NavigationLink push
+                                    NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
+                                        MasterAccessChannelRowView(launches: viewModel.launches)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .simultaneousGesture(TapGesture().onEnded {
+                                        globalTapCount += 1
+                                        print("🎯 [LINK TAP]: Master Link clicked. Total Taps: \(globalTapCount)/3")
+                                    })
+                                    
+                                } else {
+                                    // NO -> Freeze navigation and show your standard ad prompt overlay grid
+                                    Button(action: {
+                                        adInterceptActionLabel = "Global Orbital Providers Directory"
+                                        pendingAdCompletionAction = {
+                                            globalTapCount = 0 // Reset counter to 0 on ad success
+                                        }
+                                        showAdPromptOverlay = true
+                                    }) {
+                                        MasterAccessChannelRowView(launches: viewModel.launches)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
                             }
-                            .font(.system(.footnote, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .lineSpacing(4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Divider()
+                                .background(Color.cyan)
+                            
+                            // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
+                            visibleSatellitesChannelBlock
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 24)
+                            Divider()
+                                .background(Color.cyan)
+                            // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
+                            nasaAsteroidRadarChannelBlock
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 24) // 💡 Pushes the title text down away from the satellite cards above it so it matches its cards
+                            Divider()
+                                .background(Color.cyan)
+                            // 🛰️ 4. ANNUAL METEOR SHOWER LOOKAHEAD MANIFEST CHANNEL
+                            annualMeteorShowerChannelBlock
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 24) // 💡 Separates the meteor timelines from the asteroid radar matrix above it
+                            Divider()
+                                .background(Color.cyan)
+                            // THE 3D ORBITAL INTERCEPT RADAR MAP CONTAINER
+                            SpaceStationRadarChannelView()
+                                .padding(.top, 24)
+                            // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
+                            liveHumansInSpaceChannelBlock
+                                .padding(.top, 24)
+                            Divider()
+                                .background(Color.cyan)
+                        } // Closes the outermost VStack inside ScrollView
+                        .padding(.top, 24)
+                        .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
+                    } // Closes ScrollView
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.hidden, for: .navigationBar)
+                    
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            nasaApodButton
                         }
-                        .padding(24)
-                        .background(Color(red: 0.06, green: 0.06, blue: 0.06))
-                        .border(Color.white.opacity(0.1), width: 1)
-                        .cornerRadius(6)
-                        .padding(.horizontal, horizontalSizeClass == .regular ? 140 : 24)
                     }
-                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                    .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
+                    
+                    // 💡 INJECTED PRE-PRESENTATION GATEWAY OVERLAY MESH
+                    if showAdPromptOverlay {
+                        AdPromptOverlayView(
+                            adEngine: adEngine,
+                            actionLabel: adInterceptActionLabel,
+                            onTriggerAd: {
+                                // Extract active key controller windows to handle full screen Google rendering
+                                if let rootVC = UIApplication.shared.connectedScenes
+                                    .compactMap({ $0 as? UIWindowScene })
+                                    .flatMap({ $0.windows })
+                                    .first(where: { $0.isKeyWindow })?.rootViewController {
+                                    
+                                    adEngine.showAd(from: rootVC) {
+                                        // Ad completed! Fire the pending state change and tear down the prompt
+                                        showAdPromptOverlay = false
+                                        pendingAdCompletionAction?()
+                                    }
+                                }
+                            },
+                            onDismiss: {
+                                showAdPromptOverlay = false
+                                pendingAdCompletionAction = nil
+                            }
+                        )
+                        .transition(.opacity.animation(.easeInOut))
+                    }
+                    // 💡 THE CONDITIONS BRIEFING POPUP: Dimmed backdrop with a clean, centralized terminal box
+                    if showConditionsExplainer {
+                        ZStack {
+                            Color.black.opacity(0.85)
+                                .ignoresSafeArea()
+                                .onTapGesture { showConditionsExplainer = false } // Dismiss when background is tapped
+                            
+                            VStack(alignment: .leading, spacing: 20) {
+                                // Header Row
+                                HStack {
+                                    Text("FIELD BRIEFING: WEATHER STATUS")
+                                        .font(.system(.subheadline, design: .monospaced))
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.cyan)
+                                    Spacer()
+                                    Button(action: { showConditionsExplainer = false }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.title2)
+                                            .foregroundColor(.gray)
+                                    }
+                                }
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.15))
+                                
+                                // Human-Readable Telemetry Breakdown
+                                VStack(alignment: .leading, spacing: 14) {
+                                    // 💡 THE COMPLIANT TARGET INSIGHT ROW: Renders our exact dynamic string matrix text flawlessly
+                                    Text(dynamicMissionBriefingText)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(weatherViewModel.cloudCoverPercent <= 30 ? .green : (weatherViewModel.cloudCoverPercent > 70 ? .orange : .yellow))
+                                    Text("• CLOUDS & HUMIDITY: This dictates your visual visibility vector. Low cloud cover (< 30%) and low humidity mean crisp, high-clarity viewing conditions through your local atmospheric path.")
+                                    
+                                    Text("• KP-INDEX: This tracks geomagnetic solar storms in the upper atmosphere on a scale of 0 to 9. High scores (5+) trigger aurora displays.")
+                                    
+                                }
+                                .font(.system(.footnote, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .lineSpacing(4)
+                            }
+                            .padding(24)
+                            .background(Color(red: 0.06, green: 0.06, blue: 0.06))
+                            .border(Color.white.opacity(0.1), width: 1)
+                            .cornerRadius(6)
+                            .padding(.horizontal, horizontalSizeClass == .regular ? 140 : 24)
+                        }
+                        .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                    }
+                    
+                    
+                } // Closes ZStack
+                .onAppear {
+                    let navigationBarAppearance = UINavigationBarAppearance()
+                    navigationBarAppearance.configureWithTransparentBackground()
+                    UINavigationBar.appearance().standardAppearance = navigationBarAppearance
+                    UINavigationBar.appearance().compactAppearance = navigationBarAppearance
+                    UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
                 }
-
-
-            } // Closes ZStack
-            .onAppear {
-                let navigationBarAppearance = UINavigationBarAppearance()
-                navigationBarAppearance.configureWithTransparentBackground()
-                UINavigationBar.appearance().standardAppearance = navigationBarAppearance
-                UINavigationBar.appearance().compactAppearance = navigationBarAppearance
-                UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
+                .task {
+                    // 1. Request local device alert permissions immediately on workspace load
+                    notificationEngine.requestPermission()
+                    
+                    // 2. Fire down all background API web asset streams
+                    await viewModel.fetchLaunches()
+                    satViewModel.requestPasses()
+                    await rockViewModel.fetchAsteroidRadar()
+                    await apodViewModel.fetchDailyBackdrop()
+                    
+                    // 3. Process dynamic hardware location parameters for meteor streams
+                    let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
+                    let hardwareLng = CLLocationManager().location?.coordinate.longitude ?? -89.4012
+                    meteorViewModel.generateOutlook(userLatitude: hardwareLat)
+                    
+                    // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
+                    let currentISOString = ISO8601DateFormatter().string(from: Date())
+                    await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
+                    await weatherViewModel.fetchGeomagneticRadar()
+                    
+                    // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
+                    notificationEngine.scheduleDailyBriefing(
+                        launches: viewModel.launches,
+                        satellites: satViewModel.visiblePasses,
+                        meteorShowers: meteorViewModel.upcomingShowers
+                    )
+                }
+                .task {
+                    print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
+                    await crewViewModel.fetchAstronautRoster()
+                }
+            }// Closes NavigationView
+            .navigationViewStyle(.stack)
+            .preferredColorScheme(.dark)
+            .sheet(isPresented: $showAPODDetails) {
+                APODCreditDetailSheet(title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
             }
-            .task {
-                // 1. Request local device alert permissions immediately on workspace load
-                notificationEngine.requestPermission()
-                
-                // 2. Fire down all background API web asset streams
-                await viewModel.fetchLaunches()
-                satViewModel.requestPasses()
-                await rockViewModel.fetchAsteroidRadar()
-                await apodViewModel.fetchDailyBackdrop()
-                
-                // 3. Process dynamic hardware location parameters for meteor streams
-                let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
-                let hardwareLng = CLLocationManager().location?.coordinate.longitude ?? -89.4012
-                meteorViewModel.generateOutlook(userLatitude: hardwareLat)
-                
-                // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
-                let currentISOString = ISO8601DateFormatter().string(from: Date())
-                await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
-                await weatherViewModel.fetchGeomagneticRadar()
-
-                // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
-                notificationEngine.scheduleDailyBriefing(
-                    launches: viewModel.launches,
-                    satellites: satViewModel.visiblePasses,
-                    meteorShowers: meteorViewModel.upcomingShowers
+            .sheet(item: $selectedMeteorShower) { shower in
+                MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
+            }
+            .sheet(item: $selectedSpaceLaunch) { launch in
+                NavigationStack {
+                    MissionSingleDetailView(launch: launch)
+                }
+                .preferredColorScheme(.dark)
+            }
+            // Astronaut crew profile manifest sheet container
+            .sheet(item: Binding(
+                get: { selectedSpacecraftCrewName != nil ? CrewSheetIdentifiable(name: selectedSpacecraftCrewName!) : nil },
+                set: { selectedSpacecraftCrewName = $0?.name }
+            )) { wrapper in
+                // 💡 COMPUTES AUTOMATIC CROSS-REFERENCE TELEMETRY ON OPEN
+                let targetedCrew = wrapper.name.contains("International") ? crewViewModel.issCrew : crewViewModel.tiangongCrew
+                SpacecraftDetailSheet(craftName: wrapper.name, crewList: targetedCrew, passes: satViewModel.visiblePasses)
+            }
+            // 💡 FIXED: Uses exact parameter matching and safely unwraps the heading Double value
+            .sheet(item: $selectedSatellitePass) { pass in
+                SatelliteDetailSheet(
+                    sat: pass,
+                    weatherEngine: weatherViewModel,
+                    location: satViewModel.locationName,
+                    userHeading: satViewModel.currentHeading
                 )
             }
+            .sheet(isPresented: $showLiveVideoTelemetrySheet) {
+                LaunchLiveStreamPlayerView(
+                    //            streamURLString: "https://www.youtube.com/watch?v=awQzjn72bI0",
+                    streamURLString: activeLiveStreamURL,
+                    launchName: streamingLaunchName,
+                    launchNetDateString: streamingLaunchNetDate
+                )
+            }
+            .sheet(item: $selectedArticle) { article in
+                SpaceNewsDetailSheet(article: article)
+            }
             .task {
-                print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
-                await crewViewModel.fetchAstronautRoster()
+                await newsViewModel.loadLatestSpaceNews()
             }
-        } // Closes NavigationView
-        .navigationViewStyle(.stack)
-        .preferredColorScheme(.dark)
-        .sheet(isPresented: $showAPODDetails) {
-            APODCreditDetailSheet(title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
-        }
-        .sheet(item: $selectedMeteorShower) { shower in
-            MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
-        }
-        .sheet(item: $selectedSpaceLaunch) { launch in
-            NavigationStack {
-                MissionSingleDetailView(launch: launch)
+            
+            .tabItem {
+                Label("Home Command", systemImage: "house")
             }
-            .preferredColorScheme(.dark)
-        }
-        // Astronaut crew profile manifest sheet container
-        .sheet(item: Binding(
-            get: { selectedSpacecraftCrewName != nil ? CrewSheetIdentifiable(name: selectedSpacecraftCrewName!) : nil },
-            set: { selectedSpacecraftCrewName = $0?.name }
-        )) { wrapper in
-            // 💡 COMPUTES AUTOMATIC CROSS-REFERENCE TELEMETRY ON OPEN
-            let targetedCrew = wrapper.name.contains("International") ? crewViewModel.issCrew : crewViewModel.tiangongCrew
-            SpacecraftDetailSheet(craftName: wrapper.name, crewList: targetedCrew, passes: satViewModel.visiblePasses)
-        }
-        // 💡 FIXED: Uses exact parameter matching and safely unwraps the heading Double value
-        .sheet(item: $selectedSatellitePass) { pass in
-            SatelliteDetailSheet(
-                sat: pass,
-                weatherEngine: weatherViewModel,
-                location: satViewModel.locationName,
-                userHeading: satViewModel.currentHeading
-            )
-        }
-        .sheet(isPresented: $showLiveVideoTelemetrySheet) {
-            LaunchLiveStreamPlayerView(
-    //            streamURLString: "https://www.youtube.com/watch?v=awQzjn72bI0",
-                streamURLString: activeLiveStreamURL,
-                launchName: streamingLaunchName,
-                launchNetDateString: streamingLaunchNetDate
-            )
-        }
-        .sheet(item: $selectedArticle) { article in
-            SpaceNewsDetailSheet(article: article)
-        }
-        .task {
-            await newsViewModel.loadLatestSpaceNews()
+            
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 8) {
+                    // 🛰️ 6. SPACEFLIGHT NEWS API INFOTAINMENT STREAM CHANNEL BLOCK
+                    spaceflightNewsChannelBlock
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 24)// 💡 Balances the final telemetry grid segment
+                }
+                .padding(.top, 24)
+                .padding(.bottom, 60)
+            }
+            .tabItem {
+                Label("Space News", systemImage: "newspaper")
+            }
         }
     }
 
