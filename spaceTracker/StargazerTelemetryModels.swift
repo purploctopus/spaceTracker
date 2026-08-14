@@ -68,15 +68,13 @@ class StargazerState: ObservableObject {
 class StargazerViewModel: ObservableObject {
     @Published var stargazerState = StargazerState()
     
-    // 💡 THE RAM CACHE: Holds your full 9,000 star database file cleanly in the background
     private var internalStarsDatabase: [LocalStarItem] = []
     private var isDatabaseLoaded: Bool = false
     
     /// Asynchronously parses your local stars.json file inside an isolated background execution thread
     func preloadLocalStarCatalog() async {
-        guard !isDatabaseLoaded else { return } // Skip re-reading disk if already loaded
+        guard !isDatabaseLoaded else { return }
         
-        // Find the absolute system bundle file reference token path inside the app container
         guard let fileURL = Bundle.main.url(forResource: "stars", withExtension: "json") else {
             print("❌ [CATALOG ERROR]: Could not locate 'stars.json' inside the app bundle workspace.")
             return
@@ -97,7 +95,6 @@ class StargazerViewModel: ObservableObject {
     
     /// Pulls live planets via network session and combines them with calculated positions of your local stars database file
     func calculateStargazingTelemetry(latitude: Double, longitude: Double) async {
-        // Ensure our offline star list is fully initialized inside RAM memory arrays first
         await preloadLocalStarCatalog()
         
         let urlString = "https://api.visibleplanets.dev/v3/?latitude=\(latitude)&longitude=\(longitude)&showCoords=true"
@@ -131,7 +128,6 @@ class StargazerViewModel: ObservableObject {
             let (data, _) = try await URLSession.shared.data(from: url)
             let apiResponse = try JSONDecoder().decode(PlanetAPIResponse.self, from: data)
             
-            // Map incoming network results cleanly as planets
             var combinedDisplayCatalog = apiResponse.data.map { item -> APIPlanetItem in
                 var planetItem = item
                 planetItem.classification = "PLANET"
@@ -139,20 +135,31 @@ class StargazerViewModel: ObservableObject {
             }
             
             // ==============================================================================
-            // 📐 THE REAL TIME GEOMETRIC PROJECTION PASS (OPTIMIZED)
+            // 📐 THE PRECISION REAL TIME SIDEREAL TIME ALIGNMENT ENGINE
             // ==============================================================================
-            let deviceDate = Date()
-            let deviceCalendar = Calendar.current
-            let systemHour = Double(deviceCalendar.component(.hour, from: deviceDate))
+            let now = Date()
             
-            // Approximate localized sidereal tracking hour reference based on current device clock vectors
-            let dynamicLocalSiderealTime = (systemHour + 6.0).truncatingRemainder(dividingBy: 24.0)
+            // 2. Compute Julian Days since standard J2000 epoch epoch parameters
+            let timeInterval = now.timeIntervalSince1970
+            let julianDate = (timeInterval / 86400.0) + 2440587.5
+            let julianCenturiesSinceJ2000 = (julianDate - 2451545.0) / 36525.0
             
-            print("⚙️ [OPTIMIZATION ENGINE]: Transforming coordinates for local observation windows...")
+            // 3. Compute Greenwich Mean Sidereal Time (GMST) formula in degrees
+            var gmstDegrees = 280.46061837 + (360.98564736629 * (julianDate - 2451545.0)) +
+                             (0.000387933 * julianCenturiesSinceJ2000 * julianCenturiesSinceJ2000) -
+                             (julianCenturiesSinceJ2000 * julianCenturiesSinceJ2000 * julianCenturiesSinceJ2000 / 38710000.0)
+            
+            gmstDegrees = gmstDegrees.truncatingRemainder(dividingBy: 360.0)
+            if gmstDegrees < 0 { gmstDegrees += 360.0 }
+            
+            // 4. Transform to true Local Sidereal Time (LST) incorporating your dynamic longitude coordinate!
+            let localSiderealDegrees = (gmstDegrees + longitude).truncatingRemainder(dividingBy: 360.0)
+            let dynamicLocalSiderealTime = localSiderealDegrees / 15.0 // Convert circle degrees back into decimal sky hours
+            
+            print("⚙️ [PRECISION POSITIONING]: Local Sidereal Time is calculated at: \(String(format: "%.4fh", dynamicLocalSiderealTime))")
             
             // Look at only a subset of stars passing over your active hemisphere grid lines
             for star in internalStarsDatabase {
-                // Stage 1 Range Filter Box: Throw away stars on the completely opposite face of the planet
                 let distanceDelta = abs(dynamicLocalSiderealTime - star.ra)
                 let normalizedDelta = min(distanceDelta, 24.0 - distanceDelta)
                 
@@ -160,29 +167,24 @@ class StargazerViewModel: ObservableObject {
                     continue // Skip completely hidden background elements immediately
                 }
                 
-                // Stage 2 Geometry: Map standard spherical trigonometry positions based on your latitude parameters
                 let calculatedHourAngle = (dynamicLocalSiderealTime - star.ra) * 15.0 // Convert hour to circle degrees
                 let latRadians = latitude * .pi / 180.0
                 let decRadians = star.dec * .pi / 180.0
                 let haRadians = calculatedHourAngle * .pi / 180.0
                 
-                // Solve for true altitude angle above your horizon curves
                 let absoluteSinAltitude = sin(latRadians) * sin(decRadians) + cos(latRadians) * cos(decRadians) * cos(haRadians)
                 let finalAltitudeAngle = asin(max(-1.0, min(1.0, absoluteSinAltitude))) * (180.0 / .pi)
                 
-                // Filter items sitting below the ground line out of our display queues completely
                 if finalAltitudeAngle < 5.0 {
                     continue
                 }
                 
-                // Solve for true azimuth compass heading degree
                 let absoluteCosAzimuth = (sin(decRadians) - sin(latRadians) * absoluteSinAltitude) / (cos(latRadians) * cos(asin(absoluteSinAltitude)))
                 var finalAzimuthHeading = acos(max(-1.0, min(1.0, absoluteCosAzimuth))) * (180.0 / .pi)
                 if sin(haRadians) > 0 {
                     finalAzimuthHeading = 360.0 - finalAzimuthHeading
                 }
                 
-                // Wrap cleanly as a unified item and push directly to the presentation storage list arrays
                 combinedDisplayCatalog.append(APIPlanetItem(
                     name: star.name,
                     constellation: star.constellation,
@@ -193,7 +195,6 @@ class StargazerViewModel: ObservableObject {
                 ))
             }
             
-            // Prioritize listing objects passing near peak vertical visibility views
             let sortedResult = combinedDisplayCatalog.sorted { $0.altitude > $1.altitude }
             
             DispatchQueue.main.async {
@@ -201,7 +202,7 @@ class StargazerViewModel: ObservableObject {
                 self.stargazerState.forecastWeek = dynamicWeekForecast
                 self.stargazerState.liveVisibleTargets = sortedResult
                 self.stargazerState.isDataLoaded = true
-                print("🌐 [COMPUTATION LOG COMPLETE]: Merged active planets with \(sortedResult.count - apiResponse.data.count) passing stars.")
+                print("🌐 [ALIGNMENT PIPELINE COMPLETE]: Local Star map positions are perfectly synchronized to calendar vectors.")
             }
         } catch {
             print("❌ [ASTRONOMY ENGINE ERROR]: Ingestion pipeline track aborted: \(error)")
