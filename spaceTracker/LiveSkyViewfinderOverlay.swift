@@ -95,20 +95,41 @@ struct LiveSkyViewfinderOverlay: View {
                 
                 // Center Targeting Sight Reticle Rings
                 ZStack {
-                    Circle()
-                        .stroke(motionEngine.currentLockedTarget != nil ? Color.green.opacity(0.4) : Color.cyan.opacity(0.2), lineWidth: 1)
-                        .frame(width: 240, height: 240)
-                    
-                    Circle()
-                        .stroke(motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan, lineWidth: 2)
-                        .frame(width: 140, height: 140)
-                    
-                    Rectangle()
-                        .fill(motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan)
-                        .frame(width: 30, height: 1)
-                    Rectangle()
-                        .fill(motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan)
-                        .frame(width: 1, height: 30)
+                     Circle()
+                         .stroke(motionEngine.isPointingBelowHorizon ? Color.red.opacity(0.3) : (motionEngine.currentLockedTarget != nil ? Color.green.opacity(0.4) : Color.cyan.opacity(0.2)), lineWidth: 1)
+                         .frame(width: 240, height: 240)
+                     
+                     Circle()
+                         .stroke(motionEngine.isPointingBelowHorizon ? Color.red : (motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan), lineWidth: 2)
+                         .frame(width: 140, height: 140)
+                     
+                    // 💡 THE HUMAN-READABLE FIX: Clean text that anyone can understand instantly
+                    if motionEngine.isPointingBelowHorizon {
+                        VStack(spacing: 6) {
+                            Image(systemName: "arrow.up.circle")
+                                .font(.title)
+                            
+                            Text("POINT DEVICE UP")
+                                .font(.system(.headline, design: .monospaced))
+                                .fontWeight(.bold)
+                            
+                            Text("You are pointing below the horizon. Tilt your device up to view the sky.")
+                                .font(.system(.caption, design: .default))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .foregroundColor(.red)
+                        .padding()
+                        .frame(width: 240)
+                    } else {
+                         // Your normal target acquisition reticle crosshair components live cleanly inside this slot!
+                         Rectangle()
+                             .fill(motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan)
+                             .frame(width: 30, height: 1)
+                         Rectangle()
+                             .fill(motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan)
+                             .frame(width: 1, height: 30)
+                     }
                     
                     if let lockedTarget = motionEngine.currentLockedTarget {
                         ZStack {
