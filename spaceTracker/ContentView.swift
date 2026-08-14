@@ -44,7 +44,8 @@ struct ContentView: View {
     @State private var pendingAdCompletionAction: (() -> Void)? = nil
     @StateObject private var newsViewModel = SpaceNewsViewModel()
     @State private var selectedArticle: SpaceNewsArticle? = nil
-
+    @StateObject private var stargazerViewModel = StargazerViewModel()
+    @State private var showLiveViewfinderOverlay: Bool = false
     
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
 
@@ -173,6 +174,152 @@ struct ContentView: View {
         .buttonStyle(PlainButtonStyle())
         .padding(.horizontal)
         .padding(.bottom, 8)
+    }
+    
+    // ==============================================================================
+    // 🪐 STARGAZER OBSERVATION SYSTEM DASHBOARD CHANNEL BLOCK
+    // ==============================================================================
+    private var stargazerDashboardChannelBlock: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            
+            // 🗺️ 1. TOP TELEMETRY METRIC GLANCE SUMMARY CARD
+            VStack(alignment: .leading, spacing: 12) {
+                Text("SKY OBSERVATION RADAR SUMMARY")
+                    .font(.system(.caption, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundColor(.secondary)
+                
+                // 💡 UPDATED: Completely cleaned up with zero filler words or text clutter!
+                Button(action: {
+                    showLiveViewfinderOverlay = true
+                }) {
+                    ZStack(alignment: .bottomLeading) {
+                        // 🌌 DEEP SPACE GRAPHIC BANNER: Pulls from your new asset image file
+                        Image("night_sky_banner")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 120)
+                            .background(Color(.systemGray6))
+                            .clipped()
+                        
+                        // Dark tactical gradient mask to make your white text lines pop cleanly
+                        LinearGradient(
+                            colors: [Color.black.opacity(0.85), Color.black.opacity(0.1)],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                        
+                        // Simple, punchy, high-utility titles
+                        HStack(alignment: .bottom) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("LIVE INTERACTIVE SKY MAP")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.cyan)
+                                
+                                Text("POINT DEVICE TO FIND PLANETS")
+                                    .font(.system(.subheadline, design: .default))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            }
+                            
+                            Spacer()
+                            
+                            // Reticle scope graphic icon anchor
+                            Image(systemName: "scope")
+                                .font(.title2)
+                                .foregroundColor(.cyan)
+                        }
+                        .padding()
+                    }
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.bottom, 8)
+                
+                HStack(spacing: 16) {
+                    // Glowing circular rating index badge
+                    ZStack {
+                        Circle()
+                            .stroke(Color.cyan.opacity(0.2), lineWidth: 4)
+                        Circle()
+                            .trim(from: 0, to: CGFloat(stargazerViewModel.stargazerState.observationIndex) / 100.0)
+                            .stroke(Color.cyan, lineWidth: 4)
+                            .rotationEffect(.degrees(-90))
+                        
+                        VStack(spacing: 2) {
+                            Text("\(stargazerViewModel.stargazerState.observationIndex)%")
+                                .font(.system(.subheadline, design: .monospaced))
+                                .fontWeight(.bold)
+                            Text("OPTIMAL")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundColor(.green)
+                        }
+                    }
+                    .frame(width: 70, height: 70)
+                    
+                    // Vertical Text Telemetry Lines Data List
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("BORTLE SCALE: \(stargazerViewModel.stargazerState.bortleClass)")
+                        Text("MOON PHASE: \(stargazerViewModel.stargazerState.moonPhase)")
+                        Text("MOONSET TIME: \(stargazerViewModel.stargazerState.moonSetTime)")
+                        Text("TRUE DARK WINDOW: \(stargazerViewModel.stargazerState.trueDarkWindow)")
+                    }
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundColor(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
+            }
+            
+            Divider().background(Color.cyan)
+            
+            // 📅 2. HORIZONTAL SCROLL TIMELINE WEEK FORECAST
+            VStack(alignment: .leading, spacing: 8) {
+                Text("7-DAY SKY OBSERVATION LOOKAHEAD")
+                    .font(.system(.caption, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundColor(.secondary)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(stargazerViewModel.stargazerState.forecastWeek) { day in
+                            StargazeForecastCard(day: day)
+                        }
+                    }
+                }
+            }
+            
+            Divider().background(Color.cyan)
+            
+            // 🎯 3. VERTICAL LIVE TARGETS MATRIX RADAR LIST ROWS
+            VStack(alignment: .leading, spacing: 4) {
+                Text("PLANETS CURRENTLY OVERHEAD")
+                    .font(.system(.caption, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 4)
+                
+                VStack(spacing: 0) {
+                    // 💡 THE INDEX FIX: Swapped to loop over liveVisibleTargets from the API!
+                    ForEach(stargazerViewModel.stargazerState.liveVisibleTargets) { planet in
+                        CelestialTargetRowView(planet: planet)
+                        
+                        if planet.id != stargazerViewModel.stargazerState.liveVisibleTargets.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
+            }
+        }
     }
     
     // 💡 THE DYNAMIC BRIEFING ENGINE: Translates our physical scenario grid into plain-English field intelligence
@@ -1177,16 +1324,53 @@ struct ContentView: View {
                 await newsViewModel.loadLatestSpaceNews()
             }
             
+            // ==============================================================================
+            // CHANNEL TAB 1: HOME COMMAND
+            // ==============================================================================
+            // (Your untouched home command views sit inside this frame slot)
             .tabItem {
                 Label("Home Command", systemImage: "house")
             }
             
+            // ==============================================================================
+            // CHANNEL TAB 2: STAR GAZERS TELEMETRY CARD TRAY DECK
+            // ==============================================================================
+            VStack(spacing: 0) {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        stargazerDashboardChannelBlock
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 24)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 24)
+                    .padding(.bottom, 60)
+                }
+                .task {
+                    print("📡 [ASTRONOMY UPDATE]: Ingesting live hardware GPS telemetry...")
+                    
+                    let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
+                    let hardwareLng = CLLocationManager().location?.coordinate.longitude ?? -89.4012
+                    
+                    // Clean, true parameter inputs with absolutely zero made-up variables!
+                    await stargazerViewModel.calculateStargazingTelemetry(
+                        latitude: hardwareLat,
+                        longitude: hardwareLng
+                    )
+                }
+            }
+            .tabItem {
+                Label("Star Gazers", systemImage: "moon.stars")
+            }
+
+            // ==============================================================================
+            // CHANNEL TAB 3: SPACE NEWS
+            // ==============================================================================
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 8) {
-                    // 🛰️ 6. SPACEFLIGHT NEWS API INFOTAINMENT STREAM CHANNEL BLOCK
                     spaceflightNewsChannelBlock
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 24)// 💡 Balances the final telemetry grid segment
+                        .padding(.top, 24)
                 }
                 .padding(.top, 24)
                 .padding(.bottom, 60)
@@ -1194,6 +1378,10 @@ struct ContentView: View {
             .tabItem {
                 Label("Space News", systemImage: "newspaper")
             }
+        }
+        // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
+        .fullScreenCover(isPresented: $showLiveViewfinderOverlay) {
+            LiveSkyViewfinderOverlay()
         }
     }
 
