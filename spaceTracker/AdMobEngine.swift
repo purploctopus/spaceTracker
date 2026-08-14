@@ -20,7 +20,7 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     
     private let removeAdsProductID = "RemoveAdsOrbitLog"
     private var rewardedInterstitialAd: RewardedInterstitialAd?
-    private let liveAdUnitID = "ca-app-pub-1070603260872166/4282670561"
+    private let liveAdUnitID = "ca-app-pub-3940256099942544/6978759866"
     private var updatesTask: Task<Void, Never>?
     
     override init() {

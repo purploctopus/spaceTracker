@@ -7,29 +7,60 @@
 
 import SwiftUI
 
-// ==============================================================================
-// 🪐 FULL-SCREEN TELEMETRY VIEW: THE LIVE SKY POINTER VIEW-PORTS
-// ==============================================================================
+struct TargetLockMatch: Identifiable, Equatable {
+    let id = UUID()
+    let name: String
+    let constellation: String
+    let altitude: Int
+    let azimuth: Int
+}
+
 struct LiveSkyViewfinderOverlay: View {
+    let visiblePlanetsCatalog: [APIPlanetItem]
     @Environment(\.dismiss) private var dismiss
     
-    // Telemetry storage variables to receive gyroscope motion streaming values
-    @State private var deviceAzimuthHeading: Double = 0.0
-    @State private var deviceAltitudeTilt: Double = 0.0
+    @StateObject private var motionEngine = SkyMotionManager()
     
     var body: some View {
         ZStack {
-            // 💡 THE BACKGROUND: Dark ambient void to protect nighttime dark adaptation
             Color.black
                 .ignoresSafeArea()
             
-            // Sub-layer decorative tactical matrix grid lines
             ViewfinderBackgroundGridLines()
                 .stroke(Color.cyan.opacity(0.1), lineWidth: 1)
                 .ignoresSafeArea()
             
             // ==============================================================================
-            // LAYER 1: MAIN RADAR HEADS-UP DISPLAY (HUD)
+            // SPATIAL OBSERVATION SKY CANVAS
+            // ==============================================================================
+            GeometryReader { proxy in
+                let centerPoint = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                
+                // 💡 THE VISIBLE CONSTELLATION MAP FIELD PLOTTER:
+                // Draws dots and labels floating around dynamically based on phone orientation!
+                ForEach(motionEngine.currentlyVisibleInViewport) { object in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(object.classification == "PLANET" ? Color.cyan : Color.white)
+                                // Planets get a bold footprint, dim stars drop to micro points
+                                .frame(width: object.classification == "PLANET" ? 6 : 4,
+                                       height: object.classification == "PLANET" ? 6 : 4)
+                            
+                            Text(object.name.uppercased())
+                                .font(.system(.caption2, design: .monospaced))
+                                .fontWeight(.bold)
+                                .foregroundColor(object.isPrimaryLock ? .green : (object.classification == "PLANET" ? .cyan : .secondary))
+                        }
+                    }
+                    // Moves the dot to its exact real-time offset position relative to screen center
+                    .position(x: centerPoint.x + object.screenX, y: centerPoint.y + object.screenY)
+                }
+            }
+            .ignoresSafeArea()
+            
+            // ==============================================================================
+            // MAIN HUD OVERLAY LAYER GATES
             // ==============================================================================
             VStack(spacing: 0) {
                 // Top Operational Telemetry Bar Header Grid
@@ -46,7 +77,6 @@ struct LiveSkyViewfinderOverlay: View {
                     
                     Spacer()
                     
-                    // Direct interactive close command trigger button
                     Button(action: { dismiss() }) {
                         Text("DISENGAGE")
                             .font(.system(.caption, design: .monospaced))
@@ -61,38 +91,52 @@ struct LiveSkyViewfinderOverlay: View {
                 .padding()
                 .background(Color(.systemGray6).opacity(0.1))
                 
-                // Active Target Crosshair Readout Center Block
                 Spacer()
                 
+                // Center Targeting Sight Reticle Rings
                 ZStack {
-                    // Center Targeting Sight Reticle Rings
                     Circle()
-                        .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
+                        .stroke(motionEngine.currentLockedTarget != nil ? Color.green.opacity(0.4) : Color.cyan.opacity(0.2), lineWidth: 1)
                         .frame(width: 240, height: 240)
                     
                     Circle()
-                        .stroke(Color.cyan, lineWidth: 2)
+                        .stroke(motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan, lineWidth: 2)
                         .frame(width: 140, height: 140)
                     
-                    // Precision crosshair hair segments
                     Rectangle()
-                        .fill(Color.cyan)
+                        .fill(motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan)
                         .frame(width: 30, height: 1)
                     Rectangle()
-                        .fill(Color.cyan)
+                        .fill(motionEngine.currentLockedTarget != nil ? Color.green : Color.cyan)
                         .frame(width: 1, height: 30)
                     
-                    // Dynamic live position tracking tag label floating right near crosshairs
-                    VStack {
-                        Text("AZ: \(Int(deviceAzimuthHeading))°")
-                        Text("ALT: \(Int(deviceAltitudeTilt))°")
+                    if let lockedTarget = motionEngine.currentLockedTarget {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.green, lineWidth: 2)
+                                .frame(width: 180, height: 180)
+                            
+                            VStack(alignment: .center, spacing: 2) {
+                                Text("🎯 TARGET ACQUIRED")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                                
+                                Text(lockedTarget.name)
+                                    .font(.system(.headline, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                
+                                Text("CONSTELLATION: \(lockedTarget.constellation)")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(8)
+                            .background(Color.black.opacity(0.75))
+                            .cornerRadius(6)
+                            .offset(y: 130)
+                        }
                     }
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundColor(.cyan)
-                    .padding(6)
-                    .background(Color.black.opacity(0.6))
-                    .cornerRadius(4)
-                    .offset(x: 90, y: -60)
                 }
                 
                 Spacer()
@@ -103,7 +147,7 @@ struct LiveSkyViewfinderOverlay: View {
                         Text("HEADING COMPASS")
                             .font(.system(.caption2, design: .monospaced))
                             .foregroundColor(.secondary)
-                        Text("\(Int(deviceAzimuthHeading))° \(getCompassLabel(deviceAzimuthHeading))")
+                        Text("\(Int(motionEngine.azimuthHeading))° \(getCompassLabel(motionEngine.azimuthHeading))")
                             .font(.system(.headline, design: .monospaced))
                             .foregroundColor(.primary)
                     }
@@ -112,7 +156,7 @@ struct LiveSkyViewfinderOverlay: View {
                         Text("TILT PITCH ANGLE")
                             .font(.system(.caption2, design: .monospaced))
                             .foregroundColor(.secondary)
-                        Text("\(Int(deviceAltitudeTilt))°")
+                        Text("\(Int(motionEngine.altitudeTilt))°")
                             .font(.system(.headline, design: .monospaced))
                             .foregroundColor(.primary)
                     }
@@ -120,10 +164,15 @@ struct LiveSkyViewfinderOverlay: View {
                 .padding(.bottom, 40)
             }
         }
+        .onAppear {
+            motionEngine.engageSensorStreaming(with: visiblePlanetsCatalog)
+        }
+        .onDisappear {
+            motionEngine.disengageSensorStreaming()
+        }
         .navigationBarHidden(true)
     }
     
-    // Quick geometry converter translating compass degrees to layout labels
     private func getCompassLabel(_ angle: Double) -> String {
         let sectors = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
         let index = Int((angle + 22.5).truncatingRemainder(dividingBy: 360.0) / 45.0)
@@ -131,14 +180,15 @@ struct LiveSkyViewfinderOverlay: View {
     }
 }
 
-// MARK: - 🗺️ VIEW LAYER GRAPHIC DETAIL LINING STRUCT
+// ==============================================================================
+// 📐 VIEW LAYER GRAPHIC DETAIL LINING STRUCT
+// ==============================================================================
 struct ViewfinderBackgroundGridLines: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let midX = rect.midX
         let midY = rect.midY
         
-        // Draw extended alignment tracking cross axis lines across the screen space
         path.move(to: CGPoint(x: midX, y: rect.minY))
         path.addLine(to: CGPoint(x: midX, y: rect.maxY))
         path.move(to: CGPoint(x: rect.minX, y: midY))

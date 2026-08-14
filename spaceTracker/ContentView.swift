@@ -212,7 +212,7 @@ struct ContentView: View {
                         // Simple, punchy, high-utility titles
                         HStack(alignment: .bottom) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("LIVE INTERACTIVE SKY MAP")
+                                Text("OPEN LIVE INTERACTIVE SKY MAP")
                                     .font(.system(.caption2, design: .monospaced))
                                     .fontWeight(.bold)
                                     .foregroundColor(.cyan)
@@ -305,11 +305,11 @@ struct ContentView: View {
                     .padding(.bottom, 4)
                 
                 VStack(spacing: 0) {
-                    // 💡 THE INDEX FIX: Swapped to loop over liveVisibleTargets from the API!
-                    ForEach(stargazerViewModel.stargazerState.liveVisibleTargets) { planet in
+                    // 💡 THE PERFOMANCE FIX: Filter to ONLY render "PLANET" classifications on the main dashboard tab!
+                    ForEach(stargazerViewModel.stargazerState.liveVisibleTargets.filter { $0.classification == "PLANET" }) { planet in
                         CelestialTargetRowView(planet: planet)
                         
-                        if planet.id != stargazerViewModel.stargazerState.liveVisibleTargets.last?.id {
+                        if planet.id != stargazerViewModel.stargazerState.liveVisibleTargets.filter({ $0.classification == "PLANET" }).last?.id {
                             Divider()
                         }
                     }
@@ -1381,7 +1381,8 @@ struct ContentView: View {
         }
         // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
         .fullScreenCover(isPresented: $showLiveViewfinderOverlay) {
-            LiveSkyViewfinderOverlay()
+            // 💡 THE TRUE DATA FEED: Passes your real live downloaded planets list array down into the finder lookups!
+            LiveSkyViewfinderOverlay(visiblePlanetsCatalog: stargazerViewModel.stargazerState.liveVisibleTargets)
         }
     }
 
