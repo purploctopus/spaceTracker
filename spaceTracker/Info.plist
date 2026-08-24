@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>UILaunchStoryboardName</key>
+	<string>Launch Screen</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires back camera access to display the interactive 3D star map view.</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-1070603260872166~2504508868</string>
 	<key>NSAppTransportSecurity</key>
@@ -229,12 +233,5 @@
 			<string>3qcr597p9d.skadnetwork</string>
 		</dict>
 	</array>
-	<key>UILaunchScreen</key>
-	<dict>
-		<key>UIColorName</key>
-		<string>launch_background</string>
-		<key>UIImageName</key>
-		<string>launch_logo</string>
-	</dict>
 </dict>
 </plist>
