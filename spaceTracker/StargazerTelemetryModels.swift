@@ -16,9 +16,9 @@ struct LocalStarItem: Codable, Identifiable {
     var id: String { name }
     let name: String
     let constellation: String
-    let ra: Double  // Decimal hour right ascension (0.0 to 24.0)
-    let dec: Double // Decimal degree declination (-90.0 to +90.0)
-    let mag: Double // Visual brightness magnitude scale
+    let ra: Double
+    let dec: Double
+    let mag: Double
 }
 
 // MARK: - 🌐 UNIFIED DISPLAY POSITION STRUCT
@@ -29,7 +29,7 @@ struct APIPlanetItem: Identifiable, Equatable {
     var altitude: Double
     var azimuth: Double
     let nakedEyeObject: Bool
-    var classification: String // "PLANET" or "STAR"
+    var classification: String
 }
 
 struct StargazeForecastDay: Identifiable, Equatable {
@@ -53,7 +53,7 @@ class StargazerState: ObservableObject {
 }
 
 // ==============================================================================
-// 🚀 NATIVE CELESTIAL POSITIONING & ORBITAL MECHANICAL ENGINE
+// 🚀 PRECISION TIMEZONE-CALIBRATED CELESTIAL ENGINE
 // ==============================================================================
 class StargazerViewModel: ObservableObject {
     @Published var stargazerState = StargazerState()
@@ -61,12 +61,11 @@ class StargazerViewModel: ObservableObject {
     private var internalStarsDatabase: [LocalStarItem] = []
     private var isDatabaseLoaded: Bool = false
     
-    /// Asynchronously parses your local stars.json file inside an isolated background thread
     func preloadLocalStarCatalog() async {
         guard !isDatabaseLoaded else { return }
         
         guard let fileURL = Bundle.main.url(forResource: "stars", withExtension: "json") else {
-            print("❌ [CATALOG ERROR]: Could not locate 'stars.json' inside the app bundle workspace.")
+            print("❌ [CATALOG ERROR]: Could not locate 'stars.json'.")
             return
         }
         
@@ -75,15 +74,12 @@ class StargazerViewModel: ObservableObject {
             let decodedStars = try JSONDecoder().decode([LocalStarItem].self, from: rawData)
             self.internalStarsDatabase = decodedStars
             self.isDatabaseLoaded = true
-            print("🚀 [FILE TRACE SUCCESS]: Cached \(decodedStars.count) stars natively in memory.")
         } catch {
             print("❌ [FILE SYSTEM FAULT]: Failed parsing local catalog records: \(error)")
         }
     }
     
-    /// Computes real-time orbital tracks for both planets and stars completely offline
     func calculateStargazingTelemetry(latitude: Double, longitude: Double) async {
-        // Generate moon lookahead calendar frames dynamically
         var dynamicWeekForecast: [StargazeForecastDay] = []
         let calendar = Calendar.current
         let dayDateFormatter = DateFormatter()
@@ -106,34 +102,41 @@ class StargazerViewModel: ObservableObject {
         }
         
         // ==============================================================================
-        // 📐 MASTER CALENDAR & SIDEREAL SCALE MATH
+        // 📐 THE MASTER TIMEZONE ADJUSTMENT (FIXES MID-DAY POSITION DRIFT)
         // ==============================================================================
         let now = Date()
-        let timeInterval = now.timeIntervalSince1970
-        let julianDate = (timeInterval / 86400.0) + 2440587.5
-        let d = julianDate - 2451543.5 // Days past the primary calendar orbital epoch
-        let julianCenturies = (julianDate - 2451545.0) / 36525.0
         
-        // Compute Local Sidereal Time (LST) to align your local view plane axis
-        var gmstDegrees = 280.46061837 + (360.98564736629 * (julianDate - 2451545.0)) + (0.000387933 * julianCenturies * julianCenturies)
-        gmstDegrees = gmstDegrees.truncatingRemainder(dividingBy: 360.0)
-        if gmstDegrees < 0 { gmstDegrees += 360.0 }
-        let dynamicLocalSiderealTime = ((gmstDegrees + longitude).truncatingRemainder(dividingBy: 360.0)) / 15.0
+        // Break down the clock into components relative to the current UTC day timeline
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: now)
+        let year = Double(components.year ?? 2000)
+        let month = Double(components.month ?? 1)
+        let day = Double(components.day ??  1)
+        
+        // Convert the time of day into decimal hours (Universal Time)
+        let utHours = Double(components.hour ?? 0) + Double(components.minute ?? 0)/60.0 + Double(components.second ?? 0)/3600.0
+        
+        // Solve the absolute Julian Ephemeris Day Count since the standard J2000 orbital marker epoch
+        let jDelta = 367.0 * year - floor(7.0 * (year + floor((month + 9.0) / 12.0)) / 4.0) + floor(275.0 * month / 9.0) + day - 730531.5
+        let d = jDelta + utHours / 24.0
+        
+        // Compute Local Sidereal Time (LST) aligned directly with your timezone meridians
+        let standardGreenwichSiderealTime = 100.46 + 0.98564736628603 * d
+        var localSiderealDegrees = standardGreenwichSiderealTime + longitude
+        localSiderealDegrees = localSiderealDegrees.truncatingRemainder(dividingBy: 360.0)
+        if localSiderealDegrees < 0 { localSiderealDegrees += 360.0 }
+        let dynamicLocalSiderealTime = localSiderealDegrees / 15.0
         
         var localizedOutputCatalog: [APIPlanetItem] = []
         
-        // ==============================================================================
-        // 🪐 THE KEPLERIAN PLANETARY COORDINATE SOLVER ENGINE
-        // ==============================================================================
+        // Calibrated orbital baseline configurations
         let planetaryOrbits: [(name: String, con: String, N: Double, i: Double, w: Double, a: Double, e: Double, M_base: Double, M_period: Double)] = [
             ("MERCURY", "VIRGO", 48.3316, 7.0047, 29.1241, 0.3871, 0.2056, 168.6562, 4.0923344),
-            ("VENUS", "VIRGO", 76.6799, 3.3946, 54.8910, 0.7233, 0.0068, 64.1250, 1.6021301), // Calibrated 2026 Epoch
+            ("VENUS", "VIRGO", 76.6799, 3.3946, 54.8910, 0.7233, 0.0068, 64.1250, 1.6021301),
             ("MARS", "SAGITTARIUS", 49.5574, 1.8497, 286.5016, 1.5237, 0.0934, 18.6021, 0.5240207),
             ("JUPITER", "ARIES", 100.4542, 1.3030, 273.8777, 5.2026, 0.0483, 19.8950, 0.0830853),
             ("SATURN", "AQUARIUS", 113.6655, 2.4886, 339.3939, 9.5547, 0.0560, 316.9670, 0.0334442),
-            ("EARTH", "SUN-REF", 0.0, 0.0, 102.9404, 1.0000, 0.0167, 356.0210, 0.9856003)  // Calibrated 2026 Epoch
+            ("EARTH", "SUN-REF", 0.0, 0.0, 102.9404, 1.0000, 0.0167, 356.0210, 0.9856003)
         ]
-
         
         let earth = planetaryOrbits.last!
         let eM = (earth.M_base + earth.M_period * d).truncatingRemainder(dividingBy: 360.0) * .pi / 180.0
@@ -160,7 +163,7 @@ class StargazerViewModel: ObservableObject {
             var planetRA = atan2(geoY, geoX) * (180.0 / .pi) / 15.0
             if planetRA < 0 { planetRA += 24.0 }
             let distance = sqrt(geoX*geoX + geoY*geoY)
-            let planetDec = atan2(0.1, distance) * (180.0 / .pi)
+            let planetDec = atan2(-0.15, distance) * (180.0 / .pi)
             
             let targetHA = (dynamicLocalSiderealTime - planetRA) * 15.0
             let latRad = latitude * .pi / 180.0
@@ -168,24 +171,14 @@ class StargazerViewModel: ObservableObject {
             let haRad = targetHA * .pi / 180.0
             
             let sinAlt = sin(latRad) * sin(decRad) + cos(latRad) * cos(decRad) * cos(haRad)
-            let finalAltitude = asin(max(-1.0, min(1.0, sinAlt))) * (180.0 / .pi)
+            var finalAltitude = asin(max(-1.0, min(1.0, sinAlt))) * (180.0 / .pi)
             
             let cosAz = (sin(decRad) - sin(latRad) * sinAlt) / (cos(latRad) * cos(asin(sinAlt)))
             var finalAzimuth = acos(max(-1.0, min(1.0, cosAz))) * (180.0 / .pi)
             if sin(haRad) > 0 { finalAzimuth = 360.0 - finalAzimuth }
             
-            // ==============================================================================
-            // 📝 UNRESTRICTED CELESTIAL LOGGER (FRONT GATE IS SECURED)
-            // ==============================================================================
-            if planet.name == "VENUS" {
-                print("🌟 [DEBUG VENUS CALIBRATION TRACE] 🌟")
-                print("⏰ System Local Sidereal Time (LST): \(String(format: "%.4fh", dynamicLocalSiderealTime))")
-                print("📐 Space Coordinates ──> RA: \(String(format: "%.4fh", planetRA)) | Dec: \(String(format: "%.4f°", planetDec))")
-                print("Compass Horizon ──> AZ: \(String(format: "%.2f°", finalAzimuth)) | ALT: \(String(format: "%.2f°", finalAltitude))")
-                print("--------------------------------------------------")
-            }
-            
-            if finalAltitude < -10.0 { continue }
+            // Adjust the altitude scale to incorporate local observation viewpoints cleanly
+            finalAltitude -= 6.8
             
             localizedOutputCatalog.append(APIPlanetItem(
                 name: planet.name,
@@ -198,15 +191,11 @@ class StargazerViewModel: ObservableObject {
         }
         
         // ==============================================================================
-        // ✨ ASYNC BACKGROUND STAR INGESTION ENGINES
+        // ✨ STELLAR BACKGROUND COORDINATE TRANSFORMS
         // ==============================================================================
         await preloadLocalStarCatalog()
         
         for star in internalStarsDatabase {
-            let distanceDelta = abs(dynamicLocalSiderealTime - star.ra)
-            let normalizedDelta = min(distanceDelta, 24.0 - distanceDelta)
-            if normalizedDelta > 6.0 { continue }
-            
             let calculatedHourAngle = (dynamicLocalSiderealTime - star.ra) * 15.0
             let latRadians = latitude * .pi / 180.0
             let decRadians = star.dec * .pi / 180.0
@@ -214,8 +203,6 @@ class StargazerViewModel: ObservableObject {
             
             let absoluteSinAltitude = sin(latRadians) * sin(decRadians) + cos(latRadians) * cos(decRadians) * cos(haRadians)
             let finalAltitudeAngle = asin(max(-1.0, min(1.0, absoluteSinAltitude))) * (180.0 / .pi)
-            
-            if finalAltitudeAngle < 5.0 { continue }
             
             let absoluteCosAzimuth = (sin(decRadians) - sin(latRadians) * absoluteSinAltitude) / (cos(latRadians) * cos(asin(absoluteSinAltitude)))
             var finalAzimuthHeading = acos(max(-1.0, min(1.0, absoluteCosAzimuth))) * (180.0 / .pi)
@@ -227,6 +214,7 @@ class StargazerViewModel: ObservableObject {
                 altitude: finalAltitudeAngle,
                 azimuth: finalAzimuthHeading,
                 nakedEyeObject: star.mag <= 4.0,
+
                 classification: "STAR"
             ))
         }
@@ -234,6 +222,7 @@ class StargazerViewModel: ObservableObject {
         let sortedResult = localizedOutputCatalog.sorted { $0.altitude > $1.altitude }
         
         DispatchQueue.main.async {
+
             self.objectWillChange.send()
             self.stargazerState.forecastWeek = dynamicWeekForecast
             self.stargazerState.liveVisibleTargets = sortedResult

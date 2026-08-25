@@ -10,89 +10,184 @@ import ARKit
 import SceneKit
 
 // ==============================================================================
-// 🪐 SPATIAL TRACKING ENGINE (PURE BLACK SPACE MODE)
+// 🪐 SPATIAL AR ENGINE (SEAMLESS UN-CLAMPED CELESTIAL GLOBAL SPHERE)
 // ==============================================================================
-struct SkyViewportARView: UIViewRepresentable {
-    let celestialCatalog: [APIPlanetItem]
+class SkyViewportARView: UIView {
+    let arView = ARSCNView()
     
-    func makeUIView(context: Context) -> ARSCNView {
-        let arView = ARSCNView()
+    init(celestialCatalog: [APIPlanetItem]) {
+        super.init(frame: .zero)
         
-        // 💡 THE WHITEWASH FIX: Force a solid black background color contents!
-        // This shuts down the live camera video overlay feed completely, replacing
-        // it with a crisp, high-contrast pure black outer space canvas layout.
+        arView.backgroundColor = .black
         arView.scene.background.contents = UIColor.black
         arView.antialiasingMode = .multisampling4X
         arView.automaticallyUpdatesLighting = false
         
-        // Initialize world-tracking configuration locked directly to North and Gravity
         let configuration = ARWorldTrackingConfiguration()
         configuration.worldAlignment = .gravityAndHeading
         
-        // Project only the visible above-horizon star database onto our 3D space
+        arView.frame = self.bounds
+        arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        self.addSubview(arView)
+        
         populateARSkyDome(catalog: celestialCatalog, inside: arView.scene)
-        
-        // Spin up the native spatial hardware tracking session loop
         arView.session.run(configuration)
-        
-        return arView
     }
     
-    func updateUIView(_ uiView: ARSCNView, context: Context) {}
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        arView.frame = self.bounds
+    }
+    
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
     private func populateARSkyDome(catalog: [APIPlanetItem], inside scene: SCNScene) {
-        let domeRadius: Float = 30.0 // Projects star dots out onto a crisp 30-meter spatial sphere path
+        let domeRadius: Float = 25.0
         
         for object in catalog {
-            // ==============================================================================
-            // 🛡️ THE ADJUSTED LOWER HORIZON GATE (SAVES NECK STRAIN)
-            // ==============================================================================
-            // 💡 CHANGED: Lowered the visibility gate threshold from 0.0 down to -25.0!
-            // This pulls up the stars sitting just beneath your local tree and horizon lines,
-            // filling your screen with stars while you hold the phone comfortably in front of you.
-            if object.altitude < -25.0 { continue }
-            
-            // Convert input Azimuth and Altitude degrees into standard radians
+            // 💡 ALL HOLES PLUGGED: No filters or altitude cuts exist anymore.
+            // All 2,551 stars populate the inside of your virtual planetarium globe.
             let azRad = Float(object.azimuth) * .pi / 180.0
             let altRad = Float(object.altitude) * .pi / 180.0
             
-            // True AR spherical vector equations mapping coordinates relative to your camera glass
             let x = domeRadius * cos(altRad) * sin(azRad)
             let y = domeRadius * sin(altRad)
             let z = -domeRadius * cos(altRad) * cos(azRad)
             
             let isPlanet = object.classification == "PLANET"
+            let isMajorLabelBody = isPlanet || (!object.name.contains("HIP") && object.nakedEyeObject)
             
-            // Generate a vector graphic dot node for the star body
-            let dotGeometry = SCNSphere(radius: isPlanet ? 0.12 : 0.04)
+            let dotGeometry = SCNSphere(radius: isPlanet ? 0.09 : (object.nakedEyeObject ? 0.03 : 0.015))
             dotGeometry.firstMaterial?.diffuse.contents = isPlanet ? UIColor.cyan : UIColor.white
-            dotGeometry.firstMaterial?.emission.contents = isPlanet ? UIColor.cyan : UIColor.white
+            dotGeometry.firstMaterial?.emission.contents = isPlanet ? UIColor.cyan : UIColor.white.withAlphaComponent(0.5)
             
             let dotNode = SCNNode(geometry: dotGeometry)
             dotNode.position = SCNVector3(x, y, z)
             
-            // High-performance flat billboard text labels (prevents rendering drops)
-            let textGeometry = SCNText(string: object.name.uppercased(), extrusionDepth: 0.0)
-            textGeometry.font = UIFont.monospacedSystemFont(ofSize: 0.22, weight: .bold)
-            textGeometry.firstMaterial?.diffuse.contents = isPlanet ? UIColor.cyan : UIColor.white.withAlphaComponent(0.8)
+            dotNode.name = object.name
+            dotNode.setValue(object.constellation, forKey: "constellation")
+            dotNode.setValue(object.altitude, forKey: "altitude")
+            dotNode.setValue(object.azimuth, forKey: "azimuth")
+            dotNode.setValue(isPlanet ? "PLANET" : "STAR", forKey: "classification")
             
-            let textNode = SCNNode(geometry: textGeometry)
-            textNode.position = SCNVector3(0.12, -0.05, 0)
+            if isMajorLabelBody {
+                dotNode.setValue(true, forKey: "hasPermanentLabel")
+            }
             
-            // Force text labels to automatically turn and face flat at your eyes continuously
-            let billboardConstraint = SCNBillboardConstraint()
-            billboardConstraint.freeAxes = .all
-            textNode.constraints = [billboardConstraint]
-            
-            dotNode.addChildNode(textNode)
             scene.rootNode.addChildNode(dotNode)
         }
     }
+}
+
+// ==============================================================================
+// 🔌 SWIFTUI REPRESENTABLE CONTAINER (UN-CLAMPED SPATIAL RAYCASTER)
+// ==============================================================================
+struct SkyViewportARViewContainer: UIViewRepresentable {
+    let celestialCatalog: [APIPlanetItem]
+    @Binding var projectedScreenPlots: [ScreenProjectedObject]
+    @Binding var currentCrosshairTarget: TargetLockMatch?
     
-    static func dismantleUIView(_ uiView: ARSCNView, coordinator: ()) {
-        uiView.session.pause()
-        uiView.scene.rootNode.enumerateChildNodes { (node, _) in
-            node.removeFromParentNode()
+    private let safeScreenCenter = CGPoint(
+        x: UIScreen.main.bounds.width / 2,
+        y: UIScreen.main.bounds.height / 2
+    )
+    
+    func makeUIView(context: Context) -> SkyViewportARView {
+        let view = SkyViewportARView(celestialCatalog: celestialCatalog)
+        view.arView.delegate = context.coordinator
+        return view
+    }
+    
+    func updateUIView(_ uiView: SkyViewportARView, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    
+    class Coordinator: NSObject, ARSCNViewDelegate {
+        var parent: SkyViewportARViewContainer
+        
+        init(_ parent: SkyViewportARViewContainer) {
+            self.parent = parent
+        }
+        
+        func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+            guard let arView = renderer as? ARSCNView else { return }
+            
+            var temporaryPlots: [ScreenProjectedObject] = []
+            var activeLockNode: SCNNode? = nil
+            var closestDistance: Float = Float.infinity
+            
+            let targetCenterPoint = parent.safeScreenCenter
+            
+            arView.scene.rootNode.enumerateChildNodes { (node, _) in
+                guard let nodeName = node.name else { return }
+                
+                let worldPosition = node.worldPosition
+                let screenPoint = arView.projectPoint(worldPosition)
+                
+                if screenPoint.z > 0 && screenPoint.z < 1.0 {
+                    let screenX = CGFloat(screenPoint.x)
+                    let screenY = CGFloat(screenPoint.y)
+                    
+                    // 💡 FIXED: Permanent labels show up across all directions smoothly
+                    if node.value(forKey: "hasPermanentLabel") as? Bool == true {
+                        let isPlanet = node.value(forKey: "classification") as? String == "PLANET"
+                        temporaryPlots.append(ScreenProjectedObject(
+                            name: nodeName,
+                            classification: isPlanet ? "PLANET" : "STAR",
+                            x: screenX,
+                            y: screenY
+                        ))
+                    }
+                    
+                    let dx = Float(screenX - targetCenterPoint.x)
+                    let dy = Float(screenY - targetCenterPoint.y)
+                    let distanceToCenter = sqrt(dx*dx + dy*dy)
+                    
+                    if distanceToCenter < 35.0 && distanceToCenter < closestDistance {
+                        closestDistance = distanceToCenter
+                        activeLockNode = node
+                    }
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.parent.projectedScreenPlots = temporaryPlots
+                
+                // 💡 FIXED: The crosshairs will lock onto below-horizon targets natively!
+                if let lockNode = activeLockNode, let name = lockNode.name {
+                    let con = lockNode.value(forKey: "constellation") as? String ?? "UNKNOWN"
+                    let alt = lockNode.value(forKey: "altitude") as? Double ?? 0.0
+                    let az = lockNode.value(forKey: "azimuth") as? Double ?? 0.0
+                    
+                    self.parent.currentCrosshairTarget = TargetLockMatch(
+                        name: name.uppercased(),
+                        constellation: con.uppercased(),
+                        altitude: Int(alt),
+                        azimuth: Int(az)
+                    )
+                } else {
+                    self.parent.currentCrosshairTarget = nil
+                }
+            }
         }
     }
+}
+
+// ==============================================================================
+// 📦 SHARED DATATYPE SCHEMAS (DECLARED GLOBAL SCOPE)
+// ==============================================================================
+struct ScreenProjectedObject: Identifiable, Equatable {
+    let id = UUID()
+    let name: String
+    let classification: String
+    let x: CGFloat
+    let y: CGFloat
+}
+
+struct TargetLockMatch: Identifiable, Equatable {
+    let id = UUID()
+    let name: String
+    let constellation: String
+    let altitude: Int
+    let azimuth: Int
 }
