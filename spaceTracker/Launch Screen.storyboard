@@ -15,15 +15,15 @@
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="OrbitLog" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="18" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="128.66666666666666" y="404.66666666666669" width="135.99999999999997" height="43"/>
-                                <fontDescription key="fontDescription" type="system" pointSize="36"/>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="v1.0.4 StarGaze" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="18" translatesAutoresizingMaskIntoConstraints="NO" id="csm-TO-LSa">
+                                <rect key="frame" x="107.66666666666667" y="409.33333333333331" width="177.66666666666663" height="33.666666666666686"/>
+                                <fontDescription key="fontDescription" type="system" weight="thin" pointSize="28"/>
                                 <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <nil key="highlightedColor"/>
                             </label>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="v1.0.4 StarGaze" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="18" translatesAutoresizingMaskIntoConstraints="NO" id="csm-TO-LSa">
-                                <rect key="frame" x="104" y="465.66666666666669" width="185" height="33.666666666666686"/>
-                                <fontDescription key="fontDescription" type="system" weight="light" pointSize="28"/>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="OrbitLog" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="18" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
+                                <rect key="frame" x="103.00000000000001" y="333" width="187.33333333333337" height="60"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="50"/>
                                 <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <nil key="highlightedColor"/>
                             </label>
@@ -31,10 +31,10 @@
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                         <color key="backgroundColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <constraints>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="8WW-fK-jXK"/>
-                            <constraint firstItem="csm-TO-LSa" firstAttribute="top" secondItem="GJd-Yh-RWb" secondAttribute="bottom" constant="18.329999999999998" id="EZg-wJ-jdw"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="lsi-2p-AA2"/>
-                            <constraint firstItem="csm-TO-LSa" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="x1F-P2-cAb"/>
+                            <constraint firstItem="csm-TO-LSa" firstAttribute="top" secondItem="GJd-Yh-RWb" secondAttribute="bottom" constant="16.329999999999998" id="BaV-gh-UI4"/>
+                            <constraint firstItem="csm-TO-LSa" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="c6R-EA-cXZ"/>
+                            <constraint firstItem="csm-TO-LSa" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="cev-Ze-mWz"/>
+                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="s2z-LV-cS5"/>
                         </constraints>
                     </view>
                 </viewController>

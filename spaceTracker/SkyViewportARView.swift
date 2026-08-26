@@ -10,7 +10,7 @@ import ARKit
 import SceneKit
 
 // ==============================================================================
-// 🪐 SPATIAL AR ENGINE (SEAMLESS UN-CLAMPED CELESTIAL GLOBAL SPHERE)
+// 🪐 SPATIAL AR MASTER ENGINE (DIRECT ANGLE ROTATION HOOK WITH RE-INJECTED LOGS)
 // ==============================================================================
 class SkyViewportARView: UIView {
     let arView = ARSCNView()
@@ -44,43 +44,73 @@ class SkyViewportARView: UIView {
     private func populateARSkyDome(catalog: [APIPlanetItem], inside scene: SCNScene) {
         let domeRadius: Float = 25.0
         
+        let celestialSphereNode = SCNNode()
+        celestialSphereNode.name = "CELESTIAL_SPHERE_SHELL"
+        scene.rootNode.addChildNode(celestialSphereNode)
+        
+        // 🔬 MANDATORY FORENSIC GRAPHICS PRINTS - PERMANENTLY RETAINED AND RESTORED
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🖥️ [AR GRAPHICS PIPELINE] PLOTTING TELEMETRY VIA PURE EULER ANGLES")
+        
         for object in catalog {
-            // 💡 ALL HOLES PLUGGED: No filters or altitude cuts exist anymore.
-            // All 2,551 stars populate the inside of your virtual planetarium globe.
+            // Convert clean input model degrees directly to standard rotation radians
             let azRad = Float(object.azimuth) * .pi / 180.0
             let altRad = Float(object.altitude) * .pi / 180.0
             
-            let x = domeRadius * cos(altRad) * sin(azRad)
-            let y = domeRadius * sin(altRad)
-            let z = -domeRadius * cos(altRad) * cos(azRad)
+            // 📐 PURE 1:1 ANGLE MOUNT:
+            // Stop converting angles to 3D Cartesian coordinates! We position a baseline node
+            // pointing forward on the North horizon line, then pivot its parent shell by your exact angles.
+            let targetAnchorNode = SCNNode()
             
             let isPlanet = object.classification == "PLANET"
             let isMajorLabelBody = isPlanet || (!object.name.contains("HIP") && object.nakedEyeObject)
+            
+            // 💡 THE SYNTAX CORRECTION: Cleaned out the double text block typo identifier!
+            let xLogVal = domeRadius * sin(azRad) * cos(altRad)
+            let yLogVal = domeRadius * sin(altRad)
+            let zLogVal = -domeRadius * cos(azRad) * cos(altRad)
+            
+            if isPlanet {
+                print("   🌐 PLOTTING PLANET: \(object.name)")
+                print("      ├─> Input Math Model : ALT: \(String(format: "%.2f°", object.altitude)) | AZ: \(String(format: "%.2f°", object.azimuth))")
+                print("      └─> SCN Graphic Node : X: \(String(format: "%.3f", xLogVal)) | Y: \(String(format: "%.3f", yLogVal)) | Z: \(String(format: "%.3f", zLogVal))")
+            }
             
             let dotGeometry = SCNSphere(radius: isPlanet ? 0.09 : (object.nakedEyeObject ? 0.03 : 0.015))
             dotGeometry.firstMaterial?.diffuse.contents = isPlanet ? UIColor.cyan : UIColor.white
             dotGeometry.firstMaterial?.emission.contents = isPlanet ? UIColor.cyan : UIColor.white.withAlphaComponent(0.5)
             
-            let dotNode = SCNNode(geometry: dotGeometry)
-            dotNode.position = SCNVector3(x, y, z)
+            let visualDotMeshNode = SCNNode(geometry: dotGeometry)
+            visualDotMeshNode.position = SCNVector3(0, 0, -domeRadius) // Position forward on the radius boundary
+            targetAnchorNode.addChildNode(visualDotMeshNode)
             
-            dotNode.name = object.name
-            dotNode.setValue(object.constellation, forKey: "constellation")
-            dotNode.setValue(object.altitude, forKey: "altitude")
-            dotNode.setValue(object.azimuth, forKey: "azimuth")
-            dotNode.setValue(isPlanet ? "PLANET" : "STAR", forKey: "classification")
+            // Apply raw calculated angles directly to the node axes.
+            // X-Axis controls Altitude (Pitch), Y-Axis controls Azimuth (Yaw).
+            // Inverting the azimuth heading matches ARKit's native counter-clockwise rotation pass.
+            targetAnchorNode.eulerAngles = SCNVector3(altRad, -azRad, 0)
+            
+            // Tag the inner mesh node with structural metadata packets for the raycast picker sights
+            let metadata = ARNodeMetadataPacket(
+                name: object.name,
+                classification: object.classification,
+                constellation: object.constellation,
+                altitude: Int(object.altitude),
+                azimuth: Int(object.azimuth)
+            )
+            visualDotMeshNode.setValue(metadata, forKey: "celestial_packet")
             
             if isMajorLabelBody {
-                dotNode.setValue(true, forKey: "hasPermanentLabel")
+                visualDotMeshNode.setValue(true, forKey: "hasPermanentLabel")
             }
             
-            scene.rootNode.addChildNode(dotNode)
+            celestialSphereNode.addChildNode(targetAnchorNode)
         }
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
 }
 
 // ==============================================================================
-// 🔌 SWIFTUI REPRESENTABLE CONTAINER (UN-CLAMPED SPATIAL RAYCASTER)
+// 🔌 SWIFTUI REPRESENTABLE CONTAINER (THREAD-SAFE SPATIAL RAYCASTER)
 // ==============================================================================
 struct SkyViewportARViewContainer: UIViewRepresentable {
     let celestialCatalog: [APIPlanetItem]
@@ -118,34 +148,37 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
             
             let targetCenterPoint = parent.safeScreenCenter
             
-            arView.scene.rootNode.enumerateChildNodes { (node, _) in
-                guard let nodeName = node.name else { return }
-                
-                let worldPosition = node.worldPosition
-                let screenPoint = arView.projectPoint(worldPosition)
-                
-                if screenPoint.z > 0 && screenPoint.z < 1.0 {
-                    let screenX = CGFloat(screenPoint.x)
-                    let screenY = CGFloat(screenPoint.y)
+            guard let sphereContainer = arView.scene.rootNode.childNode(withName: "CELESTIAL_SPHERE_SHELL", recursively: true) else { return }
+            
+            sphereContainer.enumerateChildNodes { (parentNode, _) in
+                // Intercept the visual dot nodes sitting inside the rotated parent shells
+                parentNode.enumerateChildNodes { (node, _) in
+                    guard let packet = node.value(forKey: "celestial_packet") as? ARNodeMetadataPacket else { return }
                     
-                    // 💡 FIXED: Permanent labels show up across all directions smoothly
-                    if node.value(forKey: "hasPermanentLabel") as? Bool == true {
-                        let isPlanet = node.value(forKey: "classification") as? String == "PLANET"
-                        temporaryPlots.append(ScreenProjectedObject(
-                            name: nodeName,
-                            classification: isPlanet ? "PLANET" : "STAR",
-                            x: screenX,
-                            y: screenY
-                        ))
-                    }
+                    let worldPosition = node.worldPosition
+                    let screenPoint = arView.projectPoint(worldPosition)
                     
-                    let dx = Float(screenX - targetCenterPoint.x)
-                    let dy = Float(screenY - targetCenterPoint.y)
-                    let distanceToCenter = sqrt(dx*dx + dy*dy)
-                    
-                    if distanceToCenter < 35.0 && distanceToCenter < closestDistance {
-                        closestDistance = distanceToCenter
-                        activeLockNode = node
+                    if screenPoint.z > 0 && screenPoint.z < 1.0 {
+                        let screenX = CGFloat(screenPoint.x)
+                        let screenY = CGFloat(screenPoint.y)
+                        
+                        if node.value(forKey: "hasPermanentLabel") as? Bool == true {
+                            temporaryPlots.append(ScreenProjectedObject(
+                                name: packet.name,
+                                classification: packet.classification,
+                                x: screenX,
+                                y: screenY
+                            ))
+                        }
+                        
+                        let dx = Float(screenX - targetCenterPoint.x)
+                        let dy = Float(screenY - targetCenterPoint.y)
+                        let distanceToCenter = sqrt(dx*dx + dy*dy)
+                        
+                        if distanceToCenter < 35.0 && distanceToCenter < closestDistance {
+                            closestDistance = distanceToCenter
+                            activeLockNode = node
+                        }
                     }
                 }
             }
@@ -153,17 +186,12 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
             DispatchQueue.main.async {
                 self.parent.projectedScreenPlots = temporaryPlots
                 
-                // 💡 FIXED: The crosshairs will lock onto below-horizon targets natively!
-                if let lockNode = activeLockNode, let name = lockNode.name {
-                    let con = lockNode.value(forKey: "constellation") as? String ?? "UNKNOWN"
-                    let alt = lockNode.value(forKey: "altitude") as? Double ?? 0.0
-                    let az = lockNode.value(forKey: "azimuth") as? Double ?? 0.0
-                    
+                if let lockNode = activeLockNode, let packet = lockNode.value(forKey: "celestial_packet") as? ARNodeMetadataPacket {
                     self.parent.currentCrosshairTarget = TargetLockMatch(
-                        name: name.uppercased(),
-                        constellation: con.uppercased(),
-                        altitude: Int(alt),
-                        azimuth: Int(az)
+                        name: packet.name.uppercased(),
+                        constellation: packet.constellation.uppercased(),
+                        altitude: packet.altitude,
+                        azimuth: packet.azimuth
                     )
                 } else {
                     self.parent.currentCrosshairTarget = nil
@@ -176,6 +204,23 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
 // ==============================================================================
 // 📦 SHARED DATATYPE SCHEMAS (DECLARED GLOBAL SCOPE)
 // ==============================================================================
+class ARNodeMetadataPacket: NSObject {
+    let name: String
+    let classification: String
+    let constellation: String
+    let altitude: Int
+    let azimuth: Int
+    
+    init(name: String, classification: String, constellation: String, altitude: Int, azimuth: Int) {
+        self.name = name
+        self.classification = classification
+        self.constellation = constellation
+        self.altitude = altitude
+        self.azimuth = azimuth
+        super.init()
+    }
+}
+
 struct ScreenProjectedObject: Identifiable, Equatable {
     let id = UUID()
     let name: String
