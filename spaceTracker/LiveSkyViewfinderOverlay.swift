@@ -23,8 +23,6 @@ struct ViewfinderBackgroundGridLines: Shape {
     }
 }
 
-import SwiftUI
-
 struct LiveSkyViewfinderOverlay: View {
     let visiblePlanetsCatalog: [APIPlanetItem]
     @Environment(\.dismiss) private var dismiss
@@ -34,11 +32,12 @@ struct LiveSkyViewfinderOverlay: View {
     @State private var projectedScreenPlots: [ScreenProjectedObject] = []
     @State private var currentCrosshairTarget: TargetLockMatch? = nil
     
-    // Smoothly hides the screen for 1.5 seconds while sensors find true North!
     @State private var isStabilizingEngine = true
-    
-    // 💡 THE SHEET PRESENTATION STATE:
     @State private var selectedProfile: CelestialProfile? = nil
+    
+    // NAVIGATION ACTIVE STATE TRACKERS
+    @State private var isMenuDrawerOpen = false
+    @State private var activeNavigationTarget: String? = nil
     
     var body: some View {
         ZStack {
@@ -50,7 +49,7 @@ struct LiveSkyViewfinderOverlay: View {
             )
             .ignoresSafeArea()
             
-            // 2. Uncluttered Major Target Text Label Overlay Layer (Upgraded with Native iOS Symbols)
+            // 2. Floating Target Text Labels (Direct Tap-Safe Links)
             GeometryReader { proxy in
                 ZStack {
                     ForEach(projectedScreenPlots) { object in
@@ -67,7 +66,7 @@ struct LiveSkyViewfinderOverlay: View {
                                 }
                                 self.selectedProfile = targetProfile
                             }
-                        }){
+                        }) {
                             HStack(spacing: 5) {
                                 if hasProfileInfo {
                                     Image(systemName: "info.circle.fill")
@@ -79,8 +78,8 @@ struct LiveSkyViewfinderOverlay: View {
                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                                     .foregroundColor(isPlanet ? .cyan : (hasProfileInfo ? CelestialDatabaseRegistry.electricBlue : .yellow))
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
                             .background(Color.black.opacity(0.65))
                             .cornerRadius(4)
                         }
@@ -90,14 +89,13 @@ struct LiveSkyViewfinderOverlay: View {
                 }
             }
             .ignoresSafeArea()
-
             
-            // Minimal Visual Reticle Crosshair Line Geometry (Scope Fully Restored!)
+            // Reticle Grid Line Geometry
             ViewfinderBackgroundGridLines()
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Color.white.opacity(0.04), lineWidth: 1)
                 .ignoresSafeArea()
             
-            // 3. Main HUD Status Bar (Top and Bottom Panels Only)
+            // 3. Main HUD Interface Controller Deck Layout
             VStack(spacing: 0) {
                 // Top Monospaced Status Header Panel
                 HStack(alignment: .center) {
@@ -106,17 +104,32 @@ struct LiveSkyViewfinderOverlay: View {
                             .font(.system(.caption, design: .monospaced))
                             .fontWeight(.bold)
                             .foregroundColor(.cyan)
-                        Text("TARGET MODE: AUTOMATIC RAYCAST LOCK-ON")
+                        Text(activeNavigationTarget != nil ? "TARGET MODE: GUIDED TRACKING ACTIVE [\(activeNavigationTarget!)]" : "TARGET MODE: FREE-LOOK SCAN")
                             .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(activeNavigationTarget != nil ? .green : .secondary)
                     }
+                    
                     Spacer()
+                    
+                    // ☰ FLOATING NATIVE HAMBURGER INTERACTION BUTTON
+                    Button(action: { isMenuDrawerOpen.toggle() }) {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 16, weight: .bold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(isMenuDrawerOpen ? Color.cyan.opacity(0.2) : Color.black.opacity(0.5))
+                            .foregroundColor(isMenuDrawerOpen ? .cyan : .white)
+                            .cornerRadius(4)
+                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.cyan.opacity(0.3), lineWidth: 1))
+                    }
+                    .padding(.trailing, 8)
+                    
                     Button(action: { dismiss() }) {
                         Text("DISENGAGE")
                             .font(.system(.caption, design: .monospaced))
                             .fontWeight(.bold)
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 8)
                             .background(Color.red.opacity(0.1))
                             .foregroundColor(.red)
                             .cornerRadius(4)
@@ -126,25 +139,53 @@ struct LiveSkyViewfinderOverlay: View {
                 .background(Color.black.opacity(0.4))
                 
                 Spacer()
-                
-                // 🎯 Clean Center Crosshairs System (Purely Visual Reference Rings)
+
+                // ==============================================================================
+                // 🎯 BULLETPROOF 2D SCREEN-SPACE INTERSECTOR NEEDLE ENGINE
+                // ==============================================================================
                 ZStack {
                     Circle()
-                        .stroke(motionEngine.isPointingBelowHorizon ? Color.red : Color.cyan.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
                         .frame(width: 200, height: 240)
                     
                     Circle()
-                        .stroke(motionEngine.isPointingBelowHorizon ? Color.red : Color.cyan, lineWidth: 1.5)
+                        .stroke(Color.cyan, lineWidth: 1.5)
                         .frame(width: 100, height: 100)
                     
-                    Rectangle()
-                        .fill(Color.cyan)
-                        .frame(width: 20, height: 1)
-                    Rectangle()
-                        .fill(Color.cyan)
-                        .frame(width: 1, height: 20)
+                    Rectangle().fill(Color.cyan).frame(width: 20, height: 1)
+                    Rectangle().fill(Color.cyan).frame(width: 1, height: 20)
+                    
+                    // 💡 FIXED SCREEN MATRIX:
+                    // Completely ignores the blocked motionEngine. Reads your active, updating
+                    // screen projection plots to calculate a direct visual direction needle!
+                    if let targetName = activeNavigationTarget,
+                       let screenPlot = projectedScreenPlots.first(where: { $0.name.uppercased() == targetName }) {
+                        
+                        // Map out your exact screen center boundaries mapping metrics
+                        let centerX = UIScreen.main.bounds.width / 2.0
+                        let centerY = UIScreen.main.bounds.height / 2.0 - 50.0 // Account for upper status bar offsets
+                        
+                        let deltaX = screenPlot.x - centerX
+                        let deltaY = screenPlot.y - centerY
+                        
+                        let distanceToTarget = sqrt(pow(deltaX, 2) + pow(deltaY, 2))
+                        
+                        // Keeps needle active until the text card touches your 100px reticle ring
+                        if distanceToTarget > 45.0 {
+                            // Standard screen-space bearing angle calculation (Inverted Y coordinate rule)
+                            let angleRadians = atan2(deltaX, -deltaY)
+                            let angleDegrees = angleRadians * (180.0 / .pi)
+                            
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.green)
+                                .offset(y: -50) // Anchors cleanly on the perimeter ring
+                                .rotationEffect(.degrees(angleDegrees)) // Rotates smoothly to match the visual plot!
+                        }
+                    }
                 }
-                
+
+
                 Spacer()
                 
                 // Bottom Viewport Tilt Pitch Readout
@@ -154,7 +195,7 @@ struct LiveSkyViewfinderOverlay: View {
                         Text("VIEWPORT TILT PITCH")
                             .font(.system(.caption2, design: .monospaced))
                             .foregroundColor(.secondary)
-                        Text("\(Int(motionEngine.altitudeTilt))°")
+                        Text("\(Int(motionEngine.currentAltitude))°")
                             .font(.system(.headline, design: .monospaced))
                             .foregroundColor(.primary)
                     }
@@ -163,7 +204,74 @@ struct LiveSkyViewfinderOverlay: View {
                 .padding(.bottom, 40)
             }
             
-            // Stabilization Veil (Hides initial sensor calibration frames)
+            // ==============================================================================
+            // ☰ THE SLIDE-OVER NAVIGATION SELECTION DRAWER (ANCHORED AT Z-ROOT)
+            // ==============================================================================
+            if isMenuDrawerOpen {
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+                    .onTapGesture { isMenuDrawerOpen = false }
+                
+                HStack {
+                    Spacer()
+                    
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Text("✦ SELECT VECTOR TARGET")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundColor(.cyan)
+                            Spacer()
+                            Button(action: { isMenuDrawerOpen = false }) {
+                                Image(systemName: "xmark.square.fill")
+                                    .foregroundColor(.gray)
+                                    .font(.title3)
+                            }
+                        }
+                        .padding(.bottom, 10)
+                        
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 8) {
+                                ForEach(CelestialDatabaseRegistry.interactiveTargetsList, id: \.self) { targetID in
+                                    let profile = CelestialDatabaseRegistry.profiles[targetID]!
+                                    let isCurrentlySelected = activeNavigationTarget == targetID
+                                    
+                                    Button(action: {
+                                        if isCurrentlySelected {
+                                            activeNavigationTarget = nil
+                                        } else {
+                                            activeNavigationTarget = targetID
+                                        }
+                                        isMenuDrawerOpen = false
+                                    }) {
+                                        HStack {
+                                            Text(profile.name.uppercased())
+                                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                            Spacer()
+                                            if isCurrentlySelected {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .foregroundColor(.green)
+                                            }
+                                        }
+                                        .padding(12)
+                                        .background(isCurrentlySelected ? Color.green.opacity(0.15) : Color.white.opacity(0.04))
+                                        .foregroundColor(isCurrentlySelected ? .green : .white)
+                                        .cornerRadius(6)
+                                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(isCurrentlySelected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 1))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .frame(width: 260)
+                    .background(Color(red: 0.05, green: 0.05, blue: 0.07))
+                    .overlay(Rectangle().stroke(Color.gray.opacity(0.15), lineWidth: 1))
+                    .ignoresSafeArea()
+                    .transition(.move(edge: .trailing))
+                }
+            }
+            
+            // Stabilization Veil
             if isStabilizingEngine {
                 Color.black
                     .ignoresSafeArea()
@@ -180,7 +288,6 @@ struct LiveSkyViewfinderOverlay: View {
         }
         .onAppear {
             motionEngine.engageSensorStreaming(with: visiblePlanetsCatalog)
-            
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     isStabilizingEngine = false

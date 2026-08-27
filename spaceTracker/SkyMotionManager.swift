@@ -9,29 +9,35 @@ import Foundation
 import CoreMotion
 import Combine
 
-// ==============================================================================
-// 📡 LIGHTWEIGHT HORIZON GUARD SENSOR UTILITY
-// ==============================================================================
 class SkyMotionManager: ObservableObject {
     private let motionManager = CMMotionManager()
     
-    @Published var altitudeTilt: Double = 0.0
+    // 💡 CLEAN UN-DRIFTED VARIABLES:
+    @Published var currentAltitude: Double = 0.0
+    @Published var currentAzimuth: Double = 0.0
     @Published var isPointingBelowHorizon: Bool = false
     
     func engageSensorStreaming(with targets: [APIPlanetItem]) {
         guard motionManager.isDeviceMotionAvailable else { return }
         
-        motionManager.deviceMotionUpdateInterval = 1.0 / 30.0
+        motionManager.deviceMotionUpdateInterval = 1.0 / 60.0 // 60Hz high-frequency streaming
+        
+        // Using high-precision attitude reference grids with magnetic yaw correction layers
         motionManager.startDeviceMotionUpdates(using: .xMagneticNorthZVertical, to: .main) { [weak self] (motionData, error) in
             guard let self = self, let data = motionData else { return }
             
+            // Extracts simple 3D pitch angles relative to your portrait camera view glass axis
             let pitchDegrees = data.attitude.pitch * (180.0 / .pi)
             
+            // Extract a clean 0 to 360 degree compass bearing clockwise from North
+            var compassHeading = data.heading
+            if compassHeading < 0 { compassHeading += 360.0 }
+            
             DispatchQueue.main.async {
-                self.altitudeTilt = pitchDegrees
+                self.currentAltitude = pitchDegrees
+                self.currentAzimuth = compassHeading
                 
-                // If gravity.z drops below -0.1 while tilted down, the phone is pointing at your shoes
-                if data.gravity.z < -0.1 && pitchDegrees < 15.0 {
+                if pitchDegrees < -2.0 {
                     self.isPointingBelowHorizon = true
                 } else {
                     self.isPointingBelowHorizon = false

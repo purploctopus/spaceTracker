@@ -23,7 +23,7 @@
                                 <nil key="highlightedColor"/>
                             </label>
                             <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="OrbitLog" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="18" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="103.00000000000001" y="333" width="187.33333333333337" height="60"/>
+                                <rect key="frame" x="103.00000000000001" y="345.33333333333331" width="187.33333333333337" height="60"/>
                                 <fontDescription key="fontDescription" type="system" pointSize="50"/>
                                 <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <nil key="highlightedColor"/>
@@ -32,10 +32,10 @@
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                         <color key="backgroundColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <constraints>
-                            <constraint firstItem="csm-TO-LSa" firstAttribute="top" secondItem="GJd-Yh-RWb" secondAttribute="bottom" constant="16.329999999999998" id="BaV-gh-UI4"/>
                             <constraint firstItem="csm-TO-LSa" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="c6R-EA-cXZ"/>
                             <constraint firstItem="csm-TO-LSa" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="cev-Ze-mWz"/>
                             <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="s2z-LV-cS5"/>
+                            <constraint firstItem="csm-TO-LSa" firstAttribute="top" secondItem="GJd-Yh-RWb" secondAttribute="bottom" constant="4" id="zds-QZ-wHg"/>
                         </constraints>
                     </view>
                 </viewController>

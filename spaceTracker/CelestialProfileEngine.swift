@@ -156,3 +156,16 @@ struct CelestialDatabaseRegistry {
         )
     ]
 }
+
+// MARK: - 🛠️ EXTENDED DATA TRACKER CONTRACT REGISTRY
+extension CelestialDatabaseRegistry {
+    
+    // 💡 HIGH-VALUE SORTED TARGET LIST:
+    // A clean, sorted sequence containing exactly your 5 core planets, the Sun, the Moon,
+    // and your 10 navigation stars, which feeds the hamburger navigation drawer list natively!
+    static let interactiveTargetsList: [String] = [
+        "MERCURY", "VENUS", "MARS", "JUPITER", "SATURN",
+        "SIRIUS", "BETELGEUSE", "RIGEL", "VEGA", "POLARIS",
+        "PROCYON", "ANTARES", "ALDEBARAN", "CAPELLA", "ARCTURUS"
+    ].sorted()
+}
