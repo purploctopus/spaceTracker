@@ -13,9 +13,12 @@ struct CelestialProfile: Identifiable, Codable {
     var id: String { name.uppercased() }
     let name: String
     let subTitle: String
-    let assetImageName: String? // Nil forces the card to skip the photo frame and use a vector icon
+    let assetImageName: String? 
     let encyclopediaSummary: String
     let classification: String
+    var liveAltitude: Double? = nil
+    var liveAzimuth: Double? = nil
+    var liveDistanceAU: Double? = nil
 }
 
 // MARK: - 🗄️ MASTER OFFLINE ENCYCLOPEDIA REGISTRY STORAGE

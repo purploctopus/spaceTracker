@@ -58,12 +58,16 @@ struct LiveSkyViewfinderOverlay: View {
                         let hasProfileInfo = profileMatch != nil
                         let isPlanet = object.classification == "PLANET"
                         
-                        // Wrap the floating label matrix inside a native link Button for instant touch execution
                         Button(action: {
-                            if let targetProfile = profileMatch {
+                            if var targetProfile = profileMatch {
+                                if let liveTrack = visiblePlanetsCatalog.first(where: { $0.name.uppercased() == object.name.uppercased() }) {
+                                    targetProfile.liveAltitude = liveTrack.altitude
+                                    targetProfile.liveAzimuth = liveTrack.azimuth
+                                    targetProfile.liveDistanceAU = liveTrack.range_au
+                                }
                                 self.selectedProfile = targetProfile
                             }
-                        }) {
+                        }){
                             HStack(spacing: 5) {
                                 if hasProfileInfo {
                                     Image(systemName: "info.circle.fill")

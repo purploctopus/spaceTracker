@@ -3,7 +3,7 @@
 //  spaceTracker
 //
 //  Created by Ben Clary on 8/27/26.
-//  make an app that colin uses
+//  make an app that colin uses and sara find relief from stress
 
 import SwiftUI
 
@@ -19,10 +19,9 @@ struct CelestialDetailSheet: View {
                 VStack(alignment: .leading, spacing: 24) {
                     
                     // ==============================================================================
-                    // 📸 CONDITIONAL ASSET HEADER DISPLAY VIEW
+                    // 📸 HIGH-FIDELITY IMAGE HEADER MODULE
                     // ==============================================================================
                     if let imageName = profile.assetImageName {
-                        // PREMIUM PLANET PHOTO HEADER
                         ZStack(alignment: .topTrailing) {
                             Image(imageName)
                                 .resizable()
@@ -35,7 +34,6 @@ struct CelestialDetailSheet: View {
                             dismissButton
                         }
                     } else {
-                        // MINIMALIST STAR INTERFACE ICON UNIT
                         VStack(spacing: 16) {
                             HStack {
                                 Spacer()
@@ -89,8 +87,10 @@ struct CelestialDetailSheet: View {
                     .padding(.horizontal, 16)
                     
                     // ==============================================================================
-                    // 🌐 LIVE METRIC TELEMETRY OVERLAY FLAG
+                    // 🌐 LIVE METRIC TELEMETRY OVERLAY (REAL NASA DISTANCE INJECTED)
                     // ==============================================================================
+                    // 💡 FIXED: Stripped out the static placeholders. The sheet now calculates the true
+                    // physical range parameters and real-time look angles passing down from your live script!
                     VStack(alignment: .leading, spacing: 14) {
                         Text("LIVE NASA TELEMETRY LINK")
                             .font(.system(.subheadline, design: .monospaced))
@@ -107,13 +107,49 @@ struct CelestialDetailSheet: View {
                                     .foregroundColor(.white)
                             }
                             
-                            HStack {
-                                Text("├─> INTERACTIVE ID :")
-                                    .font(.system(.footnote, design: .monospaced))
-                                    .foregroundColor(.gray)
-                                Text("LOCAL_SECURE_V1")
-                                    .font(.system(.footnote, design: .monospaced))
-                                    .foregroundColor(.white)
+                            if let alt = profile.liveAltitude, let az = profile.liveAzimuth {
+                                HStack {
+                                    Text("├─> BACKYARD LOOK :")
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(.gray)
+                                    Text(String(format: "ALT %04.1f° / AZ %05.1f°", alt, az))
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            
+                            if let distanceAU = profile.liveDistanceAU {
+                                // 1 AU is exactly 149,597,870.7 kilometers
+                                let kmDistance = distanceAU * 149597870.7
+                                // Light travels at roughly 299,792.458 km per second
+                                let lightMinutes = (kmDistance / 299792.458) / 60.0
+                                
+                                HStack {
+                                    Text("├─> SPATIAL RANGE :")
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(.gray)
+                                    Text(String(format: "%.0f KM (%.4f AU)", kmDistance, distanceAU))
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(.cyan)
+                                }
+                                
+                                HStack {
+                                    Text("└─> LIGHT TIMELINE:")
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(.gray)
+                                    Text(String(format: "%.1f MINUTES TRAVEL TIME", lightMinutes))
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(.yellow)
+                                }
+                            } else {
+                                HStack {
+                                    Text("└─> INTERACTIVE ID :")
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(.gray)
+                                    Text("FIXED_STELLAR_BASE")
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(.white)
+                                }
                             }
                         }
                     }

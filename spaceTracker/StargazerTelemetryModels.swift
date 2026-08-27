@@ -31,6 +31,7 @@ struct APIPlanetItem: Identifiable, Equatable {
     var azimuth: Double
     let nakedEyeObject: Bool
     var classification: String
+    var range_au: Double?
 }
 
 // MARK: - 🔌 CLOUD DATA DECODER RE-ARCHITECTURE
@@ -39,6 +40,7 @@ struct CloudPlanetPacket: Codable {
     let name: String
     let ra: Double
     let dec: Double
+    let range_au: Double
 }
 
 struct IntegratedCloudPayload: Codable {
@@ -185,7 +187,8 @@ class StargazerViewModel: ObservableObject {
                 altitude: finalAltitude,
                 azimuth: finalAzimuth,
                 nakedEyeObject: true,
-                classification: "PLANET"
+                classification: "PLANET",
+                range_au: p.range_au
             ))
         }
         
