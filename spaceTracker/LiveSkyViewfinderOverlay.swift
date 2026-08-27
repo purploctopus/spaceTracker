@@ -23,9 +23,6 @@ struct ViewfinderBackgroundGridLines: Shape {
     }
 }
 
-// ==============================================================================
-// 🪐 LIVE SKY VIEWFINDER HUD INTERFACE OVERLAY
-// ==============================================================================
 import SwiftUI
 
 struct LiveSkyViewfinderOverlay: View {
@@ -40,7 +37,7 @@ struct LiveSkyViewfinderOverlay: View {
     // Smoothly hides the screen for 1.5 seconds while sensors find true North!
     @State private var isStabilizingEngine = true
     
-    // 💡 THE SHEET PRESENTATION STATE RESTORED:
+    // 💡 THE SHEET PRESENTATION STATE:
     @State private var selectedProfile: CelestialProfile? = nil
     
     var body: some View {
@@ -53,52 +50,52 @@ struct LiveSkyViewfinderOverlay: View {
             )
             .ignoresSafeArea()
             
+            // 2. Uncluttered Major Target Text Label Overlay Layer (Upgraded with Native iOS Symbols)
             GeometryReader { proxy in
                 ZStack {
                     ForEach(projectedScreenPlots) { object in
-                        // Gather our matching profile context records from the static database registry
                         let profileMatch = CelestialDatabaseRegistry.profiles[object.name.uppercased()]
                         let hasProfileInfo = profileMatch != nil
                         let isPlanet = object.classification == "PLANET"
                         
-                        HStack(spacing: 4) {
-                            // 1. Draw the interactive info graphic badge directly to the left of the name!
-                            if hasProfileInfo {
-                                Text("(i)")
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    // Planets keep your custom .cyan look, active info stars light up in Electric Blue!
-                                    .foregroundColor(isPlanet ? .cyan : CelestialDatabaseRegistry.electricBlue)
-                            }
-                            
-                            Text(object.name.uppercased())
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                // Planets stay cyan, active info stars stay Electric Blue, baseline stars stay yellow!
-                                .foregroundColor(isPlanet ? .cyan : (hasProfileInfo ? CelestialDatabaseRegistry.electricBlue : .yellow))
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.65))
-                        .cornerRadius(4)
-                        .position(x: object.x, y: object.y)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
+                        // Wrap the floating label matrix inside a native link Button for instant touch execution
+                        Button(action: {
                             if let targetProfile = profileMatch {
                                 self.selectedProfile = targetProfile
                             }
+                        }) {
+                            HStack(spacing: 5) {
+                                if hasProfileInfo {
+                                    Image(systemName: "info.circle.fill")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(isPlanet ? .cyan : CelestialDatabaseRegistry.electricBlue)
+                                }
+                                
+                                Text(object.name.uppercased())
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundColor(isPlanet ? .cyan : (hasProfileInfo ? CelestialDatabaseRegistry.electricBlue : .yellow))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(Color.black.opacity(0.65))
+                            .cornerRadius(4)
                         }
+                        .buttonStyle(PlainButtonStyle())
+                        .position(x: object.x, y: object.y)
                     }
                 }
             }
             .ignoresSafeArea()
 
             
-            // Clean Reticle Crosshair Line Geometry Grid (Scope Fully Restored!)
+            // Minimal Visual Reticle Crosshair Line Geometry (Scope Fully Restored!)
             ViewfinderBackgroundGridLines()
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 .ignoresSafeArea()
             
-            // Main HUD Controller Layer Deck
+            // 3. Main HUD Status Bar (Top and Bottom Panels Only)
             VStack(spacing: 0) {
+                // Top Monospaced Status Header Panel
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("SYSTEM: LIVE SKY VECTOR PORT")
@@ -126,94 +123,27 @@ struct LiveSkyViewfinderOverlay: View {
                 
                 Spacer()
                 
+                // 🎯 Clean Center Crosshairs System (Purely Visual Reference Rings)
                 ZStack {
                     Circle()
-                        .stroke(motionEngine.isPointingBelowHorizon ? Color.red : (currentCrosshairTarget != nil ? Color.green : Color.cyan.opacity(0.2)), lineWidth: 1)
+                        .stroke(motionEngine.isPointingBelowHorizon ? Color.red : Color.cyan.opacity(0.2), lineWidth: 1)
                         .frame(width: 200, height: 240)
                     
                     Circle()
-                        .stroke(motionEngine.isPointingBelowHorizon ? Color.red : (currentCrosshairTarget != nil ? Color.green : Color.cyan), lineWidth: 1.5)
+                        .stroke(motionEngine.isPointingBelowHorizon ? Color.red : Color.cyan, lineWidth: 1.5)
                         .frame(width: 100, height: 100)
                     
                     Rectangle()
-                        .fill(currentCrosshairTarget != nil ? Color.green : Color.cyan)
+                        .fill(Color.cyan)
                         .frame(width: 20, height: 1)
                     Rectangle()
-                        .fill(currentCrosshairTarget != nil ? Color.green : Color.cyan)
+                        .fill(Color.cyan)
                         .frame(width: 1, height: 20)
-                    
-                    if motionEngine.isPointingBelowHorizon {
-                        VStack(spacing: 4) {
-                            Image(systemName: "arrow.up.circle")
-                                .font(.title)
-                            Text("LOOK UP")
-                                .font(.system(.caption, design: .monospaced))
-                                .fontWeight(.bold)
-                        }
-                        .foregroundColor(.red)
-                        .padding(8)
-                        .background(Color.black.opacity(0.6))
-                        .cornerRadius(4)
-                    }
-                    
-                    if let lockedTarget = currentCrosshairTarget {
-                        // Evaluation flags to customize text styling based on target profile entries
-                        let profileMatch = CelestialDatabaseRegistry.profiles[lockedTarget.name.uppercased()]
-                        let hasProfileInfo = profileMatch != nil
-                        let isPlanet = profileMatch?.classification == "PLANET" || lockedTarget.name.uppercased() == "MERCURY" || lockedTarget.name.uppercased() == "VENUS" || lockedTarget.name.uppercased() == "MARS" || lockedTarget.name.uppercased() == "JUPITER" || lockedTarget.name.uppercased() == "SATURN"
-                        
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(Color.green, lineWidth: 1.5)
-                                .frame(width: 140, height: 140)
-                            
-                            VStack(spacing: 2) {
-                                Text("🎯 TARGET LOCKED")
-                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.green)
-                                
-                                // 💡 ADAPTIVE HUD IDENTITY MODULE BLOCK FIXED:
-                                HStack(spacing: 4) {
-                                    if hasProfileInfo {
-                                        Text("(i)")
-                                            .font(.system(size: 13, weight: .bold, design: .monospaced))
-                                            // Planets stay Cyan, active info stars turn Electric Blue!
-                                            .foregroundColor(isPlanet ? .cyan : CelestialDatabaseRegistry.electricBlue)
-                                    }
-                                    
-                                    Text(lockedTarget.name)
-                                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                                        // Colors fonts natively matching your rules logic parameters
-                                        .foregroundColor(isPlanet ? .white : (hasProfileInfo ? CelestialDatabaseRegistry.electricBlue : .white))
-                                }
-                                .multilineTextAlignment(.center)
-                                .fixedSize(horizontal: false, vertical: true)
-                                
-                                Text("CON: \(lockedTarget.constellation)")
-                                    .font(.system(size: 8, design: .monospaced))
-                                    .foregroundColor(.gray)
-                                
-                                Text("ALT: \(lockedTarget.altitude)° / AZ: \(lockedTarget.azimuth)°")
-                                    .font(.system(size: 8, design: .monospaced))
-                                    .foregroundColor(.cyan)
-                            }
-                            .padding(8)
-                            .background(Color.black.opacity(0.85))
-                            .cornerRadius(4)
-                            .offset(y: 115)
-                            // 💡 INTERACTIVE TOUCH GESTURE SEGMENT ATTACHMENT
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if let targetProfile = profileMatch {
-                                    self.selectedProfile = targetProfile
-                                }
-                            }
-                        }
-                    }
                 }
                 
                 Spacer()
                 
+                // Bottom Viewport Tilt Pitch Readout
                 HStack {
                     Spacer()
                     VStack(spacing: 2) {
@@ -229,7 +159,7 @@ struct LiveSkyViewfinderOverlay: View {
                 .padding(.bottom, 40)
             }
             
-            // The stabilization veil hides jitter frames during initial sensor calibration
+            // Stabilization Veil (Hides initial sensor calibration frames)
             if isStabilizingEngine {
                 Color.black
                     .ignoresSafeArea()
@@ -247,7 +177,6 @@ struct LiveSkyViewfinderOverlay: View {
         .onAppear {
             motionEngine.engageSensorStreaming(with: visiblePlanetsCatalog)
             
-            // Allow ARKit exactly 1.5 seconds to find true geographic North before dissolving the veil
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     isStabilizingEngine = false
@@ -258,9 +187,6 @@ struct LiveSkyViewfinderOverlay: View {
             motionEngine.disengageSensorStreaming()
         }
         .navigationBarHidden(true)
-        // ==============================================================================
-        // 📥 SLIDE-UP DOCK HANDLER ATTACHMENT AT LAYER ROOT BOUNDARY
-        // ==============================================================================
         .sheet(item: $selectedProfile) { profile in
             CelestialDetailSheet(profile: profile)
         }
