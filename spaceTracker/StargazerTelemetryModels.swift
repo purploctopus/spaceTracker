@@ -33,10 +33,17 @@ struct APIPlanetItem: Identifiable, Equatable {
     var classification: String
 }
 
+// MARK: - 🔌 CLOUD DATA DECODER RE-ARCHITECTURE
+// Mirrors your new hourly GitHub payload layout contract perfectly!
 struct CloudPlanetPacket: Codable {
     let name: String
     let ra: Double
     let dec: Double
+}
+
+struct IntegratedCloudPayload: Codable {
+    let gmst_hours: Double
+    let planets: [CloudPlanetPacket]
 }
 
 struct StargazeForecastDay: Identifiable, Equatable {
@@ -59,7 +66,7 @@ class StargazerState: ObservableObject {
 }
 
 // ==============================================================================
-// 🚀 DYNAMIC LIVE VIEWPORT TELEMETRY MODULE ENGINE (NORTH-COMPASS CALIBRATED)
+// 🚀 DYNAMIC API-ANCHORED CELESTIAL POSITIONING CALCULATOR ENGINE
 // ==============================================================================
 class StargazerViewModel: ObservableObject {
     @Published var stargazerState = StargazerState()
@@ -67,6 +74,7 @@ class StargazerViewModel: ObservableObject {
     private var internalStarsDatabase: [LocalStarItem] = []
     private var isDatabaseLoaded: Bool = false
     
+    // Your raw public usercontent data delivery link
     private let ephemerisCloudURLString = "https://raw.githubusercontent.com/purploctopus/spaceTracker-Ephemeris-Engine/main/ephemeris.json"
     
     func preloadLocalStarCatalog() async {
@@ -82,14 +90,14 @@ class StargazerViewModel: ObservableObject {
         }
     }
     
-    private func fetchLivePlanetaryCoordinates() async -> [CloudPlanetPacket] {
-        guard let url = URL(string: ephemerisCloudURLString) else { return [] }
+    private func fetchLiveCloudPayload() async -> IntegratedCloudPayload? {
+        guard let url = URL(string: ephemerisCloudURLString) else { return nil }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            return try JSONDecoder().decode([CloudPlanetPacket].self, from: data)
+            return try JSONDecoder().decode(IntegratedCloudPayload.self, from: data)
         } catch {
-            print("❌ [CONNECTION FAULT]: Failed fetching live ephemeris from cloud repo: \(error)")
-            return []
+            print("❌ [CONNECTION FAULT]: Failed downlinking unified data payload: \(error)")
+            return nil
         }
     }
     
@@ -122,44 +130,22 @@ class StargazerViewModel: ObservableObject {
             }
         }
         
+        // 📡 DOWNLINK ENGINE FETCH PASS
+        guard let cloudPayload = await fetchLiveCloudPayload() else { return }
+        
         // ==============================================================================
-        // 📐 Precise Civil-To-Astronomical UTC Clock Realignment
+        // 📐 THE GLOBAL-TO-LOCAL SIDEODEREAL CLOCK ASSIGNMENT
         // ==============================================================================
-        let now = Date()
-        var gmtCalendar = Calendar.current
-        gmtCalendar.timeZone = TimeZone(abbreviation: "UTC")!
+        // 💡 FIXED: We bypass all local clock loops completely. We read Greenwich time directly
+        // from your JSON file and add your raw longitude to convert it to your backyard natively!
+        let longitudeHours = longitude / 15.0
+        var dynamicLocalSiderealTime = cloudPayload.gmst_hours + longitudeHours
         
-        let components = gmtCalendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: now)
-        var Y = Double(components.year ?? 2026)
-        var M = Double(components.month ?? 8)
-        let D = Double(components.day ?? 26)
-        
-        if M <= 2 {
-            Y -= 1
-            M += 12
-        }
-        
-        let UT = Double(components.hour ?? 0) + Double(components.minute ?? 0)/60.0 + Double(components.second ?? 0)/3600.0
-        
-        let A = floor(Y / 100.0)
-        let B = 2.0 - A + floor(A / 4.0)
-        let julianDate = floor(365.25 * (Y + 4716.0)) + floor(30.6001 * (M + 1.0)) + D + ((UT - 12.0) / 24.0) + B - 1524.5
-        
-        let d = julianDate - 2451543.5
-        let T = d / 36525.0
-        
-        var gmstDegrees = 280.46061837 + 360.98564736629 * d + 0.000387933 * T * T
-        gmstDegrees = gmstDegrees.truncatingRemainder(dividingBy: 360.0)
-        if gmstDegrees < 0 { gmstDegrees += 360.0 }
-        
-        let pureLongitudeDegrees = longitude < 0 ? (360.0 + longitude) : longitude
-        var localSiderealDegrees = gmstDegrees + pureLongitudeDegrees
-        localSiderealDegrees = localSiderealDegrees.truncatingRemainder(dividingBy: 360.0)
-        if localSiderealDegrees < 0 { localSiderealDegrees += 360.0 }
-        let dynamicLocalSiderealTime = localSiderealDegrees / 15.0
+        // Keep the hours safely inside standard 24-hour clock boundaries
+        dynamicLocalSiderealTime = dynamicLocalSiderealTime.truncatingRemainder(dividingBy: 24.0)
+        if dynamicLocalSiderealTime < 0 { dynamicLocalSiderealTime += 24.0 }
         
         var localizedOutputCatalog: [APIPlanetItem] = []
-        let cloudPlanets = await fetchLivePlanetaryCoordinates()
         
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("🕵️‍♂️ [MATH FORENSICS] RUNNING LOCAL HORIZON GEOMETRY TRANSFORMS")
@@ -168,24 +154,22 @@ class StargazerViewModel: ObservableObject {
         
         let latRad = latitude * .pi / 180.0
         
-        for p in cloudPlanets {
-            let targetHA = (dynamicLocalSiderealTime - p.ra) * 15.0
+        for p in cloudPayload.planets {
+            var targetHA = (dynamicLocalSiderealTime - p.ra) * 15.0
+            targetHA = targetHA.truncatingRemainder(dividingBy: 360.0)
+            if targetHA < 0 { targetHA += 360.0 }
+            
             let decRad = p.dec * .pi / 180.0
             let haRad = targetHA * .pi / 180.0
             
-            // ==============================================================================
-            // 📐 STANDARD CANONICAL MODERN HORIZONTAL TRANSFORMATION (NORTH-EAST BALANCED)
-            // ==============================================================================
-            // 💡 FIXED: Uses standard astronomical spherical trigonometry to compute
-            // Altitude and North-based Azimuth directly, matching real compass screens natively!
+            // Standard Meeus Spherical Trigonometry Conversions
             let sinAlt = sin(latRad) * sin(decRad) + cos(latRad) * cos(decRad) * cos(haRad)
             let finalAltitude = asin(max(-1.0, min(1.0, sinAlt))) * (180.0 / .pi)
             
-            let yAz = sin(haRad)
-            let xAz = cos(haRad) * sin(latRad) - tan(decRad) * cos(latRad)
+            let yAz = -sin(haRad) * cos(decRad)
+            let xAz = sin(decRad) - sin(latRad) * sin(max(-1.0, min(1.0, sinAlt)))
             
-            // atan2(y, x) solves the exact modern compass heading quadrant correctly
-            var finalAzimuth = atan2(yAz, xAz) * (180.0 / .pi) + 180.0
+            var finalAzimuth = atan2(yAz, xAz) * (180.0 / .pi)
             finalAzimuth = finalAzimuth.truncatingRemainder(dividingBy: 360.0)
             if finalAzimuth < 0 { finalAzimuth += 360.0 }
             
@@ -212,17 +196,20 @@ class StargazerViewModel: ObservableObject {
         // ==============================================================================
         await preloadLocalStarCatalog()
         for star in internalStarsDatabase {
-            let calculatedHourAngle = (dynamicLocalSiderealTime - star.ra) * 15.0
+            var calculatedHourAngle = (dynamicLocalSiderealTime - star.ra) * 15.0
+            calculatedHourAngle = calculatedHourAngle.truncatingRemainder(dividingBy: 360.0)
+            if calculatedHourAngle < 0 { calculatedHourAngle += 360.0 }
+            
             let decRadians = star.dec * .pi / 180.0
             let haRadians = calculatedHourAngle * .pi / 180.0
             
             let sinAltS = sin(latRad) * sin(decRadians) + cos(latRad) * cos(decRadians) * cos(haRadians)
             let finalAltitudeAngle = asin(max(-1.0, min(1.0, sinAltS))) * (180.0 / .pi)
             
-            let yAzS = sin(haRadians)
-            let xAzS = cos(haRadians) * sin(latRad) - tan(decRadians) * cos(latRad)
+            let yAzS = -sin(haRadians) * cos(decRadians)
+            let xAzS = sin(decRadians) - sin(latRad) * sin(max(-1.0, min(1.0, sinAltS)))
             
-            var finalAzimuthHeading = atan2(yAzS, xAzS) * (180.0 / .pi) + 180.0
+            var finalAzimuthHeading = atan2(yAzS, xAzS) * (180.0 / .pi)
             finalAzimuthHeading = finalAzimuthHeading.truncatingRemainder(dividingBy: 360.0)
             if finalAzimuthHeading < 0 { finalAzimuthHeading += 360.0 }
             
@@ -243,8 +230,4 @@ class StargazerViewModel: ObservableObject {
             self.stargazerState.isDataLoaded = true
         }
     }
-}
-
-extension Double {
-    init(cosHBytes decRadians: Double) { self = decRadians }
 }

@@ -34,6 +34,11 @@ struct OrbitalStationState {
     var isDataLoaded: Bool = false
 }
 
+struct IvanTleResponse: Decodable {
+    let name: String
+    let line1: String
+    let line2: String
+}
 
 // MARK: - 📡 TRACKING ENGINE CLASS
 @MainActor
@@ -46,23 +51,32 @@ class OrbitalTrackingViewModel: ObservableObject {
         stopTrackingPipeline()
         
         trackingTimer = Task {
-            // Fetch the live TLE matrix parameters for Tiangong immediately on launch
-            let tiangongTLE = await fetchTiangongTLEData()
+            // 1. Kick off the slow Tiangong fetch in the background
+            let tiangongFetchTask = Task {
+                await fetchTiangongTLEData()
+            }
             
             while !Task.isCancelled {
-                // Fetch the absolute real-world location from the live web server stream
+                // 2. This fetches immediately on launch without waiting
                 let realISSLocation = await fetchLiveISSLocation()
                 
-                // Keep Tiangong moving seamlessly based on its true orbital vectors
-                let currentTiangongLocation = calculateTiangongOrbitPosition(tle: tiangongTLE)
-                
-                // Write the factual coordinates straight to your UI state variables
+                // 3. Update the ISS coordinate right away so your view loads instantly
                 self.stationState.issCoordinate = realISSLocation
-                self.stationState.tiangongCoordinate = currentTiangongLocation
                 self.stationState.isDataLoaded = true
                 
+                // 4. Get the TLE array (which is non-optional)
+                let tiangongTLE = await tiangongFetchTask.value
+                
+                // 5. Check if we actually received data inside the array
+                if !tiangongTLE.isEmpty {
+                    let currentTiangongLocation = calculateTiangongOrbitPosition(tle: tiangongTLE)
+                    self.stationState.tiangongCoordinate = currentTiangongLocation
+                } else {
+                    print("⏳ Tiangong TLE data is still downloading or empty...")
+                }
+                
                 do {
-                    // ⏱️ PRODUCTION CALIBRATION: Sleep 5 seconds between fetches to respect API servers and prevent freezing
+                    // ⏱️ PRODUCTION CALIBRATION: Sleep 5 seconds
                     try await Task.sleep(nanoseconds: 5_000_000_000)
                 } catch {
                     break
@@ -92,21 +106,24 @@ class OrbitalTrackingViewModel: ObservableObject {
     }
     
     private func fetchTiangongTLEData() async -> [String] {
-        guard let url = URL(string: "https://celestrak.org/NORAD/elements/gp.php?CATNR=48274&FORMAT=TLE") else {
+        // 1. Notice the path correction: /api/tle/48274
+        guard let url = URL(string: "https://tle.ivanstanojevic.me/api/tle/48274") else {
             return []
         }
         
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 4.0
+        let optimizedSession = URLSession(configuration: config)
+        
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard let rawTLEText = String(data: data, encoding: .utf8) else { return [] }
+            let (data, _) = try await optimizedSession.data(from: url)
+            let decoded = try JSONDecoder().decode(IvanTleResponse.self, from: data)
             
-            let lines = rawTLEText.components(separatedBy: .newlines)
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
+            print("✅ [TLE PARSED]: Successfully loaded tracking matrix for \(decoded.name)")
+            return [decoded.name, decoded.line1, decoded.line2]
             
-            return lines
         } catch {
-            print("❌ [NORAD NETWORK ERROR]: Failed to pull live Tiangong orbital matrix: \(error)")
+            print("❌ [NETWORK ERROR]: Tracking matrix endpoint unreachable: \(error)")
             return []
         }
     }
