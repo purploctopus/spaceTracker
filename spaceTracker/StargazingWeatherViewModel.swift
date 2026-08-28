@@ -34,9 +34,9 @@ class StargazingWeatherViewModel: ObservableObject {
             
             if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
                let latestReading = jsonArray.last,
-               let kpString = latestReading["kp_index"] as? String,
-               let kpParsed = Double(kpString) {
+               let kpNumber = latestReading["kp_index"] as? NSNumber {
                 
+                let kpParsed = kpNumber.doubleValue
                 self.kpIndex = kpParsed
                 
                 // Kp Scale: >= 5.0 is G1 (Minor Storm), >= 7.0 is G3 (Severe Storm)
@@ -54,6 +54,13 @@ class StargazingWeatherViewModel: ObservableObject {
                     self.geomagneticStatusText = "QUIET IONOSPHERE METRICS"
                 }
                 print("📡 [SPACE WEATHER]: Successfully processed Kp-Index: \(kpParsed)")
+            } else {
+                // This branch existing at all is the point: the previous version of this
+                // parse silently failed here on every single call (kp_index comes back from
+                // NOAA as a JSON number, not a String) with no log line anywhere — kpIndex
+                // just quietly stayed at its 0.0 default forever. If this ever fires again,
+                // it means NOAA changed the response shape; at least now it's visible.
+                print("⚠️ [SPACE WEATHER]: Response didn't match expected shape — no Kp-index applied.")
             }
         } catch {
             print("❌ [SPACE WEATHER ERROR]: Failed to decode planetary K-index logs: \(error)")

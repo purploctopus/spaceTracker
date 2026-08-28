@@ -30,6 +30,7 @@ struct APIPlanetItem: Identifiable, Equatable {
     let nakedEyeObject: Bool
     var classification: String
     var range_au: Double?
+    var magnitude: Double?
 }
 
 struct StargazeForecastDay: Identifiable, Equatable {
@@ -153,6 +154,7 @@ class StargazerViewModel: ObservableObject {
             var distanceAU: Double = 1.0
             var objectClassification = "PLANET"
             var isVisibleNakedEye = true
+            var apparentMagnitude: Double = 0.0
 
             switch targetName {
             case "SUN":
@@ -167,36 +169,50 @@ class StargazerViewModel: ObservableObject {
                 distanceAU = s.radiusVector.value
                 objectClassification = "STAR"
                 isVisibleNakedEye = finalAltitude > 0.0
+                // SwiftAA's Sun class doesn't expose a magnitude (it isn't an IlluminatedFraction
+                // conformer — that protocol is planet-specific). The Sun's true apparent visual
+                // magnitude varies by only about ±0.03 across the year (Earth's orbit isn't
+                // eccentric enough to matter here), so -26.8 is accurate enough to just hardcode.
+                apparentMagnitude = -26.8
             case "MERCURY":
                 let p = Mercury(julianDay: currentSystemTime)
                 let horiz = p.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)
                 finalAltitude = horiz.altitude.value
                 finalAzimuth = horiz.northBasedAzimuth.value
                 distanceAU = p.radiusVector.value
+                apparentMagnitude = p.magnitude.value
             case "VENUS":
                 let p = Venus(julianDay: currentSystemTime)
                 let horiz = p.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)
                 finalAltitude = horiz.altitude.value
                 finalAzimuth = horiz.northBasedAzimuth.value
                 distanceAU = p.radiusVector.value
+                apparentMagnitude = p.magnitude.value
             case "MARS":
                 let p = Mars(julianDay: currentSystemTime)
                 let horiz = p.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)
                 finalAltitude = horiz.altitude.value
                 finalAzimuth = horiz.northBasedAzimuth.value
                 distanceAU = p.radiusVector.value
+                apparentMagnitude = p.magnitude.value
             case "JUPITER":
                 let p = Jupiter(julianDay: currentSystemTime)
                 let horiz = p.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)
                 finalAltitude = horiz.altitude.value
                 finalAzimuth = horiz.northBasedAzimuth.value
                 distanceAU = p.radiusVector.value
+                // Jupiter overrides the default IlluminatedFraction magnitude with a more precise
+                // formula, so this is picking up that specialized calculation automatically.
+                apparentMagnitude = p.magnitude.value
             case "SATURN":
                 let p = Saturn(julianDay: currentSystemTime)
                 let horiz = p.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)
                 finalAltitude = horiz.altitude.value
                 finalAzimuth = horiz.northBasedAzimuth.value
                 distanceAU = p.radiusVector.value
+                // Saturn's override additionally accounts for ring tilt/opening angle, which can
+                // swing its apparent magnitude by roughly half a point depending on the season.
+                apparentMagnitude = p.magnitude.value
             default: break
             }
 
@@ -208,7 +224,8 @@ class StargazerViewModel: ObservableObject {
             let altStr = String(format: "%06.2f", finalAltitude)
             let azStr = String(format: "%06.2f", finalAzimuth)
             let distStr = String(format: "%.4f", distanceAU)
-            print(" 📈 BODY MATCH  -> [\(paddedName)] | ALT: \(altStr)° | AZ: \(azStr)° | DIST: \(distStr) AU")
+            let magStr = String(format: "%.2f", apparentMagnitude)
+            print(" 📈 BODY MATCH  -> [\(paddedName)] | ALT: \(altStr)° | AZ: \(azStr)° | DIST: \(distStr) AU | MAG: \(magStr)")
 
             localizedOutputCatalog.append(APIPlanetItem(
                 name: targetName,
@@ -217,7 +234,8 @@ class StargazerViewModel: ObservableObject {
                 azimuth: finalAzimuth,
                 nakedEyeObject: isVisibleNakedEye,
                 classification: objectClassification,
-                range_au: distanceAU
+                range_au: distanceAU,
+                magnitude: apparentMagnitude
             ))
         }
 
@@ -245,11 +263,11 @@ class StargazerViewModel: ObservableObject {
             let finalAltitudeAngle = horizontalCoordinates.altitude.value
             let finalAzimuthHeading = horizontalCoordinates.northBasedAzimuth.value
 
-//            let paddedStarName = star.name.uppercased().padding(toLength: 12, withPad: " ", startingAt: 0)
-//            let starAltStr = String(format: "%06.2f", finalAltitudeAngle)
-//            let starAzStr = String(format: "%06.2f", finalAzimuthHeading)
-//            let magStr = String(format: "%.1f", star.mag)
-           // print(" ⭐️ STAR LOG MATCH -> [\(paddedStarName)] | ALT: \(starAltStr)° | AZ: \(starAzStr)° | MAG: \(magStr)")
+            let paddedStarName = star.name.uppercased().padding(toLength: 12, withPad: " ", startingAt: 0)
+            let starAltStr = String(format: "%06.2f", finalAltitudeAngle)
+            let starAzStr = String(format: "%06.2f", finalAzimuthHeading)
+            let magStr = String(format: "%.1f", star.mag)
+            print(" ⭐️ STAR LOG MATCH -> [\(paddedStarName)] | ALT: \(starAltStr)° | AZ: \(starAzStr)° | MAG: \(magStr)")
 
             localizedOutputCatalog.append(APIPlanetItem(
                 name: star.name,
@@ -257,7 +275,8 @@ class StargazerViewModel: ObservableObject {
                 altitude: finalAltitudeAngle,
                 azimuth: finalAzimuthHeading,
                 nakedEyeObject: star.mag <= 4.0,
-                classification: "STAR"
+                classification: "STAR",
+                magnitude: star.mag
             ))
         }
 

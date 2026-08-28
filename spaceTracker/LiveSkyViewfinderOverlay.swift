@@ -23,6 +23,116 @@ private struct ReticleCenterPreferenceKey: PreferenceKey {
 
 private let arRootCoordinateSpace = "arRootSpace"
 
+// ==============================================================================
+// 🔭 VISIBILITY TIER HELPERS (magnitude vs. Bortle-class naked-eye limit)
+// ==============================================================================
+
+/// Approximate naked-eye limiting magnitude per Bortle class, at the zenith, for a typical
+/// observer. These are the commonly-cited rule-of-thumb values from amateur astronomy
+/// references (Sky & Telescope's Bortle scale writeups, Clear Sky Chart documentation) —
+/// not a precise photometric measurement. Actual limits vary with age, altitude, humidity,
+/// and how dark-adapted the observer's eyes are.
+private func bortleLimitingMagnitude(from label: String) -> Double {
+    let limitsByClass: [Int: Double] = [
+        1: 7.8, 2: 7.3, 3: 6.6, 4: 6.3, 5: 5.9,
+        6: 5.6, 7: 5.2, 8: 4.5, 9: 4.0
+    ]
+    if let digitChar = label.first(where: { $0.isNumber }), let classNumber = Int(String(digitChar)) {
+        return limitsByClass[classNumber] ?? 6.0
+    }
+    return 6.0 // reasonable suburban default if the label can't be parsed
+}
+
+private struct VisibilityTier {
+    let label: String
+    let color: Color
+}
+
+/// Buckets an object's magnitude against the current sky's naked-eye limit into a rough
+/// "what do I need to see this" tier. The magnitude gaps used here (≈4.5 mag of reach for
+/// typical 7x50 binoculars, ≈9 mag total for a modest amateur telescope) are standard
+/// approximations, not derived from any specific instrument — treat them as a helpful
+/// nudge, not a guarantee.
+private func visibilityTier(magnitude: Double, limitingMagnitude: Double) -> VisibilityTier {
+    let margin = limitingMagnitude - magnitude // positive = brighter than what the eye can see
+    switch margin {
+    case 1.5...:
+        return VisibilityTier(label: "NAKED EYE", color: .green)
+    case 0..<1.5:
+        return VisibilityTier(label: "NAKED EYE — MARGINAL", color: .yellow)
+    case -4.5..<0:
+        return VisibilityTier(label: "BINOCULARS RECOMMENDED", color: .orange)
+    case -9.0 ..< -4.5:
+        return VisibilityTier(label: "SMALL TELESCOPE", color: .red)
+    default:
+        return VisibilityTier(label: "ADVANCED SCOPE NEEDED", color: .purple)
+    }
+}
+
+/// Formats an AU distance alongside an approximate mileage, since "142 million miles" reads
+/// more concretely than "1.53 AU" for most people glancing at a live overlay.
+private func formattedDistance(auValue: Double) -> String {
+    let milesPerAU = 92_955_807.3
+    let millionMiles = (auValue * milesPerAU) / 1_000_000.0
+    return String(format: "%.2f AU  (≈%.0fM mi)", auValue, millionMiles)
+}
+
+// ==============================================================================
+// 🎯 LIVE TARGET INFO READOUT — what's currently under the crosshair
+// ==============================================================================
+private struct TargetInfoReadout: View {
+    let target: TargetLockMatch
+    let bortleClassLabel: String
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Text(target.name)
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan)
+                Text(target.constellation)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            
+            HStack(spacing: 12) {
+                Text("ALT \(String(format: "%.1f°", target.altitude))")
+                Text("AZ \(String(format: "%.1f°", target.azimuth))")
+                if let magnitude = target.magnitude {
+                    Text("MAG \(String(format: "%.1f", magnitude))")
+                }
+            }
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .foregroundColor(.white.opacity(0.85))
+            
+            if let distanceAU = target.distanceAU {
+                Text(formattedDistance(auValue: distanceAU))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.65))
+            }
+            
+            if let magnitude = target.magnitude {
+                let tier = visibilityTier(
+                    magnitude: magnitude,
+                    limitingMagnitude: bortleLimitingMagnitude(from: bortleClassLabel)
+                )
+                Text(tier.label)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(tier.color.opacity(0.18))
+                    .foregroundColor(tier.color)
+                    .cornerRadius(4)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(tier.color.opacity(0.5), lineWidth: 1))
+            }
+        }
+        .padding(10)
+        .background(Color.black.opacity(0.7))
+        .cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.cyan.opacity(0.3), lineWidth: 1))
+    }
+}
+
 struct ViewfinderBackgroundGridLines: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -38,6 +148,12 @@ struct ViewfinderBackgroundGridLines: Shape {
 
 struct LiveSkyViewfinderOverlay: View {
     let visiblePlanetsCatalog: [APIPlanetItem]
+    /// Drives the naked-eye/binoculars/scope visibility badge in the target readout. Pass
+    /// `stargazerState.bortleClass` in from the call site — this defaults to the same
+    /// placeholder value StargazerState ships with today, but note that value is currently
+    /// a static stub (not derived from the user's real location), so the badge will only be
+    /// as accurate as whatever's actually driving this string.
+    var bortleClass: String = "CLASS 4 (RURAL-SUBURBAN)"
     @Environment(\.dismiss) private var dismiss
     
     @StateObject private var motionEngine = SkyMotionManager()
@@ -152,57 +268,67 @@ struct LiveSkyViewfinderOverlay: View {
                 // ==============================================================================
                 // 🎯 BULLETPROOF 2D SCREEN-SPACE INTERSECTOR NEEDLE ENGINE
                 // ==============================================================================
-                ZStack {
-                    Circle()
-                        .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
-                        .frame(width: 200, height: 240)
-                    
-                    Circle()
-                        .stroke(Color.cyan, lineWidth: 1.5)
-                        .frame(width: 100, height: 100)
-                    
-                    Rectangle().fill(Color.cyan).frame(width: 20, height: 1)
-                    Rectangle().fill(Color.cyan).frame(width: 1, height: 20)
-                    
-                    // Reads the active, updating screen projection plots to calculate a
-                    // direct visual direction needle, targeting the reticle's *measured*
-                    // center (see reticleCenter / ReticleCenterPreferenceKey below) — the
-                    // same point the AR lock detection targets, instead of a separately
-                    // guessed constant.
-                    if let targetName = activeNavigationTarget,
-                       let screenPlot = projectedScreenPlots.first(where: { $0.name.uppercased() == targetName }) {
+                VStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
+                            .frame(width: 200, height: 240)
                         
-                        let deltaX = screenPlot.x - reticleCenter.x
-                        let deltaY = screenPlot.y - reticleCenter.y
+                        Circle()
+                            .stroke(Color.cyan, lineWidth: 1.5)
+                            .frame(width: 100, height: 100)
                         
-                        let distanceToTarget = sqrt(pow(deltaX, 2) + pow(deltaY, 2))
+                        Rectangle().fill(Color.cyan).frame(width: 20, height: 1)
+                        Rectangle().fill(Color.cyan).frame(width: 1, height: 20)
                         
-                        // Keeps needle active until the text card touches your 100px reticle ring
-                        if distanceToTarget > 45.0 {
-                            // Standard screen-space bearing angle calculation (Inverted Y coordinate rule)
-                            let angleRadians = atan2(deltaX, -deltaY)
-                            let angleDegrees = angleRadians * (180.0 / .pi)
+                        // Reads the active, updating screen projection plots to calculate a
+                        // direct visual direction needle, targeting the reticle's *measured*
+                        // center (see reticleCenter / ReticleCenterPreferenceKey below) — the
+                        // same point the AR lock detection targets, instead of a separately
+                        // guessed constant.
+                        if let targetName = activeNavigationTarget,
+                           let screenPlot = projectedScreenPlots.first(where: { $0.name.uppercased() == targetName }) {
                             
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.green)
-                                .offset(y: -50) // Anchors cleanly on the perimeter ring
-                                .rotationEffect(.degrees(angleDegrees)) // Rotates smoothly to match the visual plot!
+                            let deltaX = screenPlot.x - reticleCenter.x
+                            let deltaY = screenPlot.y - reticleCenter.y
+                            
+                            let distanceToTarget = sqrt(pow(deltaX, 2) + pow(deltaY, 2))
+                            
+                            // Keeps needle active until the text card touches your 100px reticle ring
+                            if distanceToTarget > 45.0 {
+                                // Standard screen-space bearing angle calculation (Inverted Y coordinate rule)
+                                let angleRadians = atan2(deltaX, -deltaY)
+                                let angleDegrees = angleRadians * (180.0 / .pi)
+                                
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.green)
+                                    .offset(y: -50) // Anchors cleanly on the perimeter ring
+                                    .rotationEffect(.degrees(angleDegrees)) // Rotates smoothly to match the visual plot!
+                            }
                         }
                     }
-                }
-                .background(
-                    GeometryReader { reticleProxy in
-                        Color.clear.preference(
-                            key: ReticleCenterPreferenceKey.self,
-                            value: CGPoint(
-                                x: reticleProxy.frame(in: .named(arRootCoordinateSpace)).midX,
-                                y: reticleProxy.frame(in: .named(arRootCoordinateSpace)).midY
+                    .background(
+                        GeometryReader { reticleProxy in
+                            Color.clear.preference(
+                                key: ReticleCenterPreferenceKey.self,
+                                value: CGPoint(
+                                    x: reticleProxy.frame(in: .named(arRootCoordinateSpace)).midX,
+                                    y: reticleProxy.frame(in: .named(arRootCoordinateSpace)).midY
+                                )
                             )
-                        )
+                        }
+                    )
+                    
+                    // Whatever's actually under the crosshair right now — independent of
+                    // activeNavigationTarget above, which only concerns the guided-tracking
+                    // needle for a manually selected target.
+                    if let lockedTarget = currentCrosshairTarget {
+                        TargetInfoReadout(target: lockedTarget, bortleClassLabel: bortleClass)
+                            .transition(.opacity)
                     }
-                )
-
+                }
+                .animation(.easeInOut(duration: 0.2), value: currentCrosshairTarget)
 
                 Spacer()
                 

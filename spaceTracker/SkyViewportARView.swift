@@ -94,8 +94,10 @@ class SkyViewportARView: UIView {
                 name: object.name,
                 classification: object.classification,
                 constellation: object.constellation,
-                altitude: Int(object.altitude),
-                azimuth: Int(object.azimuth)
+                altitude: object.altitude,
+                azimuth: object.azimuth,
+                magnitude: object.magnitude,
+                distanceAU: object.range_au
             )
             visualDotMeshNode.setValue(metadata, forKey: "celestial_packet")
             
@@ -199,7 +201,9 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
                         name: packet.name.uppercased(),
                         constellation: packet.constellation.uppercased(),
                         altitude: packet.altitude,
-                        azimuth: packet.azimuth
+                        azimuth: packet.azimuth,
+                        magnitude: packet.magnitude,
+                        distanceAU: packet.distanceAU
                     )
                 } else {
                     self.parent.currentCrosshairTarget = nil
@@ -216,15 +220,19 @@ class ARNodeMetadataPacket: NSObject {
     let name: String
     let classification: String
     let constellation: String
-    let altitude: Int
-    let azimuth: Int
+    let altitude: Double
+    let azimuth: Double
+    let magnitude: Double?
+    let distanceAU: Double?
     
-    init(name: String, classification: String, constellation: String, altitude: Int, azimuth: Int) {
+    init(name: String, classification: String, constellation: String, altitude: Double, azimuth: Double, magnitude: Double?, distanceAU: Double?) {
         self.name = name
         self.classification = classification
         self.constellation = constellation
         self.altitude = altitude
         self.azimuth = azimuth
+        self.magnitude = magnitude
+        self.distanceAU = distanceAU
         super.init()
     }
 }
@@ -238,9 +246,16 @@ struct ScreenProjectedObject: Identifiable, Equatable {
 }
 
 struct TargetLockMatch: Identifiable, Equatable {
-    let id = UUID()
+    // Content-based identity — NOT a fresh UUID(). This struct gets rebuilt on every AR
+    // frame (~60Hz) via Coordinator.renderer, including frames where the crosshair is still
+    // locked on the exact same object. A random per-init UUID would make every single frame
+    // look like "a new lock" to SwiftUI, defeating Equatable-based diffing/animations that
+    // key off this type (e.g. the fade transition on the live info readout).
+    var id: String { name }
     let name: String
     let constellation: String
-    let altitude: Int
-    let azimuth: Int
+    let altitude: Double
+    let azimuth: Double
+    let magnitude: Double?
+    let distanceAU: Double?
 }
