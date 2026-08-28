@@ -10,6 +10,19 @@ import SwiftUI
 // ==============================================================================
 // 📐 VIEW LAYER GRAPHIC DETAIL GRID VECTOR BLUEPRINT (SCOPE FIXED)
 // ==============================================================================
+/// Carries the reticle ring's actual on-screen center up to the root view, so both the
+/// guided-tracking needle (here) and the crosshair lock detection (inside
+/// SkyViewportARViewContainer's Coordinator) target the exact same point instead of two
+/// independently-guessed constants.
+private struct ReticleCenterPreferenceKey: PreferenceKey {
+    static var defaultValue: CGPoint = .zero
+    static func reduce(value: inout CGPoint, nextValue: () -> CGPoint) {
+        value = nextValue()
+    }
+}
+
+private let arRootCoordinateSpace = "arRootSpace"
+
 struct ViewfinderBackgroundGridLines: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -39,13 +52,22 @@ struct LiveSkyViewfinderOverlay: View {
     @State private var isMenuDrawerOpen = false
     @State private var activeNavigationTarget: String? = nil
     
+    // Real, measured center of the reticle ring. Starts as a rough screen-center guess so
+    // the first frame (before GeometryReader reports back) isn't at (0,0); gets overwritten
+    // with the true value the instant the reticle lays out.
+    @State private var reticleCenter = CGPoint(
+        x: UIScreen.main.bounds.width / 2,
+        y: UIScreen.main.bounds.height / 2
+    )
+    
     var body: some View {
         ZStack {
             // 1. Core AR Engine Canvas (100% Intact)
             SkyViewportARViewContainer(
                 celestialCatalog: visiblePlanetsCatalog,
                 projectedScreenPlots: $projectedScreenPlots,
-                currentCrosshairTarget: $currentCrosshairTarget
+                currentCrosshairTarget: $currentCrosshairTarget,
+                reticleCenter: reticleCenter
             )
             .ignoresSafeArea()
             
@@ -111,19 +133,6 @@ struct LiveSkyViewfinderOverlay: View {
                     
                     Spacer()
                     
-                    // ☰ FLOATING NATIVE HAMBURGER INTERACTION BUTTON
-                    Button(action: { isMenuDrawerOpen.toggle() }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 16, weight: .bold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(isMenuDrawerOpen ? Color.cyan.opacity(0.2) : Color.black.opacity(0.5))
-                            .foregroundColor(isMenuDrawerOpen ? .cyan : .white)
-                            .cornerRadius(4)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.cyan.opacity(0.3), lineWidth: 1))
-                    }
-                    .padding(.trailing, 8)
-                    
                     Button(action: { dismiss() }) {
                         Text("DISENGAGE")
                             .font(.system(.caption, design: .monospaced))
@@ -155,18 +164,16 @@ struct LiveSkyViewfinderOverlay: View {
                     Rectangle().fill(Color.cyan).frame(width: 20, height: 1)
                     Rectangle().fill(Color.cyan).frame(width: 1, height: 20)
                     
-                    // 💡 FIXED SCREEN MATRIX:
-                    // Completely ignores the blocked motionEngine. Reads your active, updating
-                    // screen projection plots to calculate a direct visual direction needle!
+                    // Reads the active, updating screen projection plots to calculate a
+                    // direct visual direction needle, targeting the reticle's *measured*
+                    // center (see reticleCenter / ReticleCenterPreferenceKey below) — the
+                    // same point the AR lock detection targets, instead of a separately
+                    // guessed constant.
                     if let targetName = activeNavigationTarget,
                        let screenPlot = projectedScreenPlots.first(where: { $0.name.uppercased() == targetName }) {
                         
-                        // Map out your exact screen center boundaries mapping metrics
-                        let centerX = UIScreen.main.bounds.width / 2.0
-                        let centerY = UIScreen.main.bounds.height / 2.0 - 50.0 // Account for upper status bar offsets
-                        
-                        let deltaX = screenPlot.x - centerX
-                        let deltaY = screenPlot.y - centerY
+                        let deltaX = screenPlot.x - reticleCenter.x
+                        let deltaY = screenPlot.y - reticleCenter.y
                         
                         let distanceToTarget = sqrt(pow(deltaX, 2) + pow(deltaY, 2))
                         
@@ -184,6 +191,17 @@ struct LiveSkyViewfinderOverlay: View {
                         }
                     }
                 }
+                .background(
+                    GeometryReader { reticleProxy in
+                        Color.clear.preference(
+                            key: ReticleCenterPreferenceKey.self,
+                            value: CGPoint(
+                                x: reticleProxy.frame(in: .named(arRootCoordinateSpace)).midX,
+                                y: reticleProxy.frame(in: .named(arRootCoordinateSpace)).midY
+                            )
+                        )
+                    }
+                )
 
 
                 Spacer()
@@ -271,6 +289,28 @@ struct LiveSkyViewfinderOverlay: View {
                 }
             }
             
+            // ☰ FLOATING NATIVE HAMBURGER INTERACTION BUTTON — anchored bottom-right, the
+            // primary entry point for tracking a specific star/planet via the target drawer.
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: { isMenuDrawerOpen.toggle() }) {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 16, weight: .bold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(isMenuDrawerOpen ? Color.cyan.opacity(0.2) : Color.black.opacity(0.6))
+                            .foregroundColor(isMenuDrawerOpen ? .cyan : .white)
+                            .cornerRadius(6)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.cyan.opacity(0.3), lineWidth: 1))
+                    }
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 100) // clears the tilt-pitch readout beneath it
+            }
+            .ignoresSafeArea(.container, edges: .bottom)
+
             // Stabilization Veil
             if isStabilizingEngine {
                 Color.black
@@ -296,6 +336,11 @@ struct LiveSkyViewfinderOverlay: View {
         }
         .onDisappear {
             motionEngine.disengageSensorStreaming()
+        }
+        .coordinateSpace(name: arRootCoordinateSpace)
+        .onPreferenceChange(ReticleCenterPreferenceKey.self) { measuredCenter in
+            guard measuredCenter != .zero else { return }
+            self.reticleCenter = measuredCenter
         }
         .navigationBarHidden(true)
         .sheet(item: $selectedProfile) { profile in

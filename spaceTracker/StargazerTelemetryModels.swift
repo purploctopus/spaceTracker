@@ -245,10 +245,10 @@ class StargazerViewModel: ObservableObject {
             let finalAltitudeAngle = horizontalCoordinates.altitude.value
             let finalAzimuthHeading = horizontalCoordinates.northBasedAzimuth.value
 
-            let paddedStarName = star.name.uppercased().padding(toLength: 12, withPad: " ", startingAt: 0)
-            let starAltStr = String(format: "%06.2f", finalAltitudeAngle)
-            let starAzStr = String(format: "%06.2f", finalAzimuthHeading)
-            let magStr = String(format: "%.1f", star.mag)
+//            let paddedStarName = star.name.uppercased().padding(toLength: 12, withPad: " ", startingAt: 0)
+//            let starAltStr = String(format: "%06.2f", finalAltitudeAngle)
+//            let starAzStr = String(format: "%06.2f", finalAzimuthHeading)
+//            let magStr = String(format: "%.1f", star.mag)
            // print(" ⭐️ STAR LOG MATCH -> [\(paddedStarName)] | ALT: \(starAltStr)° | AZ: \(starAzStr)° | MAG: \(magStr)")
 
             localizedOutputCatalog.append(APIPlanetItem(

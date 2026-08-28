@@ -117,26 +117,34 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
     @Binding var projectedScreenPlots: [ScreenProjectedObject]
     @Binding var currentCrosshairTarget: TargetLockMatch?
     
-    private let safeScreenCenter = CGPoint(
-        x: UIScreen.main.bounds.width / 2,
-        y: UIScreen.main.bounds.height / 2
-    )
+    /// The actual measured center of the on-screen reticle ring, in the same coordinate
+    /// space as `arView.projectPoint(_:)` output (i.e. the AR view's own top-left-origin
+    /// screen space). Supplied by the SwiftUI parent via a GeometryReader on the reticle
+    /// itself, so lock detection always targets exactly where the ring is drawn — never a
+    /// guessed offset, and never `UIScreen.main.bounds`, which doesn't reflect the actual
+    /// view size in multitasking / Split View / Slide Over on iPad.
+    var reticleCenter: CGPoint
     
     func makeUIView(context: Context) -> SkyViewportARView {
         let view = SkyViewportARView(celestialCatalog: celestialCatalog)
         view.arView.delegate = context.coordinator
+        context.coordinator.reticleCenter = reticleCenter
         return view
     }
     
-    func updateUIView(_ uiView: SkyViewportARView, context: Context) {}
+    func updateUIView(_ uiView: SkyViewportARView, context: Context) {
+        context.coordinator.reticleCenter = reticleCenter
+    }
     
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     
     class Coordinator: NSObject, ARSCNViewDelegate {
         var parent: SkyViewportARViewContainer
+        var reticleCenter: CGPoint
         
         init(_ parent: SkyViewportARViewContainer) {
             self.parent = parent
+            self.reticleCenter = parent.reticleCenter
         }
         
         func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
@@ -146,7 +154,7 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
             var activeLockNode: SCNNode? = nil
             var closestDistance: Float = Float.infinity
             
-            let targetCenterPoint = parent.safeScreenCenter
+            let targetCenterPoint = self.reticleCenter
             
             guard let sphereContainer = arView.scene.rootNode.childNode(withName: "CELESTIAL_SPHERE_SHELL", recursively: true) else { return }
             
