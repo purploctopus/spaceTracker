@@ -236,6 +236,15 @@ struct LiveSkyViewfinderOverlay: View {
                             .cornerRadius(4)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        // The rendered chip (small icon + small text, tight padding) is well
+                        // under Apple's 44x44pt minimum tappable target — this expands the
+                        // actual hit area to that minimum without touching how it looks.
+                        // .contentShape(Rectangle()) is required here: without it, SwiftUI
+                        // only counts the small drawn content as tappable even after the
+                        // frame grows, since Button's default hit-testing follows the content
+                        // shape, not the frame.
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                         .position(x: object.x, y: object.y)
                     }
                 }
