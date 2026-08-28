@@ -63,22 +63,41 @@ class SkyViewportARView: UIView {
             let targetAnchorNode = SCNNode()
             
             let isPlanet = object.classification == "PLANET"
-            let isMajorLabelBody = isPlanet || (!object.name.contains("HIP") && object.nakedEyeObject)
+            let isMoon = object.classification == "MOON"
+            let isMajorLabelBody = isPlanet || isMoon || (!object.name.contains("HIP") && object.nakedEyeObject)
             
             // 💡 THE SYNTAX CORRECTION: Cleaned out the double text block typo identifier!
             let xLogVal = domeRadius * sin(azRad) * cos(altRad)
             let yLogVal = domeRadius * sin(altRad)
             let zLogVal = -domeRadius * cos(azRad) * cos(altRad)
             
-            if isPlanet {
+            if isMoon {
+                print("   🌙 PLOTTING MOON")
+                print("      ├─> Input Math Model : ALT: \(String(format: "%.2f°", object.altitude)) | AZ: \(String(format: "%.2f°", object.azimuth))")
+                print("      └─> SCN Graphic Node : X: \(String(format: "%.3f", xLogVal)) | Y: \(String(format: "%.3f", yLogVal)) | Z: \(String(format: "%.3f", zLogVal))")
+            } else if isPlanet {
                 print("   🌐 PLOTTING PLANET: \(object.name)")
                 print("      ├─> Input Math Model : ALT: \(String(format: "%.2f°", object.altitude)) | AZ: \(String(format: "%.2f°", object.azimuth))")
                 print("      └─> SCN Graphic Node : X: \(String(format: "%.3f", xLogVal)) | Y: \(String(format: "%.3f", yLogVal)) | Z: \(String(format: "%.3f", zLogVal))")
             }
             
-            let dotGeometry = SCNSphere(radius: isPlanet ? 0.09 : (object.nakedEyeObject ? 0.03 : 0.015))
-            dotGeometry.firstMaterial?.diffuse.contents = isPlanet ? UIColor.cyan : UIColor.white
-            dotGeometry.firstMaterial?.emission.contents = isPlanet ? UIColor.cyan : UIColor.white.withAlphaComponent(0.5)
+            // The Moon gets the most prominent treatment of anything in the sky dome — bigger
+            // than a planet dot and a warm pale-white "moonlight" color rather than reusing
+            // planet cyan, since it's not really in the same visual "category" as the planets.
+            let dotGeometry: SCNSphere
+            let bodyColor: UIColor
+            if isMoon {
+                dotGeometry = SCNSphere(radius: 0.14)
+                bodyColor = UIColor(red: 0.96, green: 0.96, blue: 0.88, alpha: 1.0)
+            } else if isPlanet {
+                dotGeometry = SCNSphere(radius: 0.09)
+                bodyColor = .cyan
+            } else {
+                dotGeometry = SCNSphere(radius: object.nakedEyeObject ? 0.03 : 0.015)
+                bodyColor = .white
+            }
+            dotGeometry.firstMaterial?.diffuse.contents = bodyColor
+            dotGeometry.firstMaterial?.emission.contents = isMoon || isPlanet ? bodyColor : bodyColor.withAlphaComponent(0.5)
             
             let visualDotMeshNode = SCNNode(geometry: dotGeometry)
             visualDotMeshNode.position = SCNVector3(0, 0, -domeRadius) // Position forward on the radius boundary

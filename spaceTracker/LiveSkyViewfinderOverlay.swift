@@ -69,11 +69,17 @@ private func visibilityTier(magnitude: Double, limitingMagnitude: Double) -> Vis
 }
 
 /// Formats an AU distance alongside an approximate mileage, since "142 million miles" reads
-/// more concretely than "1.53 AU" for most people glancing at a live overlay.
+/// more concretely than "1.53 AU" for most people glancing at a live overlay. Branches on
+/// scale because the Moon (~0.0026 AU, ~239,000 mi) would otherwise round to a misleading
+/// "≈0M mi" under the million-miles formatting built for planetary distances.
 private func formattedDistance(auValue: Double) -> String {
     let milesPerAU = 92_955_807.3
-    let millionMiles = (auValue * milesPerAU) / 1_000_000.0
-    return String(format: "%.2f AU  (≈%.0fM mi)", auValue, millionMiles)
+    let miles = auValue * milesPerAU
+    if miles < 1_000_000 {
+        return String(format: "%.4f AU  (≈%.0f mi)", auValue, miles)
+    } else {
+        return String(format: "%.2f AU  (≈%.0fM mi)", auValue, miles / 1_000_000.0)
+    }
 }
 
 // ==============================================================================
@@ -200,6 +206,8 @@ struct LiveSkyViewfinderOverlay: View {
                         let profileMatch = CelestialDatabaseRegistry.profiles[object.name.uppercased()]
                         let hasProfileInfo = profileMatch != nil
                         let isPlanet = object.classification == "PLANET"
+                        let isMoon = object.classification == "MOON"
+                        let moonlightColor = Color(red: 0.96, green: 0.96, blue: 0.82)
                         
                         Button(action: {
                             if var targetProfile = profileMatch {
@@ -215,12 +223,12 @@ struct LiveSkyViewfinderOverlay: View {
                                 if hasProfileInfo {
                                     Image(systemName: "info.circle.fill")
                                         .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(isPlanet ? .cyan : CelestialDatabaseRegistry.electricBlue)
+                                        .foregroundColor(isMoon ? moonlightColor : (isPlanet ? .cyan : CelestialDatabaseRegistry.electricBlue))
                                 }
                                 
                                 Text(object.name.uppercased())
                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(isPlanet ? .cyan : (hasProfileInfo ? CelestialDatabaseRegistry.electricBlue : .yellow))
+                                    .foregroundColor(isMoon ? moonlightColor : (isPlanet ? .cyan : (hasProfileInfo ? CelestialDatabaseRegistry.electricBlue : .yellow)))
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 4)

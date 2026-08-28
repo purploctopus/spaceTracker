@@ -183,7 +183,7 @@ class StargazerViewModel: ObservableObject {
         print("📍 Location: lat \(String(format: "%.4f", latitude)), lon \(String(format: "%.4f", longitude))")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        let trackingCelestialBodies = ["SUN", "MERCURY", "VENUS", "MARS", "JUPITER", "SATURN"]
+        let trackingCelestialBodies = ["SUN", "MOON", "MERCURY", "VENUS", "MARS", "JUPITER", "SATURN"]
 
         for targetName in trackingCelestialBodies {
             var finalAltitude: Double = 0.0
@@ -211,6 +211,28 @@ class StargazerViewModel: ObservableObject {
                 // magnitude varies by only about ±0.03 across the year (Earth's orbit isn't
                 // eccentric enough to matter here), so -26.8 is accurate enough to just hardcode.
                 apparentMagnitude = -26.8
+            case "MOON":
+                // WeatherKit gives phase/moonrise/moonset (StargazingWeatherViewModel), but
+                // not live position — that's not weather data. Real alt/az for AR tracking
+                // and the live dashboard still needs SwiftAA, same pattern as every other
+                // body here.
+                let m = Moon(julianDay: currentSystemTime)
+                let horiz = m.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)
+                finalAltitude = horiz.altitude.value
+                finalAzimuth = horiz.northBasedAzimuth.value
+                distanceAU = m.radiusVector.value // ~0.0026 AU — genuinely tiny vs. the planets
+                objectClassification = "MOON"
+                isVisibleNakedEye = finalAltitude > 0.0
+                // SwiftAA's Moon doesn't expose .magnitude either (not an IlluminatedFraction
+                // conformer, same situation as the Sun above). Using the standard amateur/
+                // Allen (1976)-derived approximation from phase angle: V ≈ -12.73 +
+                // 0.026|α| + 4×10⁻⁹α⁴, where α is the phase angle in degrees (0°=full,
+                // ~180°=new). This isn't going to be perfectly precise, but precision barely
+                // matters here — the Moon is always trivially naked-eye visible regardless
+                // of the exact number, so this mainly just needs to be in the right ballpark
+                // for display.
+                let phaseAngleDegrees = abs(m.phaseAngle().value)
+                apparentMagnitude = -12.73 + 0.026 * phaseAngleDegrees + 0.000000004 * pow(phaseAngleDegrees, 4)
             case "MERCURY":
                 let p = Mercury(julianDay: currentSystemTime)
                 let horiz = p.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)

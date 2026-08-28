@@ -408,18 +408,18 @@ struct ContentView: View {
             
             // 🎯 3. VERTICAL LIVE TARGETS MATRIX RADAR LIST ROWS
             VStack(alignment: .leading, spacing: 4) {
-                Text("PLANETS CURRENTLY OVERHEAD")
+                Text("PLANETS & MOON CURRENTLY OVERHEAD")
                     .font(.system(.caption, design: .monospaced))
                     .fontWeight(.bold)
                     .foregroundColor(.secondary)
                     .padding(.bottom, 4)
                 
                 VStack(spacing: 0) {
-                    // 💡 THE PERFOMANCE FIX: Filter to ONLY render "PLANET" classifications on the main dashboard tab!
-                    ForEach(stargazerViewModel.stargazerState.liveVisibleTargets.filter { $0.classification == "PLANET" }) { planet in
+                    // 💡 THE PERFOMANCE FIX: Filter to ONLY render "PLANET"/"MOON" classifications on the main dashboard tab!
+                    ForEach(stargazerViewModel.stargazerState.liveVisibleTargets.filter { $0.classification == "PLANET" || $0.classification == "MOON" }) { planet in
                         CelestialTargetRowView(planet: planet)
                         
-                        if planet.id != stargazerViewModel.stargazerState.liveVisibleTargets.filter({ $0.classification == "PLANET" }).last?.id {
+                        if planet.id != stargazerViewModel.stargazerState.liveVisibleTargets.filter({ $0.classification == "PLANET" || $0.classification == "MOON" }).last?.id {
                             Divider()
                         }
                     }
@@ -1563,11 +1563,27 @@ struct ContentView: View {
                         weatherViewModel.moonsetTimeString = "--:--"
                         weatherViewModel.observationIndex = 0
                         weatherViewModel.observationQualityLabel = "CALCULATING..."
+                        stargazerViewModel.stargazerState.isDataLoaded = false
                         
                         // 4. Dispatch the exact clean coordinates down to your satellite engine network pipeline
                         let latStr = String(format: "%.4f", coordinate.latitude)
                         let lngStr = String(format: "%.4f", coordinate.longitude)
                         satViewModel.selectCityCoordinates(lat: latStr, lng: lngStr)
+                    }
+                    
+                    // 5. Actually re-fetch everything location-dependent for the new coordinates.
+                    // Previously this only reset fields to loading placeholders and stopped —
+                    // nothing ever re-populated them, so switching cities silently left every
+                    // stargazing/weather/moon value stuck showing the OLD city's data (or a
+                    // permanent "CALCULATING..." if the old data hadn't loaded yet either).
+                    let currentISOString = ISO8601DateFormatter().string(from: Date())
+                    await stargazerViewModel.calculateStargazingTelemetry(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                    await weatherViewModel.fetchStargazingWeather(lat: coordinate.latitude, lng: coordinate.longitude, targetISO8601Date: currentISOString)
+                    await weatherViewModel.fetchMoonData(lat: coordinate.latitude, lng: coordinate.longitude)
+                    weatherViewModel.updateObservationIndex()
+                    let newOutlook = await weatherViewModel.fetchWeekAheadOutlook(lat: coordinate.latitude, lng: coordinate.longitude)
+                    await MainActor.run {
+                        stargazerViewModel.stargazerState.forecastWeek = newOutlook
                     }
                 } else {
                     await MainActor.run {
