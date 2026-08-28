@@ -8,6 +8,115 @@
 import SwiftUI
 import CoreLocation
 import MapKit
+import Combine
+
+// ==============================================================================
+// 📍 DEVICE LOCATION PROVIDER — a single, correctly-authorized location source
+// ==============================================================================
+/// Wraps CLLocationManager the way it actually needs to be used: request authorization if
+/// undetermined, then request a fix and *wait* for the delegate callback before returning.
+///
+/// This replaces the pattern of `CLLocationManager().location` read immediately after
+/// construction — a fresh manager has no authorization and hasn't been given any time to
+/// acquire a fix, so that property is essentially always nil on a cold instance. That
+/// silent nil is why the fallback coordinate (Madison, WI) has been used almost every time
+/// this app has run, regardless of the user's real location.
+///
+/// Concurrent callers are de-duplicated: if two `.task` blocks both call `currentLocation()`
+/// around launch (as this file's do), they share one underlying request instead of each
+/// standing up their own CLLocationManager continuation — doing that naively would leak the
+/// first caller's continuation and trigger a runtime "continuation misuse" fault.
+@MainActor
+final class DeviceLocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
+    // Declared explicitly rather than relying on ObservableObject's synthesized
+    // objectWillChange — that synthesis is unreliable for NSObject-subclassing types
+    // (needed here for CLLocationManagerDelegate), which is what triggered "does not
+    // conform to protocol 'ObservableObject'" despite conforming to it correctly.
+    // Nothing here needs to actually .send() through it — this class has no @Published
+    // state driving UI, it's purely an async location-fetch helper — it just needs to
+    // exist to satisfy @StateObject's requirement.
+    let objectWillChange = ObservableObjectPublisher()
+
+    private let manager = CLLocationManager()
+    private var cachedLocation: CLLocationCoordinate2D?
+    private var inFlightTask: Task<CLLocationCoordinate2D?, Never>?
+
+    private var authorizationContinuation: CheckedContinuation<Bool, Never>?
+    private var locationContinuation: CheckedContinuation<CLLocationCoordinate2D?, Never>?
+
+    override init() {
+        super.init()
+        manager.delegate = self
+    }
+
+    /// Returns the device's current coordinate. Requests "when in use" authorization first
+    /// if that hasn't been decided yet. Returns nil if permission is denied/restricted, or
+    /// if CoreLocation genuinely couldn't produce a fix — callers must supply their own
+    /// fallback for that case, this never invents one.
+    func currentLocation() async -> CLLocationCoordinate2D? {
+        if let cachedLocation { return cachedLocation }
+        if let inFlightTask { return await inFlightTask.value }
+
+        let task = Task<CLLocationCoordinate2D?, Never> { [weak self] in
+            await self?.resolveLocation()
+        }
+        inFlightTask = task
+        let result = await task.value
+        inFlightTask = nil
+        cachedLocation = result
+        return result
+    }
+
+    private func resolveLocation() async -> CLLocationCoordinate2D? {
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            let granted = await requestAuthorization()
+            guard granted else { return nil }
+        case .denied, .restricted:
+            return nil
+        default:
+            break
+        }
+        return await requestFix()
+    }
+
+    private func requestAuthorization() async -> Bool {
+        await withCheckedContinuation { continuation in
+            self.authorizationContinuation = continuation
+            manager.requestWhenInUseAuthorization()
+        }
+    }
+
+    private func requestFix() async -> CLLocationCoordinate2D? {
+        await withCheckedContinuation { continuation in
+            self.locationContinuation = continuation
+            manager.requestLocation()
+        }
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        Task { @MainActor in
+            guard status != .notDetermined, let continuation = self.authorizationContinuation else { return }
+            self.authorizationContinuation = nil
+            continuation.resume(returning: status == .authorizedWhenInUse || status == .authorizedAlways)
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        Task { @MainActor in
+            self.locationContinuation?.resume(returning: locations.last?.coordinate)
+            self.locationContinuation = nil
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            self.locationContinuation?.resume(returning: nil)
+            self.locationContinuation = nil
+        }
+    }
+}
 
 struct ContentView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
@@ -48,6 +157,7 @@ struct ContentView: View {
     @State private var showLiveViewfinderOverlay: Bool = false
     
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
+    @StateObject private var locationProvider = DeviceLocationProvider()
 
 
     // 💡 RESPONSIVE ATMOSPHERIC CELL MATRIX: Stacks vertically on iPhone, aligns horizontally on iPad
@@ -1256,8 +1366,12 @@ struct ContentView: View {
                     await apodViewModel.fetchDailyBackdrop()
                     
                     // 3. Process dynamic hardware location parameters for meteor streams
-                    let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
-                    let hardwareLng = CLLocationManager().location?.coordinate.longitude ?? -89.4012
+                    let resolvedCoordinate = await locationProvider.currentLocation()
+                    let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                    let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                    if resolvedCoordinate == nil {
+                        print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
+                    }
                     meteorViewModel.generateOutlook(userLatitude: hardwareLat)
                     
                     // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
@@ -1349,8 +1463,12 @@ struct ContentView: View {
                 .task {
                     print("📡 [ASTRONOMY UPDATE]: Ingesting live hardware GPS telemetry...")
                     
-                    let hardwareLat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
-                    let hardwareLng = CLLocationManager().location?.coordinate.longitude ?? -89.4012
+                    let resolvedCoordinate = await locationProvider.currentLocation()
+                    let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                    let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                    if resolvedCoordinate == nil {
+                        print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
+                    }
                     
                     // Clean, true parameter inputs with absolutely zero made-up variables!
                     await stargazerViewModel.calculateStargazingTelemetry(
@@ -1382,7 +1500,10 @@ struct ContentView: View {
         // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
         .fullScreenCover(isPresented: $showLiveViewfinderOverlay) {
             // 💡 THE TRUE DATA FEED: Passes your real live downloaded planets list array down into the finder lookups!
-            LiveSkyViewfinderOverlay(visiblePlanetsCatalog: stargazerViewModel.stargazerState.liveVisibleTargets)
+            LiveSkyViewfinderOverlay(
+                visiblePlanetsCatalog: stargazerViewModel.stargazerState.liveVisibleTargets,
+                bortleClass: stargazerViewModel.stargazerState.bortleClass
+            )
         }
     }
 
@@ -1497,4 +1618,3 @@ struct IdentifiableStream: Identifiable {
     let id = UUID()
     let url: String
 }
-
