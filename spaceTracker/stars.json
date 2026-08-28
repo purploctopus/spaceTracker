@@ -1,12 +1,5 @@
 [
   {
-    "name": "SOL",
-    "constellation": "UNK",
-    "ra": 0.0,
-    "dec": 0.0,
-    "mag": -26.7
-  },
-  {
     "name": "SIRIUS",
     "constellation": "CMA",
     "ra": 6.7525,

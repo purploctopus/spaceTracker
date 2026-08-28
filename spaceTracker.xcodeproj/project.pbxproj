@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		800933A33041BBED00CFB57C /* AABridge in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A23041BBED00CFB57C /* AABridge */; };
+		800933A53041BBED00CFB57C /* AAplus in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A43041BBED00CFB57C /* AAplus */; };
+		800933A73041BBED00CFB57C /* SwiftAA in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A63041BBED00CFB57C /* SwiftAA */; };
 		8052EF133017A10600CA4AE8 /* StoreKitTestCertificate.cer in Resources */ = {isa = PBXBuildFile; fileRef = 8052EF123017A10600CA4AE8 /* StoreKitTestCertificate.cer */; };
 		80B0623A2FFD8C5600990CBD /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 80B062392FFD8C5600990CBD /* GoogleMobileAds */; };
 		80B062912FFEA6E700990CBD /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 80B062902FFEA6E700990CBD /* Products.storekit */; };
@@ -44,7 +47,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				800933A53041BBED00CFB57C /* AAplus in Frameworks */,
 				80B0623A2FFD8C5600990CBD /* GoogleMobileAds in Frameworks */,
+				800933A73041BBED00CFB57C /* SwiftAA in Frameworks */,
+				800933A33041BBED00CFB57C /* AABridge in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +96,9 @@
 			name = spaceTracker;
 			packageProductDependencies = (
 				80B062392FFD8C5600990CBD /* GoogleMobileAds */,
+				800933A23041BBED00CFB57C /* AABridge */,
+				800933A43041BBED00CFB57C /* AAplus */,
+				800933A63041BBED00CFB57C /* SwiftAA */,
 			);
 			productName = spaceTracker;
 			productReference = 8068C9A02FE33592001E1DDE /* spaceTracker.app */;
@@ -121,6 +130,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				80B062382FFD8C5600990CBD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+				800933A13041BBED00CFB57C /* XCRemoteSwiftPackageReference "SwiftAA" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8068C9A12FE33592001E1DDE /* Products */;
@@ -378,6 +388,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		800933A13041BBED00CFB57C /* XCRemoteSwiftPackageReference "SwiftAA" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onekiloparsec/SwiftAA";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.1;
+			};
+		};
 		80B062382FFD8C5600990CBD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads";
@@ -389,6 +407,21 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		800933A23041BBED00CFB57C /* AABridge */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 800933A13041BBED00CFB57C /* XCRemoteSwiftPackageReference "SwiftAA" */;
+			productName = AABridge;
+		};
+		800933A43041BBED00CFB57C /* AAplus */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 800933A13041BBED00CFB57C /* XCRemoteSwiftPackageReference "SwiftAA" */;
+			productName = AAplus;
+		};
+		800933A63041BBED00CFB57C /* SwiftAA */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 800933A13041BBED00CFB57C /* XCRemoteSwiftPackageReference "SwiftAA" */;
+			productName = SwiftAA;
+		};
 		80B062392FFD8C5600990CBD /* GoogleMobileAds */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 80B062382FFD8C5600990CBD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
