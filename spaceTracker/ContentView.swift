@@ -354,26 +354,26 @@ struct ContentView: View {
                         Circle()
                             .stroke(Color.cyan.opacity(0.2), lineWidth: 4)
                         Circle()
-                            .trim(from: 0, to: CGFloat(stargazerViewModel.stargazerState.observationIndex) / 100.0)
+                            .trim(from: 0, to: CGFloat(weatherViewModel.observationIndex) / 100.0)
                             .stroke(Color.cyan, lineWidth: 4)
                             .rotationEffect(.degrees(-90))
                         
                         VStack(spacing: 2) {
-                            Text("\(stargazerViewModel.stargazerState.observationIndex)%")
+                            Text("\(weatherViewModel.observationIndex)%")
                                 .font(.system(.subheadline, design: .monospaced))
                                 .fontWeight(.bold)
-                            Text("OPTIMAL")
+                            Text(weatherViewModel.observationQualityLabel)
                                 .font(.system(.caption2, design: .monospaced))
-                                .foregroundColor(.green)
+                                .foregroundColor(observationQualityColor(weatherViewModel.observationQualityLabel))
                         }
                     }
                     .frame(width: 70, height: 70)
                     
                     // Vertical Text Telemetry Lines Data List
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("MOON ILLUMINATION: \(Int(stargazerViewModel.stargazerState.moonIlluminatedFraction * 100))%")
-                        Text("MOON PHASE: \(stargazerViewModel.stargazerState.moonPhase)")
-                        Text("MOONSET TIME: \(stargazerViewModel.stargazerState.moonSetTime)")
+                        Text("MOON ILLUMINATION: \(Int(weatherViewModel.moonIlluminationEstimate * 100))%")
+                        Text("MOON PHASE: \(weatherViewModel.moonPhaseDescription)")
+                        Text("MOONSET TIME: \(weatherViewModel.moonsetTimeString)")
                         Text("TRUE DARK WINDOW: \(stargazerViewModel.stargazerState.trueDarkWindow)")
                     }
                     .font(.system(.caption2, design: .monospaced))
@@ -1378,6 +1378,14 @@ struct ContentView: View {
                     let currentISOString = ISO8601DateFormatter().string(from: Date())
                     await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
                     await weatherViewModel.fetchGeomagneticRadar()
+                    await weatherViewModel.fetchMoonData(lat: hardwareLat, lng: hardwareLng)
+                    
+                    // Both cloud/humidity (fetchStargazingWeather) and moon brightness
+                    // (fetchMoonData) are in now, so the composite score can be computed.
+                    weatherViewModel.updateObservationIndex()
+                    
+                    // Real 7-day outlook, replacing the old fixed "EXCELLENT" stub.
+                    stargazerViewModel.stargazerState.forecastWeek = await weatherViewModel.fetchWeekAheadOutlook(lat: hardwareLat, lng: hardwareLng)
                     
                     // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
                     notificationEngine.scheduleDailyBriefing(
@@ -1502,13 +1510,24 @@ struct ContentView: View {
             // 💡 THE TRUE DATA FEED: Passes your real live downloaded planets list array down into the finder lookups!
             LiveSkyViewfinderOverlay(
                 visiblePlanetsCatalog: stargazerViewModel.stargazerState.liveVisibleTargets,
-                moonBrightnessPenalty: stargazerViewModel.stargazerState.moonBrightnessPenalty
+                moonBrightnessPenalty: weatherViewModel.moonBrightnessPenalty
             )
         }
     }
 
  // Closes var body: some View
     // 💡 THE UNTANGLED GEOCODING INTERCEPT METHOD: Handles universal vector mapping
+    /// Maps the quality label back to a display color. Kept here rather than in the view
+    /// model since color choice is a UI concern — the view model only owns the score/label.
+    private func observationQualityColor(_ label: String) -> Color {
+        switch label {
+        case "OPTIMAL": return .green
+        case "GOOD": return .cyan
+        case "FAIR": return .yellow
+        default: return .orange
+        }
+    }
+
     private func executeUniversalCitySearch() {
         guard !manualCitySearch.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         
@@ -1539,6 +1558,11 @@ struct ContentView: View {
                         weatherViewModel.cloudCoverPercent = 0
                         weatherViewModel.humidityPercent = 0
                         weatherViewModel.observationRating = "POLLING COMPASS DATA..."
+                        weatherViewModel.moonPhaseDescription = "CALCULATING..."
+                        weatherViewModel.moonriseTimeString = "--:--"
+                        weatherViewModel.moonsetTimeString = "--:--"
+                        weatherViewModel.observationIndex = 0
+                        weatherViewModel.observationQualityLabel = "CALCULATING..."
                         
                         // 4. Dispatch the exact clean coordinates down to your satellite engine network pipeline
                         let latStr = String(format: "%.4f", coordinate.latitude)

@@ -42,18 +42,7 @@ struct StargazeForecastDay: Identifiable, Equatable {
 
 // MARK: - 🔌 CORE INTERFACE STATES (100% Intact)
 class StargazerState: ObservableObject {
-    @Published var observationIndex: Int = 85
-    @Published var moonPhase: String = "WAXING CRESCENT"
-    @Published var moonSetTime: String = "10:14 PM"
-    @Published var trueDarkWindow: String = "09:34 PM - 04:15 AM"
-
-    /// The Moon's real illuminated fraction right now (0...1), from SwiftAA — not a stub.
-    @Published var moonIlluminatedFraction: Double = 0.0
-    /// How many magnitudes of naked-eye reach tonight's moonlight costs you. Feeds the
-    /// visibility badge in LiveSkyViewfinderOverlay. This is a moonlight-only estimate —
-    /// it does NOT model light pollution (see moonSkyBrightnessPenalty for why that's a
-    /// deliberate scope decision, not an oversight).
-    @Published var moonBrightnessPenalty: Double = 0.0
+    @Published var trueDarkWindow: String = "CALCULATING..."
 
     @Published var liveVisibleTargets: [APIPlanetItem] = []
     @Published var forecastWeek: [StargazeForecastDay] = []
@@ -61,26 +50,56 @@ class StargazerState: ObservableObject {
 }
 
 // ==============================================================================
-// 🌙 MOON SKY-BRIGHTNESS PENALTY (replaces the removed Bortle-based visibility badge)
+// 🌌 TRUE DARK WINDOW (astronomical twilight bounds)
 // ==============================================================================
-/// Estimates how many magnitudes of naked-eye reach tonight's moonlight costs an observer,
-/// based on the Moon's illuminated fraction and whether it's actually above the horizon (a
-/// full moon below the horizon has zero effect on the sky).
+/// Formats a "start – end" local-time string for astronomical night: from the moment the
+/// Sun drops below -18° this evening, to the moment it climbs back above -18° the following
+/// morning. Below -18°, natural airglow from the Sun no longer brightens the sky at all —
+/// this is the standard definition of a fully dark astronomical sky.
 ///
-/// This is a standard amateur-astronomy rule of thumb — a full moon high overhead can
-/// suppress naked-eye limiting magnitude by roughly 3–4 magnitudes versus a moonless sky,
-/// tapering toward zero as illumination or altitude drops — not a rigorous sky-glow
-/// radiative-transfer model. Deliberately does NOT attempt to model light pollution: after
-/// looking into it, real light-pollution data either isn't legally reusable in a commercial
-/// app without explicit permission, or (per the atlas authors' own published analysis)
-/// doesn't reliably convert into a Bortle-style number in the first place. Moonlight is the
-/// one major sky-brightness factor that's both physically well-understood and computable
-/// entirely offline with data we already have a legitimate right to use.
-func moonSkyBrightnessPenalty(illuminatedFraction: Double, altitude: Double) -> Double {
-    guard altitude > 0 else { return 0.0 }
-    let maxPenalty = 3.5
-    let altitudeFactor = min(altitude / 45.0, 1.0) // ramps to full effect by ~45° altitude
-    return maxPenalty * illuminatedFraction * altitudeFactor
+/// Built directly from RiseTransitSetTimes and Sun.makeHorizontalCoordinates rather than
+/// SwiftAA's twilights(forSunAltitude:coordinates:) convenience wrapper — that wrapper's
+/// exact return shape (tuple vs. struct, presence of an .error field) turned out to differ
+/// between SwiftAA versions/commits, so this replicates the same logic from primitives whose
+/// signatures are stable and already confirmed working elsewhere in this file.
+///
+/// Two separate RiseTransitSetTimes calls are needed for the actual dusk/dawn times: one for
+/// "today" (its setTime is tonight's dusk) and one for "tomorrow" (its riseTime is tomorrow's
+/// dawn) — a single day's rise/set pair only covers this morning's dawn paired with tonight's
+/// dusk, not the full overnight span. Polar day/night is detected by sampling the Sun's
+/// altitude at local midnight and noon, same approach SwiftAA's own twilights() uses
+/// internally for that edge case.
+func formattedTrueDarkWindow(currentJulianDay: JulianDay, geoCoordinates: GeographicCoordinates) -> String {
+    let timeFormatter = DateFormatter()
+    timeFormatter.timeStyle = .short
+
+    let astronomicalAltitude = TwilightSunAltitude.astronomical.rawValue // -18°
+
+    let midnightSun = Sun(julianDay: currentJulianDay)
+    let midnightAltitude = midnightSun.makeHorizontalCoordinates(with: geoCoordinates).altitude
+    if midnightAltitude > astronomicalAltitude {
+        return "NO TRUE DARKNESS TONIGHT"
+    }
+
+    let noonJulianDay = JulianDay(currentJulianDay.value + 0.5)
+    let noonSun = Sun(julianDay: noonJulianDay)
+    let noonAltitude = noonSun.makeHorizontalCoordinates(with: geoCoordinates).altitude
+    if noonAltitude < astronomicalAltitude {
+        return "DARK ALL NIGHT"
+    }
+
+    let sunToday = Sun(julianDay: currentJulianDay)
+    let todayTimes = RiseTransitSetTimes(celestialBody: sunToday, geographicCoordinates: geoCoordinates, riseSetAltitude: astronomicalAltitude)
+
+    let tomorrowJulianDay = JulianDay(currentJulianDay.value + 1.0)
+    let sunTomorrow = Sun(julianDay: tomorrowJulianDay)
+    let tomorrowTimes = RiseTransitSetTimes(celestialBody: sunTomorrow, geographicCoordinates: geoCoordinates, riseSetAltitude: astronomicalAltitude)
+
+    guard let duskDate = todayTimes.setTime?.date, let dawnDate = tomorrowTimes.riseTime?.date else {
+        return "UNAVAILABLE"
+    }
+
+    return "\(timeFormatter.string(from: duskDate)) - \(timeFormatter.string(from: dawnDate))"
 }
 
 // ==============================================================================
@@ -135,22 +154,10 @@ class StargazerViewModel: ObservableObject {
     }
 
     func calculateStargazingTelemetry(latitude: Double, longitude: Double) async {
-        var dynamicWeekForecast: [StargazeForecastDay] = []
-        let calendar = Calendar.current
-        let dayDateFormatter = DateFormatter()
-        dayDateFormatter.dateFormat = "EEE MMM d"
-        dayDateFormatter.locale = Locale(identifier: "en_US")
-
-        for dayOffset in 0..<7 {
-            if let calculatedDate = calendar.date(byAdding: .day, value: dayOffset, to: Date()) {
-                let dayLabelText = dayDateFormatter.string(from: calculatedDate).uppercased()
-                dynamicWeekForecast.append(StargazeForecastDay(
-                    dayLabel: dayLabelText,
-                    conditionGrade: "EXCELLENT",
-                    commentary: "MOONLIGHT: MINIMAL"
-                ))
-            }
-        }
+        // NOTE: forecastWeek is no longer built here — it used to be a fixed 7-day stub
+        // ("EXCELLENT" / "MOONLIGHT: MINIMAL" every day, regardless of reality). The real
+        // 7-day outlook now comes from StargazingWeatherViewModel.fetchWeekAheadOutlook,
+        // called separately in ContentView and assigned to stargazerState.forecastWeek.
 
         // Convert coordinates cleanly to SwiftAA geographic and timeline data models
         let now = Date()
@@ -313,15 +320,13 @@ class StargazerViewModel: ObservableObject {
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         // ==============================================================================
-        // 🌙 REAL MOON ILLUMINATION & BRIGHTNESS PENALTY — replaces the Bortle badge
+        // 🌌 TRUE DARK WINDOW — Sun-based (astronomical twilight), not moon data, so this
+        // stays SwiftAA-computed. Real moon data (phase/moonrise/moonset/brightness) now
+        // comes from WeatherKit via StargazingWeatherViewModel.fetchMoonData instead.
         // ==============================================================================
-        let moon = Moon(julianDay: currentSystemTime)
-        let moonHoriz = moon.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)
-        let moonAltitude = moonHoriz.altitude.value
-        let moonIllumination = moon.illuminatedFraction() // 0...1, real SwiftAA calculation
-        let moonPenalty = moonSkyBrightnessPenalty(illuminatedFraction: moonIllumination, altitude: moonAltitude)
+        let darkWindowString = formattedTrueDarkWindow(currentJulianDay: currentSystemTime, geoCoordinates: geoCoordinates)
 
-        print(" 🌙 MOON: \(String(format: "%.0f", moonIllumination * 100))% illuminated | ALT: \(String(format: "%.1f°", moonAltitude)) | Sky penalty: -\(String(format: "%.1f", moonPenalty)) mag")
+        print(" 🌌 TRUE DARK WINDOW: \(darkWindowString)")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         let sortedResult = localizedOutputCatalog.sorted { $0.altitude > $1.altitude }
@@ -329,9 +334,7 @@ class StargazerViewModel: ObservableObject {
         DispatchQueue.main.async {
             self.objectWillChange.send()
             self.stargazerState.liveVisibleTargets = sortedResult
-            self.stargazerState.forecastWeek = dynamicWeekForecast
-            self.stargazerState.moonIlluminatedFraction = moonIllumination
-            self.stargazerState.moonBrightnessPenalty = moonPenalty
+            self.stargazerState.trueDarkWindow = darkWindowString
             self.stargazerState.isDataLoaded = true
         }
     }

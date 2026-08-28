@@ -43,8 +43,10 @@ struct StargazeForecastCard: View {
     private func gradeColor(_ grade: String) -> Color {
         switch grade.uppercased() {
         case "EXCELLENT": return .green
-        case "MARGINAL": return .orange
-        default: return .red
+        case "GOOD": return .cyan
+        case "FAIR", "MARGINAL": return .yellow // MARGINAL kept in case anything else still emits it
+        case "POOR": return .orange
+        default: return .red // genuinely unrecognized value — not a real tier, just a safety net
         }
     }
 }
