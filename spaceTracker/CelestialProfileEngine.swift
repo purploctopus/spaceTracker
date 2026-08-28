@@ -143,14 +143,14 @@ struct CelestialDatabaseRegistry {
         "SUN": CelestialProfile(
             name: "The Sun",
             subTitle: "OUR SYSTEM ANCHOR",
-            assetImageName: nil,
+            assetImageName: "sun",
             encyclopediaSummary: "The yellow dwarf star sitting at the absolute center of our system. Accounting for 99.8% of the entire solar system's mass, its immense gravitational field and thermal heat drive the lifecycle and orbital tracking geometry of every planet.",
             classification: "STAR"
         ),
         "MOON": CelestialProfile(
             name: "The Moon",
             subTitle: "OUR NEIGHBOR SATELLITE",
-            assetImageName: nil,
+            assetImageName: "moon",
             encyclopediaSummary: "Earth's only natural satellite. The Moon is tidally locked to our planet, meaning it always shows us the exact same face. Its changing reflection angles create the familiar crescent and full illumination cycles on your camera viewport glass.",
             classification: "STAR"
         )
@@ -166,6 +166,6 @@ extension CelestialDatabaseRegistry {
     static let interactiveTargetsList: [String] = [
         "MERCURY", "VENUS", "MARS", "JUPITER", "SATURN",
         "SIRIUS", "BETELGEUSE", "RIGEL", "VEGA", "POLARIS",
-        "PROCYON", "ANTARES", "ALDEBARAN", "CAPELLA", "ARCTURUS"
+        "PROCYON", "ANTARES", "ALDEBARAN", "CAPELLA", "ARCTURUS", "SUN", "MOON"
     ].sorted()
 }
