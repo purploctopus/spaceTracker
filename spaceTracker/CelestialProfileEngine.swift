@@ -140,14 +140,14 @@ struct CelestialDatabaseRegistry {
             encyclopediaSummary: "A brilliant orange giant star located in Bootes. Arcturus is ancient, forming long before our solar system. It is currently tearing through our sector of the Milky Way galaxy at an incredible speed of over 260,000 miles per hour.",
             classification: "STAR"
         ),
-        "THE_SUN": CelestialProfile(
+        "SUN": CelestialProfile(
             name: "The Sun",
             subTitle: "OUR SYSTEM ANCHOR",
             assetImageName: nil,
             encyclopediaSummary: "The yellow dwarf star sitting at the absolute center of our system. Accounting for 99.8% of the entire solar system's mass, its immense gravitational field and thermal heat drive the lifecycle and orbital tracking geometry of every planet.",
             classification: "STAR"
         ),
-        "THE_MOON": CelestialProfile(
+        "MOON": CelestialProfile(
             name: "The Moon",
             subTitle: "OUR NEIGHBOR SATELLITE",
             assetImageName: nil,
