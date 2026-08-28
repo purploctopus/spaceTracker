@@ -24,35 +24,34 @@ private struct ReticleCenterPreferenceKey: PreferenceKey {
 private let arRootCoordinateSpace = "arRootSpace"
 
 // ==============================================================================
-// 🔭 VISIBILITY TIER HELPERS (magnitude vs. Bortle-class naked-eye limit)
+// 🔭 VISIBILITY TIER HELPERS (magnitude vs. tonight's moonlight-adjusted sky)
 // ==============================================================================
+// NOTE: this used to key off a Bortle-class light-pollution lookup. That was removed —
+// real light-pollution datasets either aren't legally reusable in a monetized app without
+// the data owner's explicit permission, or (per the leading atlas's own author, who
+// published a direct comparison against real observer Bortle ratings) don't reliably
+// convert into a Bortle number in the first place. Moonlight is the one major sky-brightness
+// factor that's both physically well-understood and fully computable offline from data we
+// already have a legitimate right to use (see moonSkyBrightnessPenalty in
+// StargazerTelemetryModels.swift). This intentionally does NOT model light pollution — the
+// disclaimer surfaced in TargetInfoReadout below exists specifically so that isn't mistaken
+// for a complete picture, especially for anyone under a city sky on a moonless night.
 
-/// Approximate naked-eye limiting magnitude per Bortle class, at the zenith, for a typical
-/// observer. These are the commonly-cited rule-of-thumb values from amateur astronomy
-/// references (Sky & Telescope's Bortle scale writeups, Clear Sky Chart documentation) —
-/// not a precise photometric measurement. Actual limits vary with age, altitude, humidity,
-/// and how dark-adapted the observer's eyes are.
-private func bortleLimitingMagnitude(from label: String) -> Double {
-    let limitsByClass: [Int: Double] = [
-        1: 7.8, 2: 7.3, 3: 6.6, 4: 6.3, 5: 5.9,
-        6: 5.6, 7: 5.2, 8: 4.5, 9: 4.0
-    ]
-    if let digitChar = label.first(where: { $0.isNumber }), let classNumber = Int(String(digitChar)) {
-        return limitsByClass[classNumber] ?? 6.0
-    }
-    return 6.0 // reasonable suburban default if the label can't be parsed
-}
+/// A fixed "typical clear, reasonably dark sky" starting point — not location-specific,
+/// since this badge no longer attempts to model any particular observer's real light
+/// pollution. Tonight's moon penalty is subtracted from this baseline.
+private let assumedBaselineLimitingMagnitude = 6.5
 
 private struct VisibilityTier {
     let label: String
     let color: Color
 }
 
-/// Buckets an object's magnitude against the current sky's naked-eye limit into a rough
-/// "what do I need to see this" tier. The magnitude gaps used here (≈4.5 mag of reach for
-/// typical 7x50 binoculars, ≈9 mag total for a modest amateur telescope) are standard
-/// approximations, not derived from any specific instrument — treat them as a helpful
-/// nudge, not a guarantee.
+/// Buckets an object's magnitude against tonight's moonlight-adjusted naked-eye limit into a
+/// rough "what do I need to see this" tier. The magnitude gaps used here (≈4.5 mag of reach
+/// for typical 7x50 binoculars, ≈9 mag total for a modest amateur telescope) are standard
+/// approximations, not derived from any specific instrument — treat them as a helpful nudge,
+/// not a guarantee.
 private func visibilityTier(magnitude: Double, limitingMagnitude: Double) -> VisibilityTier {
     let margin = limitingMagnitude - magnitude // positive = brighter than what the eye can see
     switch margin {
@@ -82,7 +81,7 @@ private func formattedDistance(auValue: Double) -> String {
 // ==============================================================================
 private struct TargetInfoReadout: View {
     let target: TargetLockMatch
-    let bortleClassLabel: String
+    let moonBrightnessPenalty: Double
     
     var body: some View {
         VStack(spacing: 6) {
@@ -112,10 +111,8 @@ private struct TargetInfoReadout: View {
             }
             
             if let magnitude = target.magnitude {
-                let tier = visibilityTier(
-                    magnitude: magnitude,
-                    limitingMagnitude: bortleLimitingMagnitude(from: bortleClassLabel)
-                )
+                let effectiveLimitingMagnitude = assumedBaselineLimitingMagnitude - moonBrightnessPenalty
+                let tier = visibilityTier(magnitude: magnitude, limitingMagnitude: effectiveLimitingMagnitude)
                 Text(tier.label)
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .padding(.horizontal, 8)
@@ -124,6 +121,15 @@ private struct TargetInfoReadout: View {
                     .foregroundColor(tier.color)
                     .cornerRadius(4)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(tier.color.opacity(0.5), lineWidth: 1))
+                
+                // Keeps this from being read as a complete "can I see this" verdict — it's
+                // moonlight only. A moonless sky in a bright city will still show NAKED EYE
+                // here even though the real sky is far too bright to actually see it.
+                Text("Moonlight-only estimate — doesn't account for local light pollution")
+                    .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.4))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 160)
             }
         }
         .padding(10)
@@ -149,11 +155,11 @@ struct ViewfinderBackgroundGridLines: Shape {
 struct LiveSkyViewfinderOverlay: View {
     let visiblePlanetsCatalog: [APIPlanetItem]
     /// Drives the naked-eye/binoculars/scope visibility badge in the target readout. Pass
-    /// `stargazerState.bortleClass` in from the call site — this defaults to the same
-    /// placeholder value StargazerState ships with today, but note that value is currently
-    /// a static stub (not derived from the user's real location), so the badge will only be
-    /// as accurate as whatever's actually driving this string.
-    var bortleClass: String = "CLASS 4 (RURAL-SUBURBAN)"
+    /// `stargazerState.moonBrightnessPenalty` in from the call site — unlike the Bortle
+    /// value this replaced, this is real, computed from the Moon's actual current
+    /// illumination and altitude (see moonSkyBrightnessPenalty in
+    /// StargazerTelemetryModels.swift), not a stub.
+    var moonBrightnessPenalty: Double = 0.0
     @Environment(\.dismiss) private var dismiss
     
     @StateObject private var motionEngine = SkyMotionManager()
@@ -324,7 +330,7 @@ struct LiveSkyViewfinderOverlay: View {
                     // activeNavigationTarget above, which only concerns the guided-tracking
                     // needle for a manually selected target.
                     if let lockedTarget = currentCrosshairTarget {
-                        TargetInfoReadout(target: lockedTarget, bortleClassLabel: bortleClass)
+                        TargetInfoReadout(target: lockedTarget, moonBrightnessPenalty: moonBrightnessPenalty)
                             .transition(.opacity)
                     }
                 }

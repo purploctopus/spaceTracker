@@ -43,14 +43,44 @@ struct StargazeForecastDay: Identifiable, Equatable {
 // MARK: - 🔌 CORE INTERFACE STATES (100% Intact)
 class StargazerState: ObservableObject {
     @Published var observationIndex: Int = 85
-    @Published var bortleClass: String = "CLASS 4 (RURAL-SUBURBAN)"
     @Published var moonPhase: String = "WAXING CRESCENT"
     @Published var moonSetTime: String = "10:14 PM"
     @Published var trueDarkWindow: String = "09:34 PM - 04:15 AM"
 
+    /// The Moon's real illuminated fraction right now (0...1), from SwiftAA — not a stub.
+    @Published var moonIlluminatedFraction: Double = 0.0
+    /// How many magnitudes of naked-eye reach tonight's moonlight costs you. Feeds the
+    /// visibility badge in LiveSkyViewfinderOverlay. This is a moonlight-only estimate —
+    /// it does NOT model light pollution (see moonSkyBrightnessPenalty for why that's a
+    /// deliberate scope decision, not an oversight).
+    @Published var moonBrightnessPenalty: Double = 0.0
+
     @Published var liveVisibleTargets: [APIPlanetItem] = []
     @Published var forecastWeek: [StargazeForecastDay] = []
     @Published var isDataLoaded: Bool = false
+}
+
+// ==============================================================================
+// 🌙 MOON SKY-BRIGHTNESS PENALTY (replaces the removed Bortle-based visibility badge)
+// ==============================================================================
+/// Estimates how many magnitudes of naked-eye reach tonight's moonlight costs an observer,
+/// based on the Moon's illuminated fraction and whether it's actually above the horizon (a
+/// full moon below the horizon has zero effect on the sky).
+///
+/// This is a standard amateur-astronomy rule of thumb — a full moon high overhead can
+/// suppress naked-eye limiting magnitude by roughly 3–4 magnitudes versus a moonless sky,
+/// tapering toward zero as illumination or altitude drops — not a rigorous sky-glow
+/// radiative-transfer model. Deliberately does NOT attempt to model light pollution: after
+/// looking into it, real light-pollution data either isn't legally reusable in a commercial
+/// app without explicit permission, or (per the atlas authors' own published analysis)
+/// doesn't reliably convert into a Bortle-style number in the first place. Moonlight is the
+/// one major sky-brightness factor that's both physically well-understood and computable
+/// entirely offline with data we already have a legitimate right to use.
+func moonSkyBrightnessPenalty(illuminatedFraction: Double, altitude: Double) -> Double {
+    guard altitude > 0 else { return 0.0 }
+    let maxPenalty = 3.5
+    let altitudeFactor = min(altitude / 45.0, 1.0) // ramps to full effect by ~45° altitude
+    return maxPenalty * illuminatedFraction * altitudeFactor
 }
 
 // ==============================================================================
@@ -282,12 +312,26 @@ class StargazerViewModel: ObservableObject {
 
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
+        // ==============================================================================
+        // 🌙 REAL MOON ILLUMINATION & BRIGHTNESS PENALTY — replaces the Bortle badge
+        // ==============================================================================
+        let moon = Moon(julianDay: currentSystemTime)
+        let moonHoriz = moon.equatorialCoordinates.makeHorizontalCoordinates(for: geoCoordinates, at: currentSystemTime)
+        let moonAltitude = moonHoriz.altitude.value
+        let moonIllumination = moon.illuminatedFraction() // 0...1, real SwiftAA calculation
+        let moonPenalty = moonSkyBrightnessPenalty(illuminatedFraction: moonIllumination, altitude: moonAltitude)
+
+        print(" 🌙 MOON: \(String(format: "%.0f", moonIllumination * 100))% illuminated | ALT: \(String(format: "%.1f°", moonAltitude)) | Sky penalty: -\(String(format: "%.1f", moonPenalty)) mag")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         let sortedResult = localizedOutputCatalog.sorted { $0.altitude > $1.altitude }
 
         DispatchQueue.main.async {
             self.objectWillChange.send()
             self.stargazerState.liveVisibleTargets = sortedResult
             self.stargazerState.forecastWeek = dynamicWeekForecast
+            self.stargazerState.moonIlluminatedFraction = moonIllumination
+            self.stargazerState.moonBrightnessPenalty = moonPenalty
             self.stargazerState.isDataLoaded = true
         }
     }

@@ -371,7 +371,7 @@ struct ContentView: View {
                     
                     // Vertical Text Telemetry Lines Data List
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("BORTLE SCALE: \(stargazerViewModel.stargazerState.bortleClass)")
+                        Text("MOON ILLUMINATION: \(Int(stargazerViewModel.stargazerState.moonIlluminatedFraction * 100))%")
                         Text("MOON PHASE: \(stargazerViewModel.stargazerState.moonPhase)")
                         Text("MOONSET TIME: \(stargazerViewModel.stargazerState.moonSetTime)")
                         Text("TRUE DARK WINDOW: \(stargazerViewModel.stargazerState.trueDarkWindow)")
@@ -1502,7 +1502,7 @@ struct ContentView: View {
             // 💡 THE TRUE DATA FEED: Passes your real live downloaded planets list array down into the finder lookups!
             LiveSkyViewfinderOverlay(
                 visiblePlanetsCatalog: stargazerViewModel.stargazerState.liveVisibleTargets,
-                bortleClass: stargazerViewModel.stargazerState.bortleClass
+                moonBrightnessPenalty: stargazerViewModel.stargazerState.moonBrightnessPenalty
             )
         }
     }
