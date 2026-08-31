@@ -47,6 +47,17 @@ struct IvanTleResponse: Decodable {
     let line2: String
 }
 
+/// A locally-cached TLE with the time it was fetched, so the app can avoid re-hitting the
+/// network on every launch. Both TLE sources (tle.ivanstanojevic.me and CelesTrak) are small
+/// services with real, documented rate-limiting against exactly this app's usage pattern —
+/// many individual devices, often sharing carrier-NAT IPs, each independently querying.
+/// TLEs don't meaningfully change within a few hours, so there's no accuracy reason to fetch
+/// more often than that.
+private struct CachedTLE: Codable {
+    let lines: [String]
+    let fetchedAt: Date
+}
+
 // MARK: - 📡 TRACKING ENGINE CLASS
 @MainActor
 class OrbitalTrackingViewModel: ObservableObject {
@@ -118,15 +129,59 @@ class OrbitalTrackingViewModel: ObservableObject {
         }
     }
     
-    /// Fetches a satellite's TLE by NORAD catalog ID, trying the primary JSON source first
-    /// and falling back to CelesTrak directly if that fails — see fetchTLEFromCelesTrak for why.
+    /// Fetches a satellite's TLE by NORAD catalog ID. Checks a local cache first (see
+    /// CachedTLE) — only hits the network if there's no cached copy or it's gone stale.
+    /// This is the actual fix for both TLE sources' rate-limiting: it cuts real-world
+    /// network traffic from "every app launch, every device" down to "roughly once per
+    /// freshness window, per device" — directly addressing the "many individual devices
+    /// querying independently" pattern CelesTrak's own usage policy names as the thing that
+    /// gets blocked.
     private func fetchTLEData(noradId: Int) async -> [String] {
+        let freshnessWindow: TimeInterval = 6 * 60 * 60 // 6 hours — generous vs. how slowly TLE accuracy actually degrades
+        let cacheKey = "cachedTLE_\(noradId)"
+        
+        if let cached = loadCachedTLE(forKey: cacheKey), Date().timeIntervalSince(cached.fetchedAt) < freshnessWindow {
+            let ageMinutes = Int(Date().timeIntervalSince(cached.fetchedAt) / 60)
+            print("💾 [TLE CACHE]: Using cached TLE for NORAD \(noradId), \(ageMinutes) min old — no network call needed")
+            return cached.lines
+        }
+        
         if let primary = await fetchTLEFromIvanstanojevic(noradId: noradId), !primary.isEmpty {
+            saveCachedTLE(primary, forKey: cacheKey)
             return primary
         }
         
         print("⚠️ [TLE FALLBACK]: Primary TLE source failed for NORAD \(noradId), trying CelesTrak directly...")
-        return await fetchTLEFromCelesTrak(noradId: noradId)
+        let fallback = await fetchTLEFromCelesTrak(noradId: noradId)
+        if !fallback.isEmpty {
+            saveCachedTLE(fallback, forKey: cacheKey)
+            return fallback
+        }
+        
+        // Both live sources failed. A stale cached TLE — even hours or a day old — is still
+        // far more accurate than the hardcoded Shanghai placeholder, since orbital elements
+        // degrade gracefully over time rather than becoming instantly wrong the moment the
+        // freshness window expires.
+        if let staleCache = loadCachedTLE(forKey: cacheKey) {
+            let ageHours = Int(Date().timeIntervalSince(staleCache.fetchedAt) / 3600)
+            print("⚠️ [TLE CACHE]: Both live sources failed for NORAD \(noradId) — using \(ageHours)h-old cached TLE as last resort")
+            return staleCache.lines
+        }
+        
+        print("❌ [TLE FAILURE]: No network data and no cache available for NORAD \(noradId)")
+        return []
+    }
+    
+    private func loadCachedTLE(forKey key: String) -> CachedTLE? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(CachedTLE.self, from: data)
+    }
+    
+    private func saveCachedTLE(_ lines: [String], forKey key: String) {
+        let cached = CachedTLE(lines: lines, fetchedAt: Date())
+        if let data = try? JSONEncoder().encode(cached) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
     }
     
     private func fetchTLEFromIvanstanojevic(noradId: Int) async -> [String]? {
