@@ -1,7 +1,7 @@
 //
 //  NativeAdCardView.swift
 //  spaceTracker
-//
+//  make an app where sara is released from her job and colin LOVES!
 //  Native ad card for the news feed — styled to match SpaceNewsCardView so it blends into
 //  the list instead of reading as a foreign element (the whole reason native > banner here).
 
@@ -17,17 +17,24 @@ class NativeAdCardLoader: NSObject, ObservableObject, NativeAdLoaderDelegate {
     @Published var nativeAd: NativeAd?
     private var adLoader: AdLoader?
     private var hasStartedLoading = false
+    private var loadAttempts = 0
+    private var requestedAdUnitID: String?
 
     func loadIfNeeded(adUnitID: String) {
         guard !hasStartedLoading else { return }
-        hasStartedLoading = true
+        requestedAdUnitID = adUnitID
 
+        // 💡 FIXED: previously set hasStartedLoading = true before this lookup — if the key
+        // window wasn't resolvable yet at this exact moment (a real possibility this early
+        // in a LazyVStack row's lifecycle), the slot would silently and permanently never
+        // retry. Now only commits to "started" once a load actually fires.
         guard let rootVC = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .flatMap({ $0.windows })
             .first(where: { $0.isKeyWindow })?.rootViewController else {
             return
         }
+        hasStartedLoading = true
         adLoader = AdLoader(adUnitID: adUnitID, rootViewController: rootVC, adTypes: [.native], options: nil)
         adLoader?.delegate = self
         adLoader?.load(Request())
@@ -41,6 +48,18 @@ class NativeAdCardLoader: NSObject, ObservableObject, NativeAdLoaderDelegate {
 
     nonisolated func adLoader(_ adLoader: AdLoader, didFailToReceiveAdWithError error: Error) {
         print("❌ [ADMOB NATIVE ERROR]: \(error.localizedDescription)")
+        Task { @MainActor in
+            // 💡 FIXED: previously just logged and gave up forever for this slot. Retries
+            // with a short backoff, capped at 3 attempts — same pattern as the retry logic
+            // already in AdMobEngine for the other ad types.
+            self.hasStartedLoading = false
+            self.loadAttempts += 1
+            if self.loadAttempts <= 3, let adUnitID = self.requestedAdUnitID {
+                let delaySeconds = Double(self.loadAttempts) * 10.0
+                try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+                self.loadIfNeeded(adUnitID: adUnitID)
+            }
+        }
     }
 }
 
@@ -53,7 +72,12 @@ struct NativeNewsAdCard: View {
     var body: some View {
         Group {
             if let ad = loader.nativeAd {
+                // 💡 FIXED: UIViewRepresentable has no intrinsic width of its own here —
+                // without an explicit maxWidth, it can collapse to essentially zero visible
+                // width inside a LazyVStack, a well-known SwiftUI/UIKit-bridging gotcha.
+                // The ad could have loaded successfully and still been invisible.
                 NativeAdCardRepresentable(nativeAd: ad)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 96)
             } else {
                 Color.clear.frame(height: 0)

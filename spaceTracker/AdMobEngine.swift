@@ -60,6 +60,20 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
 
     override init() {
         super.init()
+
+        // 💡 TEST MODE ONLY: a rewarded/App Open ad watched during an earlier test session
+        // leaves the real 24h temporary ad-free window active, which then silently suppresses
+        // every ad surface in the app (including this one) for the rest of that real day —
+        // easy to mistake for a loading bug. This clears it fresh on every launch while
+        // isTestMode is true. Never runs in production — a real user's temporary unlock is
+        // never touched by this. The permanent purchase flag is deliberately left alone: a
+        // real StoreKit entitlement would just re-grant itself via verifyActivePurchases()
+        // regardless, so clearing it here wouldn't accomplish anything for testing purchases
+        // anyway — that needs Apple's own Sandbox "clear purchase history," not app code.
+        if Self.isTestMode {
+            resetTemporaryUnlockStateForTesting()
+        }
+
         checkDailyUnlockStatus()
         loadRewardedInterstitial()
         loadAppOpenAd()
@@ -70,6 +84,13 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
             await fetchStoreProduct()
             await verifyActivePurchases()
         }
+    }
+
+    private func resetTemporaryUnlockStateForTesting() {
+        UserDefaults.standard.removeObject(forKey: "last_successful_ad_unlock_timestamp")
+        UserDefaults.standard.removeObject(forKey: "last_transition_ad_shown_at")
+        UserDefaults.standard.removeObject(forKey: "last_app_open_ad_shown_at")
+        print("🧪 [TEST MODE]: Cleared temporary ad-free window + frequency caps for a fresh test session.")
     }
 
     deinit {
