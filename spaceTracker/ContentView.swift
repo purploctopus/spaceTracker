@@ -933,7 +933,7 @@ struct ContentView: View {
                 // 💡 THE LAZY LAYER FIX: Swapped VStack for LazyVStack to recycle
                 // device image memory automatically as the user scrolls!
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(newsViewModel.newsState.topStories) { article in
+                    ForEach(Array(newsViewModel.newsState.topStories.enumerated()), id: \.element.id) { index, article in
                         Button(action: {
                                
                                 // Open up the details summary sheet natively
@@ -958,6 +958,19 @@ struct ContentView: View {
                                 Task {
                                     print("🏁 [TRUE SCROLL BOTTOM]: Fetching next page data segment frame...")
                                     await newsViewModel.fetchNextPagePayload()
+                                }
+                            }
+                        }
+                        
+                        // 💡 Native ad card, woven in every 7 articles — styled to match
+                        // SpaceNewsCardView so it reads as part of the feed rather than an
+                        // interruption. Renders nothing until an ad actually loads.
+                        if (index + 1) % 7 == 0 && !adEngine.isPremiumUnlocked {
+                            VStack(spacing: 0) {
+                                NativeNewsAdCard(adUnitID: adEngine.newsNativeAdUnitID)
+                                if article.id != newsViewModel.newsState.topStories.last?.id {
+                                    Divider()
+                                        .padding(.leading, 92)
                                 }
                             }
                         }
@@ -1113,7 +1126,12 @@ struct ContentView: View {
                                     // 💡 Persistent, low-key entry point into the voluntary
                                     // "Go Ad-Free" sheet — nothing forces this open, it's
                                     // just always reachable for whoever goes looking for it.
-                                    if !adEngine.isPremiumUnlocked {
+                                    // 💡 Keys off hasPermanentAdFree specifically, not the
+                                    // combined isPremiumUnlocked — this icon should stay
+                                    // visible through an active temporary ad-free window
+                                    // (there's still a reason to tap it: buying permanently),
+                                    // only disappearing once ads are actually gone for good.
+                                    if !adEngine.hasPermanentAdFree {
                                         ToolbarItem(placement: .navigationBarTrailing) {
                                             Button(action: { showAdPromptOverlay = true }) {
                                                 Image(systemName: "tv.slash")
