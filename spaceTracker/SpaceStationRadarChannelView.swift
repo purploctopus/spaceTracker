@@ -29,7 +29,9 @@ struct SpaceStationRadarChannelView: View {
                     OrbitalGlobeView(
                         issCoordinate: $trackingViewModel.stationState.issCoordinate,
                         tiangongCoordinate: $trackingViewModel.stationState.tiangongCoordinate,
-                        currentFocus: $trackingViewModel.stationState.currentFocus // 💡 FIXED: Safely wires the selection binding token down to MapKit
+                        currentFocus: $trackingViewModel.stationState.currentFocus, // 💡 FIXED: Safely wires the selection binding token down to MapKit
+                        issGroundTrack: $trackingViewModel.stationState.issGroundTrack,
+                        tiangongGroundTrack: $trackingViewModel.stationState.tiangongGroundTrack
                     )
                     .frame(height: 280)
                     

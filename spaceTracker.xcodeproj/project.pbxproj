@@ -10,6 +10,7 @@
 		800933A33041BBED00CFB57C /* AABridge in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A23041BBED00CFB57C /* AABridge */; };
 		800933A53041BBED00CFB57C /* AAplus in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A43041BBED00CFB57C /* AAplus */; };
 		800933A73041BBED00CFB57C /* SwiftAA in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A63041BBED00CFB57C /* SwiftAA */; };
+		800933AA3045C21700CFB57C /* SatelliteKit in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A93045C21700CFB57C /* SatelliteKit */; };
 		8052EF133017A10600CA4AE8 /* StoreKitTestCertificate.cer in Resources */ = {isa = PBXBuildFile; fileRef = 8052EF123017A10600CA4AE8 /* StoreKitTestCertificate.cer */; };
 		80B0623A2FFD8C5600990CBD /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 80B062392FFD8C5600990CBD /* GoogleMobileAds */; };
 		80B062912FFEA6E700990CBD /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 80B062902FFEA6E700990CBD /* Products.storekit */; };
@@ -51,6 +52,7 @@
 				80B0623A2FFD8C5600990CBD /* GoogleMobileAds in Frameworks */,
 				800933A73041BBED00CFB57C /* SwiftAA in Frameworks */,
 				800933A33041BBED00CFB57C /* AABridge in Frameworks */,
+				800933AA3045C21700CFB57C /* SatelliteKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -99,6 +101,7 @@
 				800933A23041BBED00CFB57C /* AABridge */,
 				800933A43041BBED00CFB57C /* AAplus */,
 				800933A63041BBED00CFB57C /* SwiftAA */,
+				800933A93045C21700CFB57C /* SatelliteKit */,
 			);
 			productName = spaceTracker;
 			productReference = 8068C9A02FE33592001E1DDE /* spaceTracker.app */;
@@ -131,6 +134,7 @@
 			packageReferences = (
 				80B062382FFD8C5600990CBD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 				800933A13041BBED00CFB57C /* XCRemoteSwiftPackageReference "SwiftAA" */,
+				800933A83045C21600CFB57C /* XCRemoteSwiftPackageReference "SatelliteKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8068C9A12FE33592001E1DDE /* Products */;
@@ -396,6 +400,14 @@
 				minimumVersion = 3.0.1;
 			};
 		};
+		800933A83045C21600CFB57C /* XCRemoteSwiftPackageReference "SatelliteKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gavineadie/SatelliteKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.1.2;
+			};
+		};
 		80B062382FFD8C5600990CBD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads";
@@ -421,6 +433,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 800933A13041BBED00CFB57C /* XCRemoteSwiftPackageReference "SwiftAA" */;
 			productName = SwiftAA;
+		};
+		800933A93045C21700CFB57C /* SatelliteKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 800933A83045C21600CFB57C /* XCRemoteSwiftPackageReference "SatelliteKit" */;
+			productName = SatelliteKit;
 		};
 		80B062392FFD8C5600990CBD /* GoogleMobileAds */ = {
 			isa = XCSwiftPackageProductDependency;

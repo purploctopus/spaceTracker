@@ -11,6 +11,9 @@
 import Foundation
 import Combine
 import CoreLocation
+// 💡 REQUIRES: add SatelliteKit as a Swift Package dependency first —
+// Xcode: File → Add Package Dependencies… → https://github.com/gavineadie/SatelliteKit.git
+import SatelliteKit
 
 // MARK: - 🛰️ ISS JSON PAYLOAD STRUCTURE
 struct ISSResponse: Codable {
@@ -30,6 +33,10 @@ struct OrbitalStationState {
     
     var issCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
     var tiangongCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+    // Predicted future ground-track points, both from real SGP4 propagation — a dashed
+    // "where it's headed" line to draw on the globe, distinct from the solid current-position dot.
+    var issGroundTrack: [CLLocationCoordinate2D] = []
+    var tiangongGroundTrack: [CLLocationCoordinate2D] = []
     var currentFocus: TrackingTarget = .iss // 💡 ISS IS THE STANDARD DEFAULT FOCUS TARGET
     var isDataLoaded: Bool = false
 }
@@ -51,28 +58,34 @@ class OrbitalTrackingViewModel: ObservableObject {
         stopTrackingPipeline()
         
         trackingTimer = Task {
-            // 1. Kick off the slow Tiangong fetch in the background
-            let tiangongFetchTask = Task {
-                await fetchTiangongTLEData()
-            }
+            // Kick off both TLE fetches in the background. These only need to run once —
+            // TLEs stay valid for hours to days, unlike the position itself, which needs
+            // fresh SGP4 propagation on every poll.
+            let tiangongFetchTask = Task { await fetchTLEData(noradId: 48274) }
+            let issFetchTask = Task { await fetchTLEData(noradId: 25544) }
             
             while !Task.isCancelled {
-                // 2. This fetches immediately on launch without waiting
+                // ISS current position: stays on the live wheretheiss.at feed — the most
+                // authoritative "right now" source, unrelated to the SGP4 work below.
                 let realISSLocation = await fetchLiveISSLocation()
-                
-                // 3. Update the ISS coordinate right away so your view loads instantly
                 self.stationState.issCoordinate = realISSLocation
                 self.stationState.isDataLoaded = true
                 
-                // 4. Get the TLE array (which is non-optional)
+                // Tiangong current position + both satellites' predicted ground tracks all
+                // come from the same real SGP4 propagation now.
                 let tiangongTLE = await tiangongFetchTask.value
-                
-                // 5. Check if we actually received data inside the array
                 if !tiangongTLE.isEmpty {
-                    let currentTiangongLocation = calculateTiangongOrbitPosition(tle: tiangongTLE)
-                    self.stationState.tiangongCoordinate = currentTiangongLocation
+                    self.stationState.tiangongCoordinate = calculateOrbitPosition(tle: tiangongTLE)
+                    self.stationState.tiangongGroundTrack = generateGroundTrack(tle: tiangongTLE)
                 } else {
                     print("⏳ Tiangong TLE data is still downloading or empty...")
+                }
+                
+                let issTLE = await issFetchTask.value
+                if !issTLE.isEmpty {
+                    self.stationState.issGroundTrack = generateGroundTrack(tle: issTLE)
+                } else {
+                    print("⏳ ISS TLE data is still downloading or empty...")
                 }
                 
                 do {
@@ -105,10 +118,20 @@ class OrbitalTrackingViewModel: ObservableObject {
         }
     }
     
-    private func fetchTiangongTLEData() async -> [String] {
-        // 1. Notice the path correction: /api/tle/48274
-        guard let url = URL(string: "https://tle.ivanstanojevic.me/api/tle/48274") else {
-            return []
+    /// Fetches a satellite's TLE by NORAD catalog ID, trying the primary JSON source first
+    /// and falling back to CelesTrak directly if that fails — see fetchTLEFromCelesTrak for why.
+    private func fetchTLEData(noradId: Int) async -> [String] {
+        if let primary = await fetchTLEFromIvanstanojevic(noradId: noradId), !primary.isEmpty {
+            return primary
+        }
+        
+        print("⚠️ [TLE FALLBACK]: Primary TLE source failed for NORAD \(noradId), trying CelesTrak directly...")
+        return await fetchTLEFromCelesTrak(noradId: noradId)
+    }
+    
+    private func fetchTLEFromIvanstanojevic(noradId: Int) async -> [String]? {
+        guard let url = URL(string: "https://tle.ivanstanojevic.me/api/tle/\(noradId)") else {
+            return nil
         }
         
         let config = URLSessionConfiguration.default
@@ -119,24 +142,147 @@ class OrbitalTrackingViewModel: ObservableObject {
             let (data, _) = try await optimizedSession.data(from: url)
             let decoded = try JSONDecoder().decode(IvanTleResponse.self, from: data)
             
-            print("✅ [TLE PARSED]: Successfully loaded tracking matrix for \(decoded.name)")
+            print("✅ [TLE PARSED]: Successfully loaded tracking matrix for \(decoded.name) (primary source)")
             return [decoded.name, decoded.line1, decoded.line2]
-            
         } catch {
-            print("❌ [NETWORK ERROR]: Tracking matrix endpoint unreachable: \(error)")
+            print("❌ [NETWORK ERROR]: Primary TLE endpoint unreachable for NORAD \(noradId): \(error)")
+            return nil
+        }
+    }
+    
+    /// Fallback TLE source, hit only when the primary fails. tle.ivanstanojevic.me is a
+    /// small, single-maintainer community service — there's a documented history of
+    /// reliability/behavior complaints about it (see the discussion on NASA's own
+    /// nasa/api-docs GitHub issue #170). CelesTrak is the actual authoritative source that
+    /// mirror itself pulls from daily, so querying it directly here means a hiccup on the
+    /// primary doesn't leave a satellite's trajectory stuck on stale data.
+    ///
+    /// Unlike the primary source, this returns plain text (name / line1 / line2 on separate
+    /// lines), not JSON — hence the manual line-splitting instead of JSONDecoder.
+    private func fetchTLEFromCelesTrak(noradId: Int) async -> [String] {
+        guard let url = URL(string: "https://celestrak.org/NORAD/elements/gp.php?CATNR=\(noradId)&FORMAT=TLE") else {
+            return []
+        }
+        
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 6.0
+        let session = URLSession(configuration: config)
+        
+        do {
+            let (data, _) = try await session.data(from: url)
+            guard let rawText = String(data: data, encoding: .utf8) else {
+                print("❌ [CELESTRAK ERROR]: Response wasn't valid text for NORAD \(noradId)")
+                return []
+            }
+            
+            let lines = rawText
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            
+            guard lines.count >= 3 else {
+                print("❌ [CELESTRAK ERROR]: Unexpected response for NORAD \(noradId): \(rawText.prefix(120))")
+                return []
+            }
+            
+            print("✅ [TLE PARSED]: Successfully loaded tracking matrix for \(lines[0]) (CelesTrak fallback)")
+            return [lines[0], lines[1], lines[2]]
+        } catch {
+            print("❌ [CELESTRAK ERROR]: Fallback endpoint also unreachable for NORAD \(noradId): \(error)")
             return []
         }
     }
     
-    private func calculateTiangongOrbitPosition(tle: [String]) -> CLLocationCoordinate2D {
+    private func calculateOrbitPosition(tle: [String]) -> CLLocationCoordinate2D {
         guard tle.count >= 3 else {
             return CLLocationCoordinate2D(latitude: 31.2304, longitude: 121.4737)
         }
         
-        let timeModifier = Date().timeIntervalSince1970
-        let simulatedLat = 41.5 * sin(timeModifier / 1200.0)
-        let simulatedLng = (timeModifier.truncatingRemainder(dividingBy: 2400.0) / 2400.0 * 360.0) - 180.0
+        do {
+            let elements = try Elements(tle[0], tle[1], tle[2])
+            let satellite = Satellite(elements: elements)
+            
+            let nowJulianDay = Date().timeIntervalSince1970 / 86400.0 + 2440587.5
+            let eciPositionKm = try satellite.position(julianDays: nowJulianDay)
+            
+            return Self.geodeticCoordinate(fromECIKilometers: eciPositionKm, julianDay: nowJulianDay)
+        } catch {
+            print("❌ [SGP4 ERROR]: Failed to propagate orbit from TLE: \(error)")
+            return CLLocationCoordinate2D(latitude: 31.2304, longitude: 121.4737)
+        }
+    }
+    
+    /// Predicts the next `minutesAhead` minutes of ground track from real SGP4 propagation
+    /// — the same technique as calculateOrbitPosition above, just sampled repeatedly across
+    /// a future time window instead of once at "now". 20 minutes / 40 samples gives a
+    /// visually clear curve (roughly a fifth of a ~90-minute LEO orbit) without extending so
+    /// far it wraps confusingly across the globe.
+    private func generateGroundTrack(tle: [String], minutesAhead: Double = 20.0, sampleCount: Int = 40) -> [CLLocationCoordinate2D] {
+        guard tle.count >= 3 else { return [] }
         
-        return CLLocationCoordinate2D(latitude: simulatedLat, longitude: simulatedLng)
+        do {
+            let elements = try Elements(tle[0], tle[1], tle[2])
+            let satellite = Satellite(elements: elements)
+            let nowJulianDay = Date().timeIntervalSince1970 / 86400.0 + 2440587.5
+            
+            var trackPoints: [CLLocationCoordinate2D] = []
+            trackPoints.reserveCapacity(sampleCount + 1)
+            
+            for step in 0...sampleCount {
+                let fractionalMinutes = (Double(step) / Double(sampleCount)) * minutesAhead
+                let futureJulianDay = nowJulianDay + (fractionalMinutes / 1440.0) // 1440 min/day
+                let eciPositionKm = try satellite.position(julianDays: futureJulianDay)
+                trackPoints.append(Self.geodeticCoordinate(fromECIKilometers: eciPositionKm, julianDay: futureJulianDay))
+            }
+            
+            return trackPoints
+        } catch {
+            print("❌ [SGP4 ERROR]: Failed to generate ground track from TLE: \(error)")
+            return []
+        }
+    }
+    
+    /// Converts an Earth-Centered Inertial (ECI) position — what SGP4 propagators output —
+    /// into a geographic lat/lon suitable for plotting on a map. This is standard,
+    /// well-documented math (Vallado, "Fundamentals of Astrodynamics and Applications" —
+    /// the same reference SatelliteKit itself is validated against): rotate by Greenwich
+    /// Mean Sidereal Time to move from the inertial frame into the Earth-fixed rotating
+    /// frame, then derive latitude/longitude from the rotated vector.
+    ///
+    /// Uses a spherical-Earth approximation for latitude (geocentric, not true WGS-84
+    /// geodetic) — the difference is at most ~0.19° at mid-latitudes, well below what's
+    /// visible on a world map pin. This exact simplification is standard practice in
+    /// reference implementations meant for display rather than precision navigation.
+    ///
+    /// NOTE: `eci.x`/`.y`/`.z` assumes SatelliteKit's Vector type uses that naming — I
+    /// couldn't fetch the library's raw source directly to confirm (GitHub's robots.txt
+    /// blocked it), so if this doesn't compile, check Xcode's autocomplete on the `Vector`
+    /// type for the actual property names and swap them in here — the math around them is
+    /// correct regardless of what they're called.
+    private static func geodeticCoordinate(fromECIKilometers eci: Vector, julianDay: Double) -> CLLocationCoordinate2D {
+        // Greenwich Mean Sidereal Time (IAU 1982 model), in degrees.
+        let centuriesSinceJ2000 = (julianDay - 2451545.0) / 36525.0
+        var gmstDegrees = 280.46061837
+            + 360.98564736629 * (julianDay - 2451545.0)
+            + 0.000387933 * centuriesSinceJ2000 * centuriesSinceJ2000
+            - (centuriesSinceJ2000 * centuriesSinceJ2000 * centuriesSinceJ2000) / 38710000.0
+        gmstDegrees = gmstDegrees.truncatingRemainder(dividingBy: 360.0)
+        if gmstDegrees < 0 { gmstDegrees += 360.0 }
+        let gmstRadians = gmstDegrees * .pi / 180.0
+        
+        let x = eci.x, y = eci.y, z = eci.z
+        
+        var longitudeRadians = atan2(y, x) - gmstRadians
+        longitudeRadians = longitudeRadians.truncatingRemainder(dividingBy: 2 * .pi)
+        if longitudeRadians > .pi { longitudeRadians -= 2 * .pi }
+        if longitudeRadians < -.pi { longitudeRadians += 2 * .pi }
+        
+        let rXY = sqrt(x * x + y * y)
+        let latitudeRadians = atan2(z, rXY)
+        
+        return CLLocationCoordinate2D(
+            latitude: latitudeRadians * 180.0 / .pi,
+            longitude: longitudeRadians * 180.0 / .pi
+        )
     }
 }

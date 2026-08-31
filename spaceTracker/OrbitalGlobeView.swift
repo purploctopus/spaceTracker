@@ -16,6 +16,10 @@ struct OrbitalGlobeView: UIViewRepresentable {
     @Binding var issCoordinate: CLLocationCoordinate2D
     @Binding var tiangongCoordinate: CLLocationCoordinate2D
     @Binding var currentFocus: OrbitalStationState.TrackingTarget // 💡 THE FOCUS BINDING RESCUE LINE
+    // Predicted future ground-track points, from real SGP4 propagation — drawn as dashed
+    // lines distinct from the solid current-position markers.
+    @Binding var issGroundTrack: [CLLocationCoordinate2D]
+    @Binding var tiangongGroundTrack: [CLLocationCoordinate2D]
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -46,6 +50,7 @@ struct OrbitalGlobeView: UIViewRepresentable {
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
         context.coordinator.updateAnnotationPositions(on: uiView, iss: issCoordinate, tiangong: tiangongCoordinate)
+        context.coordinator.updateGroundTracks(on: uiView, issTrack: issGroundTrack, tiangongTrack: tiangongGroundTrack)
         
         let activeTargetCoordinate = currentFocus == .iss ? issCoordinate : tiangongCoordinate
         
@@ -72,6 +77,12 @@ class Coordinator: NSObject, MKMapViewDelegate {
     private var tiangongAnnotation = MKPointAnnotation()
     private var isFirstLoad = true
     
+    // Predicted ground-track overlays. MKPolyline's point array is immutable once created,
+    // so unlike the point annotations above (which slide smoothly via animated coordinate
+    // changes), a changed track means removing the old overlay and adding a fresh one.
+    private var issTrackOverlay: MKPolyline?
+    private var tiangongTrackOverlay: MKPolyline?
+    
     override init() {
         super.init()
         issAnnotation.title = "ISS"
@@ -93,6 +104,48 @@ class Coordinator: NSObject, MKMapViewDelegate {
             self.issAnnotation.coordinate = iss
             self.tiangongAnnotation.coordinate = tiangong
         }
+    }
+    
+    /// Replaces each satellite's predicted ground-track overlay with a fresh one built from
+    /// its latest SGP4-propagated points. Empty arrays (TLE not loaded yet) simply clear
+    /// any existing line rather than drawing nothing new.
+    func updateGroundTracks(on mapView: MKMapView, issTrack: [CLLocationCoordinate2D], tiangongTrack: [CLLocationCoordinate2D]) {
+        if let existing = issTrackOverlay {
+            mapView.removeOverlay(existing)
+            issTrackOverlay = nil
+        }
+        if !issTrack.isEmpty {
+            let polyline = MKPolyline(coordinates: issTrack, count: issTrack.count)
+            polyline.title = "ISS_TRACK"
+            mapView.addOverlay(polyline)
+            issTrackOverlay = polyline
+        }
+        
+        if let existing = tiangongTrackOverlay {
+            mapView.removeOverlay(existing)
+            tiangongTrackOverlay = nil
+        }
+        if !tiangongTrack.isEmpty {
+            let polyline = MKPolyline(coordinates: tiangongTrack, count: tiangongTrack.count)
+            polyline.title = "TIANGONG_TRACK"
+            mapView.addOverlay(polyline)
+            tiangongTrackOverlay = polyline
+        }
+    }
+    
+    // 🎨 GROUND TRACK STYLING: color-matches each satellite's existing callsign label color
+    // (cyan for ISS, orange for Tiangong), dashed to visually read as "predicted future
+    // path" rather than a solid, already-traveled trail.
+    func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+        guard let polyline = overlay as? MKPolyline else {
+            return MKOverlayRenderer(overlay: overlay)
+        }
+        
+        let renderer = MKPolylineRenderer(polyline: polyline)
+        renderer.strokeColor = (polyline.title == "TIANGONG_TRACK" ? UIColor.orange : UIColor.cyan).withAlphaComponent(0.75)
+        renderer.lineWidth = 2.0
+        renderer.lineDashPattern = [6, 5]
+        return renderer
     }
     
     // 🎨 TELMETRY TEXT INTERCEPT: Stacks a clean monospace tracking label directly beneath your satellite emoji vector
