@@ -162,18 +162,38 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
             return
         }
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        
-        let todayString = formatter.string(from: Date())
-        let lastUnlockDate = UserDefaults.standard.string(forKey: "last_successful_ad_unlock_date") ?? ""
-        
-        if todayString == lastUnlockDate {
-            self.isPremiumUnlocked = true
+        // 💡 FIXED: rolling 24h window from a stored timestamp, not a calendar-date string
+        // comparison. The old version compared "yyyy-MM-dd" strings, so watching an ad at
+        // 11:58 PM only bought ~2 minutes of ad-free time before the calendar day rolled
+        // over — not the "24 hours" / "until midnight" the popup copy promised (those two
+        // phrases didn't even agree with each other). Also, this now gets called whenever
+        // the app becomes active (see spaceTrackerApp.swift), not just at cold launch, so a
+        // long-running session crossing the 24h boundary re-locks correctly instead of
+        // staying unlocked until the next full relaunch.
+        if let unlockedAt = UserDefaults.standard.object(forKey: "last_successful_ad_unlock_timestamp") as? Date {
+            self.isPremiumUnlocked = Date().timeIntervalSince(unlockedAt) < 24 * 60 * 60
         } else {
             self.isPremiumUnlocked = false
         }
     }
+    
+    /// Whether enough time has passed since the last automatically-shown transition ad to
+    /// show another one. Keeps the ambient "ad break on app transition" from firing every
+    /// single time the app comes back to foreground (e.g. quickly switching to Messages and
+    /// back) — capped to roughly once per 12 minutes.
+    func canShowTransitionAd() -> Bool {
+        guard !isPremiumUnlocked, isAdReady else { return false }
+        guard let lastShown = UserDefaults.standard.object(forKey: "last_transition_ad_shown_at") as? Date else {
+            return true
+        }
+        return Date().timeIntervalSince(lastShown) > 12 * 60
+    }
+    
+    func markTransitionAdShown() {
+        UserDefaults.standard.set(Date(), forKey: "last_transition_ad_shown_at")
+    }
+    
+    private var rewardedInterstitialLoadAttempts = 0
     
     func loadRewardedInterstitial() {
         let request = Request()
@@ -183,9 +203,22 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
                 if let error = error {
                     print("❌ [ADMOB ERROR]: Asset pre-fetch failure: \(error.localizedDescription)")
                     self.isAdReady = false
+                    
+                    // 💡 FIXED: previously a failed initial load left isAdReady stuck at
+                    // false for the rest of the session — the "Watch Ad" button would show
+                    // "LOADING Ad..." forever with nothing ever retrying. Retries with a
+                    // short backoff, capped so a persistently offline device doesn't retry
+                    // forever in the background.
+                    self.rewardedInterstitialLoadAttempts += 1
+                    if self.rewardedInterstitialLoadAttempts <= 5 {
+                        let delaySeconds = Double(self.rewardedInterstitialLoadAttempts) * 15.0
+                        try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+                        self.loadRewardedInterstitial()
+                    }
                     return
                 }
                 
+                self.rewardedInterstitialLoadAttempts = 0
                 self.rewardedInterstitialAd = ad
                 self.rewardedInterstitialAd?.fullScreenContentDelegate = self
                 self.isAdReady = true
@@ -202,17 +235,27 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
         }
         
         ad.present(from: viewController) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            let todayString = formatter.string(from: Date())
-            
-            UserDefaults.standard.set(todayString, forKey: "last_successful_ad_unlock_date")
+            UserDefaults.standard.set(Date(), forKey: "last_successful_ad_unlock_timestamp")
             
             DispatchQueue.main.async {
                 self.isPremiumUnlocked = true
                 completion()
             }
         }
+    }
+    
+    /// Shared "find the key window and present" helper — both the voluntary watch-ad button
+    /// and the automatic app-transition trigger need this exact lookup, previously
+    /// duplicated inline wherever an ad needed to be shown.
+    func showAdFromKeyWindow(completion: @escaping () -> Void = {}) {
+        guard let rootVC = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow })?.rootViewController else {
+            completion()
+            return
+        }
+        showAd(from: rootVC, completion: completion)
     }
     
     nonisolated func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
@@ -223,4 +266,3 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
         }
     }
 }
-

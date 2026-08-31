@@ -7,7 +7,6 @@
 
 import SwiftUI
 import StoreKit
-import Combine
 
 struct AdPromptOverlayView: View {
     @ObservedObject var adEngine: AdMobEngine
@@ -15,10 +14,12 @@ struct AdPromptOverlayView: View {
     let onTriggerAd: () -> Void
     let onDismiss: () -> Void
     
-    @State private var countdownTimer = 10 // Your 10-second warning state
-    @State private var cancellable: AnyCancellable?
-    
-    // 💡 THE TIMER SHIELD: Freezes the countdown if Apple's credit card sheet is active
+    // 💡 REMOVED: the 10-second auto-play countdown. This view is only ever reached now
+    // through a voluntary tap (the persistent "Go Ad-Free" entry point, or a post-ad toast)
+    // — never as a forced interrupt — so there's no reason for the ad to fire itself if the
+    // person just sits on the screen. Auto-playing also worked against the whole point of
+    // using a *rewarded* format: completion rates (and therefore eCPM) are meaningfully
+    // better when someone actively chose to watch, versus an ad that happens to them.
     @State private var isPurchasing = false
     
     var body: some View {
@@ -32,7 +33,7 @@ struct AdPromptOverlayView: View {
                     Image(systemName: "video.badge.checkmark")
                         .font(.largeTitle)
                         .foregroundColor(.cyan)
-                    Text("UNLOCK DAILY DETAILED REPORTS")
+                    Text("UNLOCK 24H AD-FREE ACCESS")
                         .font(.system(.headline, design: .monospaced))
                         .fontWeight(.bold)
                         .foregroundColor(.white)
@@ -48,14 +49,14 @@ struct AdPromptOverlayView: View {
                     .background(Color.white.opacity(0.15))
                 
                 // Content Description
-                Text("Watch a brief Ad to unlock unlimited access free until midnight.")
+                Text("Watch a brief ad to unlock unlimited access for 24 hours.")
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(.secondary)
                     .lineSpacing(4)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
                 
-                // Countdown Tracker Box
+                // Ready State Box
                 VStack(spacing: 4) {
                     if isPurchasing {
                         Text("TRANSACTION IN PROGRESS")
@@ -65,17 +66,10 @@ struct AdPromptOverlayView: View {
                         Text("PAUSED")
                             .font(.system(size: 32, weight: .bold, design: .monospaced))
                             .foregroundColor(.yellow)
-                    } else if countdownTimer > 0 {
-                        Text("Ad PLAYS IN")
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.orange)
-                        Text("\(countdownTimer)")
-                            .font(.system(size: 32, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
                     } else {
-                        Text("Ad READY")
+                        Text(adEngine.isAdReady ? "Ad READY" : "PREPARING Ad...")
                             .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(.green)
+                            .foregroundColor(adEngine.isAdReady ? .green : .orange)
                             .fontWeight(.bold)
                     }
                 }
@@ -152,7 +146,6 @@ struct AdPromptOverlayView: View {
                     .disabled(isPurchasing) // Block dismissing while buying
                     
                     Button(action: {
-                        countdownTimer = 0
                         onTriggerAd()
                     }) {
                         Text(adEngine.isAdReady ? "WATCH Ad 24-Hours FREE" : "LOADING Ad...")
@@ -173,33 +166,7 @@ struct AdPromptOverlayView: View {
             .cornerRadius(8)
             .padding(.horizontal, horizontalSizeClass == .regular ? 120 : 24)
         }
-        .onAppear {
-            startCountdownLoop()
-        }
-        .onDisappear {
-            stopCountdownLoop()
-        }
     }
     
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    
-    private func startCountdownLoop() {
-        let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-        self.cancellable = timer.sink { _ in
-            // 💡 REFIED GUARD RULE: If buying, skip the mathematical clock calculations completely
-            guard !isPurchasing else { return }
-            
-            if countdownTimer > 1 {
-                countdownTimer -= 1
-            } else {
-                countdownTimer = 0
-                stopCountdownLoop()
-                onTriggerAd()
-            }
-        }
-    }
-    
-    private func stopCountdownLoop() {
-        cancellable?.cancel()
-    }
 }
