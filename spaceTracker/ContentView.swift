@@ -1117,6 +1117,56 @@ struct ContentView: View {
                                 .padding(.top, 16) // 💡 Clears the frame constraints of the absolutely positioned Daily Command header box
                             Divider()
                                 .background(Color.cyan)
+                            
+                            // 💡 StarGaze entry point, also on the default landing tab — not a
+                            // duplicate dashboard, just the same single launch card used on
+                            // the Star Gazer tab, reusing the same trigger
+                            // (showLiveViewfinderOverlay) and the same asset/design. The
+                            // flagship feature of this release shouldn't be a tab-swipe away
+                            // from the screen most users land on first.
+                            Button(action: {
+                                showLiveViewfinderOverlay = true
+                            }) {
+                                ZStack(alignment: .bottomLeading) {
+                                    Image("night_sky_banner")
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(height: 120)
+                                        .background(Color(.systemGray6))
+                                        .clipped()
+                                    
+                                    LinearGradient(
+                                        colors: [Color.black.opacity(0.85), Color.black.opacity(0.1)],
+                                        startPoint: .bottom,
+                                        endPoint: .top
+                                    )
+                                    
+                                    HStack(alignment: .bottom) {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("OPEN LIVE INTERACTIVE SKY MAP")
+                                                .font(.system(.caption2, design: .monospaced))
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.cyan)
+                                            
+                                            Text("POINT DEVICE TO FIND PLANETS")
+                                                .font(.system(.subheadline, design: .default))
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.white)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "scope")
+                                            .font(.title2)
+                                            .foregroundColor(.cyan)
+                                    }
+                                    .padding()
+                                }
+                                .cornerRadius(12)
+                                .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
                             // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL (Includes your company filter buttons and horizontal cards)
                             upcoming7DayMissionsChannelBlock
                                 .toolbar {
