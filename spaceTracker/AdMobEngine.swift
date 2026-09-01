@@ -14,7 +14,7 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     // 💡 TEST MODE: flip this one flag to switch every ad unit ID below between Google's
     // published sample/demo IDs and your real production IDs. Nothing else needs touching
     // when going into or out of testing.
-    static let isTestMode = true
+    static let isTestMode = false
 
     // MARK: - Ad unit IDs
     // Test IDs are Google's official published demo ad units (developers.google.com/admob/ios/test-ads) —

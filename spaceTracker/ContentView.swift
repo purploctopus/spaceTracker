@@ -150,6 +150,7 @@ struct ContentView: View {
     // taps. See spaceTrackerApp.swift for the transition trigger.
     @EnvironmentObject var adEngine: AdMobEngine
     @State private var showAdPromptOverlay = false
+    @State private var showAcknowledgements = false
     @State private var showConditionsExplainer = false
     @StateObject private var newsViewModel = SpaceNewsViewModel()
     @State private var selectedArticle: SpaceNewsArticle? = nil
@@ -343,6 +344,15 @@ struct ContentView: View {
                         .padding()
                     }
                     .cornerRadius(12)
+                    // 💡 STAND-OUT TREATMENT: a crisp cyan border plus a soft outward glow —
+                    // this is the flagship feature of the release, so it gets a visual cue
+                    // that breaks the grid rhythm of the surrounding cards, layered on top
+                    // of (not replacing) the original depth shadow below.
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.cyan, lineWidth: 1.5)
+                    )
+                    .shadow(color: Color.cyan.opacity(0.5), radius: 10, x: 0, y: 0)
                     .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -872,6 +882,15 @@ struct ContentView: View {
                         .font(.system(size: sizeClass == .regular ? 9 : 8, weight: .bold, design: .monospaced))
                         .foregroundColor(connectivityMonitor.isSystemOnline ? .gray : .red)
                         .tracking(1.5)
+                    
+                    // 💡 Open-source acknowledgements — placed here specifically because
+                    // this status line, unlike the SYS.VER/RADAR block below, renders on
+                    // both iPhone and iPad rather than being iPad-only.
+                    Button(action: { showAcknowledgements = true }) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 9))
+                            .foregroundColor(.gray)
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
@@ -1163,6 +1182,11 @@ struct ContentView: View {
                                     .padding()
                                 }
                                 .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.cyan, lineWidth: 1.5)
+                                )
+                                .shadow(color: Color.cyan.opacity(0.5), radius: 10, x: 0, y: 0)
                                 .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
                             }
                             .buttonStyle(PlainButtonStyle())
@@ -1478,6 +1502,9 @@ struct ContentView: View {
                 visiblePlanetsCatalog: stargazerViewModel.stargazerState.liveVisibleTargets,
                 moonBrightnessPenalty: weatherViewModel.moonBrightnessPenalty
             )
+        }
+        .sheet(isPresented: $showAcknowledgements) {
+            AcknowledgementsView()
         }
     }
 

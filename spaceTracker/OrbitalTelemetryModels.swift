@@ -11,7 +11,6 @@
 import Foundation
 import Combine
 import CoreLocation
-// 💡 REQUIRES: add SatelliteKit as a Swift Package dependency first —
 // Xcode: File → Add Package Dependencies… → https://github.com/gavineadie/SatelliteKit.git
 import SatelliteKit
 
