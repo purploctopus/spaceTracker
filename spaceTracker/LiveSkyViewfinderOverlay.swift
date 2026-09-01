@@ -180,6 +180,9 @@ struct LiveSkyViewfinderOverlay: View {
     @State private var isMenuDrawerOpen = false
     @State private var activeNavigationTarget: String? = nil
     
+    // First-run how-to-use overlay, replayable via the "?" icon in the header.
+    @State private var showHowToUseOverlay = false
+    
     // Real, measured center of the reticle ring. Starts as a rough screen-center guess so
     // the first frame (before GeometryReader reports back) isn't at (0,0); gets overwritten
     // with the true value the instant the reticle lays out.
@@ -271,6 +274,15 @@ struct LiveSkyViewfinderOverlay: View {
                     }
                     
                     Spacer()
+                    
+                    // Replays the how-to-use overlay on demand — same small, low-key visual
+                    // treatment as the "go ad-free" icon in ContentView's toolbar.
+                    Button(action: { showHowToUseOverlay = true }) {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.cyan)
+                    }
+                    .padding(.trailing, 4)
                     
                     Button(action: { dismiss() }) {
                         Text("DISENGAGE")
@@ -474,12 +486,58 @@ struct LiveSkyViewfinderOverlay: View {
                         }
                     )
             }
+            
+            // First-run (or replayed via the "?" icon) how-to-use overlay. Tap anywhere to
+            // dismiss — no buttons to hunt for, nothing to read past a glance.
+            if showHowToUseOverlay {
+                Color.black.opacity(0.85)
+                    .ignoresSafeArea()
+                    .overlay(
+                        VStack(spacing: 20) {
+                            Image(systemName: "sparkles")
+                                .font(.largeTitle)
+                                .foregroundColor(.cyan)
+                            
+                            Text("HOW TO USE STARGAZE")
+                                .font(.system(.headline, design: .monospaced))
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .tracking(1)
+                            
+                            VStack(alignment: .leading, spacing: 16) {
+                                howToUseLine(icon: "camera.viewfinder", text: "Point your phone at the sky.")
+                                howToUseLine(icon: "hand.tap", text: "Tap any (i) you see for details.")
+                                howToUseLine(icon: "line.3.horizontal", text: "Tap ☰ to track a specific target.")
+                            }
+                            .padding(.horizontal, 32)
+                            
+                            Text("TAP ANYWHERE TO DISMISS")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .padding(.top, 8)
+                        }
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showHowToUseOverlay = false
+                        }
+                    }
+                    .transition(.opacity)
+            }
         }
         .onAppear {
             motionEngine.engageSensorStreaming(with: visiblePlanetsCatalog)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     isStabilizingEngine = false
+                }
+                // Shown once, right after the stabilization veil clears — showing it
+                // simultaneously with the veil would read as two overlapping loading
+                // states; this way it appears the moment the live view is actually visible.
+                if !UserDefaults.standard.bool(forKey: "hasSeenStarGazeHowToUse") {
+                    showHowToUseOverlay = true
+                    UserDefaults.standard.set(true, forKey: "hasSeenStarGazeHowToUse")
                 }
             }
         }
@@ -494,6 +552,19 @@ struct LiveSkyViewfinderOverlay: View {
         .navigationBarHidden(true)
         .sheet(item: $selectedProfile) { profile in
             CelestialDetailSheet(profile: profile)
+        }
+    }
+    
+    @ViewBuilder
+    private func howToUseLine(icon: String, text: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.cyan)
+                .frame(width: 24)
+            Text(text)
+                .font(.system(.subheadline, design: .monospaced))
+                .foregroundColor(.white)
         }
     }
 }

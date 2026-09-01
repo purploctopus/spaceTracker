@@ -75,13 +75,27 @@ func formattedTrueDarkWindow(currentJulianDay: JulianDay, geoCoordinates: Geogra
 
     let astronomicalAltitude = TwilightSunAltitude.astronomical.rawValue // -18°
 
-    let midnightSun = Sun(julianDay: currentJulianDay)
+    // 💡 FIXED: this polar day/night edge-case check was sampling the Sun's altitude at
+    // "now" — whatever time of day this function happened to run — instead of true local
+    // midnight. That meant it could report "NO TRUE DARKNESS TONIGHT" any time it ran
+    // during actual daylight hours, for any user, at any latitude, in any season — not just
+    // the genuine polar-summer case it was meant to catch. This now computes real local
+    // midnight and local noon for today's calendar date before sampling either one.
+    let calendar = Calendar.current
+    let now = currentJulianDay.date
+    let localMidnight = calendar.startOfDay(for: now)
+    guard let localNoon = calendar.date(byAdding: .hour, value: 12, to: localMidnight) else {
+        return "UNAVAILABLE"
+    }
+
+    let midnightJulianDay = JulianDay(localMidnight)
+    let midnightSun = Sun(julianDay: midnightJulianDay)
     let midnightAltitude = midnightSun.makeHorizontalCoordinates(with: geoCoordinates).altitude
     if midnightAltitude > astronomicalAltitude {
         return "NO TRUE DARKNESS TONIGHT"
     }
 
-    let noonJulianDay = JulianDay(currentJulianDay.value + 0.5)
+    let noonJulianDay = JulianDay(localNoon)
     let noonSun = Sun(julianDay: noonJulianDay)
     let noonAltitude = noonSun.makeHorizontalCoordinates(with: geoCoordinates).altitude
     if noonAltitude < astronomicalAltitude {

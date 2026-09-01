@@ -140,19 +140,31 @@ struct CelestialDatabaseRegistry {
             encyclopediaSummary: "A brilliant orange giant star located in Bootes. Arcturus is ancient, forming long before our solar system. It is currently tearing through our sector of the Milky Way galaxy at an incredible speed of over 260,000 miles per hour.",
             classification: "STAR"
         ),
+        // 💡 FIXED: Keys changed from "THE_SUN"/"THE_MOON" to plain "SUN"/"MOON" — the
+        // telemetry model tracks these bodies under the short name (trackingCelestialBodies
+        // = ["SUN", "MOON", ...]), and the info-icon lookup in LiveSkyViewfinderOverlay does
+        // an exact-match dictionary lookup on object.name.uppercased(). "THE_SUN" != "SUN",
+        // so the lookup always came back nil for both — hasProfileInfo was false, so the
+        // info icon (and tapping through to the detail sheet) never appeared for either body,
+        // even though their entries existed here the whole time.
         "SUN": CelestialProfile(
             name: "The Sun",
             subTitle: "OUR SYSTEM ANCHOR",
-            assetImageName: "sun",
+            assetImageName: nil,
             encyclopediaSummary: "The yellow dwarf star sitting at the absolute center of our system. Accounting for 99.8% of the entire solar system's mass, its immense gravitational field and thermal heat drive the lifecycle and orbital tracking geometry of every planet.",
             classification: "STAR"
         ),
         "MOON": CelestialProfile(
             name: "The Moon",
             subTitle: "OUR NEIGHBOR SATELLITE",
-            assetImageName: "moon",
+            assetImageName: nil,
             encyclopediaSummary: "Earth's only natural satellite. The Moon is tidally locked to our planet, meaning it always shows us the exact same face. Its changing reflection angles create the familiar crescent and full illumination cycles on your camera viewport glass.",
-            classification: "STAR"
+            // 💡 FIXED: was "STAR" — left over from when the Sun and Moon were the only two
+            // non-planet bodies and both got lumped under the same placeholder value. The
+            // Sun's "STAR" is actually correct astronomically, so that one was never wrong;
+            // the Moon's was, and it renders directly as visible on-screen text in
+            // CelestialDetailSheet ("CLASSIFICATION: STAR"), not just an internal value.
+            classification: "MOON"
         )
     ]
 }
