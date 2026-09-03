@@ -397,7 +397,8 @@ class StargazerViewModel: ObservableObject {
             return
         }
         let task = Task { [weak self] in
-            await self?.calculateStargazingTelemetry(latitude: latitude, longitude: longitude)
+            guard let self else { return }
+            await self.calculateStargazingTelemetry(latitude: latitude, longitude: longitude)
         }
         inFlightTelemetryTask = task
         await task.value
