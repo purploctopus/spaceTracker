@@ -156,6 +156,9 @@ struct ContentView: View {
     @State private var selectedArticle: SpaceNewsArticle? = nil
     @StateObject private var stargazerViewModel = StargazerViewModel()
     @State private var showLiveViewfinderOverlay: Bool = false
+    // True only while a tap on "open sky map" is waiting on ensureTelemetryLoaded --
+    // see that function's doc comment for the bug this closes.
+    @State private var isPreparingSkyMap: Bool = false
     
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
     @StateObject private var locationProvider = DeviceLocationProvider()
@@ -302,7 +305,20 @@ struct ContentView: View {
                 
                 // 💡 UPDATED: Completely cleaned up with zero filler words or text clutter!
                 Button(action: {
-                    showLiveViewfinderOverlay = true
+                    Task {
+                        // Gate on real data instead of presenting the sky map with whatever
+                        // (possibly still-empty) catalog happens to be in stargazerState right
+                        // now. See ensureTelemetryLoaded's doc comment for the bug this fixes.
+                        if !stargazerViewModel.stargazerState.isDataLoaded {
+                            isPreparingSkyMap = true
+                            let resolvedCoordinate = await locationProvider.currentLocation()
+                            let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                            let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                            await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
+                            isPreparingSkyMap = false
+                        }
+                        showLiveViewfinderOverlay = true
+                    }
                 }) {
                     ZStack(alignment: .bottomLeading) {
                         // 🌌 DEEP SPACE GRAPHIC BANNER: Pulls from your new asset image file
@@ -336,10 +352,17 @@ struct ContentView: View {
                             
                             Spacer()
                             
-                            // Reticle scope graphic icon anchor
-                            Image(systemName: "scope")
-                                .font(.title2)
-                                .foregroundColor(.cyan)
+                            // Reticle scope graphic icon anchor -- swaps to a spinner while
+                            // ensureTelemetryLoaded is in flight (see the button's action above)
+                            // so the tap gives immediate feedback instead of a silent pause.
+                            if isPreparingSkyMap {
+                                ProgressView()
+                                    .tint(.cyan)
+                            } else {
+                                Image(systemName: "scope")
+                                    .font(.title2)
+                                    .foregroundColor(.cyan)
+                            }
                         }
                         .padding()
                     }
@@ -1129,6 +1152,29 @@ struct ContentView: View {
             NavigationView {
                 ZStack {
                     TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
+                        // 💡 FIX: the StarGaze launch card on this tab reads from
+                        // stargazerViewModel.stargazerState.liveVisibleTargets, but that data
+                        // was only ever fetched by a .task scoped to the Star Gazers tab's own
+                        // view — which SwiftUI's TabView loads lazily, so it never ran if
+                        // someone launched the sky map from here without visiting Star Gazers
+                        // first (resulting in an empty planet catalog, no planets rendered).
+                        // Home Command is the default/first tab, so it renders eagerly on
+                        // launch — attaching the same fetch here guarantees it's run
+                        // regardless of which tab or shortcut the user touches first. Guarded
+                        // by isDataLoaded so whichever tab's .task runs first does the real
+                        // fetch and the other just skips redundant work.
+                        .task {
+                            guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
+                            
+                            let resolvedCoordinate = await locationProvider.currentLocation()
+                            let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                            let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                            
+                            await stargazerViewModel.ensureTelemetryLoaded(
+                                latitude: hardwareLat,
+                                longitude: hardwareLng
+                            )
+                        }
                     
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
@@ -1144,7 +1190,21 @@ struct ContentView: View {
                             // flagship feature of this release shouldn't be a tab-swipe away
                             // from the screen most users land on first.
                             Button(action: {
-                                showLiveViewfinderOverlay = true
+                                Task {
+                                    // Gate on real data instead of presenting the sky map with
+                                    // whatever (possibly still-empty) catalog happens to be in
+                                    // stargazerState right now. See ensureTelemetryLoaded's doc
+                                    // comment for the bug this fixes.
+                                    if !stargazerViewModel.stargazerState.isDataLoaded {
+                                        isPreparingSkyMap = true
+                                        let resolvedCoordinate = await locationProvider.currentLocation()
+                                        let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                                        let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                                        await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
+                                        isPreparingSkyMap = false
+                                    }
+                                    showLiveViewfinderOverlay = true
+                                }
                             }) {
                                 ZStack(alignment: .bottomLeading) {
                                     Image("night_sky_banner")
@@ -1175,9 +1235,14 @@ struct ContentView: View {
                                         
                                         Spacer()
                                         
-                                        Image(systemName: "scope")
-                                            .font(.title2)
-                                            .foregroundColor(.cyan)
+                                        if isPreparingSkyMap {
+                                            ProgressView()
+                                                .tint(.cyan)
+                                        } else {
+                                            Image(systemName: "scope")
+                                                .font(.title2)
+                                                .foregroundColor(.cyan)
+                                        }
                                     }
                                     .padding()
                                 }
@@ -1459,6 +1524,8 @@ struct ContentView: View {
                     .padding(.bottom, 60)
                 }
                 .task {
+                    guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
+                    
                     print("📡 [ASTRONOMY UPDATE]: Ingesting live hardware GPS telemetry...")
                     
                     let resolvedCoordinate = await locationProvider.currentLocation()
@@ -1469,7 +1536,7 @@ struct ContentView: View {
                     }
                     
                     // Clean, true parameter inputs with absolutely zero made-up variables!
-                    await stargazerViewModel.calculateStargazingTelemetry(
+                    await stargazerViewModel.ensureTelemetryLoaded(
                         latitude: hardwareLat,
                         longitude: hardwareLng
                     )

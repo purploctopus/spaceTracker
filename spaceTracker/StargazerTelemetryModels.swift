@@ -125,6 +125,9 @@ class StargazerViewModel: ObservableObject {
     private var internalStarsDatabase: [LocalStarItem] = []
     private var isDatabaseLoaded: Bool = false
 
+    /// Backs ensureTelemetryLoaded's de-duplication -- see that function for why this exists.
+    private var inFlightTelemetryTask: Task<Void, Never>?
+
     /// Name of a star to echo raw RA/Dec for on every run, as a cheap sanity check that the
     /// decoded catalog data hasn't drifted from what's actually in stars.json on disk.
     /// Set to nil to disable this diagnostic print.
@@ -336,11 +339,13 @@ class StargazerViewModel: ObservableObject {
             let finalAltitudeAngle = horizontalCoordinates.altitude.value
             let finalAzimuthHeading = horizontalCoordinates.northBasedAzimuth.value
 
-            let paddedStarName = star.name.uppercased().padding(toLength: 12, withPad: " ", startingAt: 0)
-            let starAltStr = String(format: "%06.2f", finalAltitudeAngle)
-            let starAzStr = String(format: "%06.2f", finalAzimuthHeading)
-            let magStr = String(format: "%.1f", star.mag)
-            print(" ⭐️ STAR LOG MATCH -> [\(paddedStarName)] | ALT: \(starAltStr)° | AZ: \(starAzStr)° | MAG: \(magStr)")
+            // PERF FIX: this loop runs once per star in stars.json (8,920 of them) on
+            // every telemetry calc. It used to build a padded/formatted string and
+            // print() it per star, unconditionally (not gated behind DEBUG) -- that's
+            // 8,920 synchronous console writes plus string formatting on every load,
+            // which was the dominant cost of "opening the sky map is slow" / data
+            // arriving too late for a sky map that had already been presented with an
+            // empty catalog. Removed; nothing downstream read these formatted strings.
 
             localizedOutputCatalog.append(APIPlanetItem(
                 name: star.name,
@@ -373,5 +378,29 @@ class StargazerViewModel: ObservableObject {
             self.stargazerState.trueDarkWindow = darkWindowString
             self.stargazerState.isDataLoaded = true
         }
+    }
+
+    /// Ensures live telemetry (planets + stars) is loaded, sharing ONE in-flight computation
+    /// across concurrent callers instead of racing separate ones.
+    ///
+    /// This is what closes the "open live interactive sky map before it's loaded" bug: the
+    /// sky map is presented with a one-time snapshot of stargazerState.liveVisibleTargets
+    /// taken at that instant, not a live binding -- so if a tap arrived while the background
+    /// prefetch .task was still awaiting a GPS fix / decoding stars.json, the map opened with
+    /// an empty catalog forever, even after the prefetch finished moments later. Callers that
+    /// present the map now await this before setting showLiveViewfinderOverlay = true,
+    /// guaranteeing real data is already in stargazerState by the time the map is built.
+    @MainActor
+    func ensureTelemetryLoaded(latitude: Double, longitude: Double) async {
+        if let inFlightTelemetryTask {
+            await inFlightTelemetryTask.value
+            return
+        }
+        let task = Task { [weak self] in
+            await self?.calculateStargazingTelemetry(latitude: latitude, longitude: longitude)
+        }
+        inFlightTelemetryTask = task
+        await task.value
+        inFlightTelemetryTask = nil
     }
 }
