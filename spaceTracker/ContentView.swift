@@ -176,23 +176,37 @@ struct ContentView: View {
     /// from a bare 9pt label to a larger pill with a background/border -- a plain unlabeled
     /// icon (and later a tiny caption) both tested as too easy to miss; this is sized and
     /// styled to actually read as a tappable button.
+    ///
+    /// BUG FIX: this used to render at one fixed size regardless of size class. On iPhone
+    /// it sits in the trailing toolbar slot at the same time the principal title
+    /// ("DAILY COMMAND") and the leading settings gear are also fighting for the same narrow
+    /// nav bar -- this pill's own padding/capsule/icon was easily 70-90pt wide on its own
+    /// (more with "UNTIL h:mm" showing instead of a short price), which was the actual reason
+    /// the title kept truncating even after the title's own font/scale got tuned down: no
+    /// amount of shrinking the title fixes it if the thing competing with it for space never
+    /// shrinks. Tightened up specifically on .compact -- smaller icon, smaller text, a third
+    /// of the padding, no capsule border -- to give that width back to the title, while
+    /// leaving the .regular/iPad button exactly as it was.
     @ViewBuilder
     private var adFreeToolbarButton: some View {
+        let isCompact = horizontalSizeClass == .compact
         Button(action: { showAdPromptOverlay = true }) {
-            HStack(spacing: 5) {
+            HStack(spacing: isCompact ? 3 : 5) {
                 Image(systemName: adEngine.hasTemporaryAdFreeActive ? "checkmark.seal.fill" : "tv.slash")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: isCompact ? 11 : 14, weight: .semibold))
                 Text(adFreeToolbarLabelText)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: isCompact ? 10 : 12, weight: .bold, design: .monospaced))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundColor(.cyan)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, isCompact ? 6 : 10)
+            .padding(.vertical, isCompact ? 4 : 6)
             .background(Color.cyan.opacity(0.12))
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .stroke(Color.cyan.opacity(0.4), lineWidth: 1)
+                    .stroke(Color.cyan.opacity(isCompact ? 0.25 : 0.4), lineWidth: isCompact ? 0.5 : 1)
             )
         }
     }
@@ -1011,7 +1025,11 @@ struct ContentView: View {
                     .foregroundColor(.white)
                     .tracking(sizeClass == .regular ? 6 : 1.5)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    // Lowered from 0.6 -- extra headroom now that adFreeToolbarButton no
+                    // longer eats most of the compact nav bar's width on its own (see that
+                    // property's doc comment), but kept as a safety net rather than assuming
+                    // this is the last narrow-screen combination this title will ever meet.
+                    .minimumScaleFactor(0.5)
                 
                 HStack(spacing: 5) {
                     Circle()
