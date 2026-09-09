@@ -9,6 +9,7 @@ import SwiftUI
 import CoreLocation
 import MapKit
 import Combine
+import StoreKit
 
 // ==============================================================================
 // 📍 DEVICE LOCATION PROVIDER — a single, correctly-authorized location source
