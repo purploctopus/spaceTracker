@@ -72,17 +72,21 @@ final class LiveActivityCoordinator {
     // MARK: - Widget snapshot (FEAT-04)
 
     private func publishWidgetSnapshot(nextLaunch: (SpaceLaunch, Date)?, nextPass: (SatellitePass, Date)?) {
+        // Note: written as if-let chains rather than switching on (nextLaunch, nextPass) --
+        // each is Optional<(Model, Date)>, so a `.some(launch, launchDate)` pattern there
+        // reads as ".some" taking two associated values instead of one tuple value, which
+        // doesn't compile ("Enum case 'some' has one associated value that is a tuple of 2
+        // elements"). This reads the same and avoids that pitfall entirely.
         let candidateEvent: UpcomingSpaceEvent?
-        switch (nextLaunch, nextPass) {
-        case let (.some(launch, launchDate), .some(pass, passDate)):
+        if let (launch, launchDate) = nextLaunch, let (pass, passDate) = nextPass {
             candidateEvent = launchDate <= passDate
                 ? makeEvent(fromLaunch: launch, date: launchDate)
                 : makeEvent(fromPass: pass, date: passDate)
-        case let (.some(launch, launchDate), .none):
+        } else if let (launch, launchDate) = nextLaunch {
             candidateEvent = makeEvent(fromLaunch: launch, date: launchDate)
-        case let (.none, .some(pass, passDate)):
+        } else if let (pass, passDate) = nextPass {
             candidateEvent = makeEvent(fromPass: pass, date: passDate)
-        case (.none, .none):
+        } else {
             candidateEvent = nil
         }
 
