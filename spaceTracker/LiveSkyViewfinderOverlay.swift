@@ -283,6 +283,22 @@ struct LiveSkyViewfinderOverlay: View {
                         Text(activeNavigationTarget != nil ? "TARGET MODE: GUIDED TRACKING ACTIVE [\(activeNavigationTarget!)]" : "TARGET MODE: FREE-LOOK SCAN")
                             .font(.system(.caption2, design: .monospaced))
                             .foregroundColor(activeNavigationTarget != nil ? .green : .secondary)
+                        
+                        // TEMPORARY CALIBRATION READOUT -- not a permanent feature. Shows the
+                        // one-shot compass heading SkyMotionManager captured at session start
+                        // (see captureInitialTrueHeading), which the sky dome's alignment is
+                        // built entirely around. If the sky still comes out wrong even with the
+                        // heading math correct on paper, the fastest way to know FOR SURE
+                        // whether the raw captured number itself is right is to compare it
+                        // directly against an independent compass (Sky Guide's ribbon, or
+                        // Apple's own Compass app) read at the same moment, instead of guessing
+                        // again at axis conventions from documentation. Remove once alignment is
+                        // confirmed solid.
+                        if let trueHeadingOffsetDegrees {
+                            Text("CAL HEADING: \(Int(trueHeadingOffsetDegrees.rounded()))°")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundColor(.yellow)
+                        }
                     }
                     
                     Spacer()
