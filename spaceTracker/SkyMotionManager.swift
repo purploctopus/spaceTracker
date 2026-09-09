@@ -5,36 +5,26 @@
 //  Created by Ben Clary on 8/14/26.
 //  MAKE AN APP COLIN LOVES AND ENABLES SARA'S FREEDOM!
 //
-//  BUG FIX: Live Sky mode was jittery and wouldn't hold still even with the device
-//  completely stationary (e.g. resting flat on a desk). Two compounding causes, both
-//  rooted in continuously re-reading the magnetometer for heading:
-//    1. SkyViewportARView's ARWorldTrackingConfiguration used .gravityAndHeading, which
-//       (per Apple's own docs) keeps ARKit's world orientation locked to live "compass
-//       heading" for as long as the session runs. Magnetometer readings are noisy and
-//       easily disturbed by nearby metal or magnetic fields -- a desk, a laptop, or (very
-//       commonly on iPad specifically) a Smart Folio/Magic Keyboard/Pencil's own magnets --
-//       so every wobble in that continuous compass feed directly wobbled the whole AR
-//       scene, even at rest.
-//    2. That heading is also just magnetic north, not true north, while every azimuth in
-//       the celestial catalog (StargazerTelemetryModels.swift, via SwiftAA's
-//       northBasedAzimuth) is measured from true geographic north -- a systematic offset of
-//       however many degrees of local magnetic declination apply, on top of the jitter.
-//  Fix: ARKit now uses plain .gravity alignment with no continuous compass input at all
-//  (see SkyViewportARView.swift), and the sky dome is aligned to real-world north exactly
-//  ONCE using a heading sample captured here. After that one-time alignment, ARKit's own
-//  gyro/visual tracking -- not the magnetometer -- holds the scene steady.
+//  ARCHITECTURE CHANGE: Live Sky mode used to run this alongside a full ARKit world-tracking
+//  session (see SkyViewportARView.swift), with this file only ever contributing a single
+//  one-shot heading sample that got frozen for the rest of the session while ARKit's own
+//  gyro/visual tracking took over. That two-system split is where most of this feature's bugs
+//  came from: a timing mismatch between when the heading was captured and when the AR session
+//  actually started, then (once that was fixed) a sign error in how the frozen heading got
+//  applied, and finally residual pointing error that no one-shot capture could ever fully
+//  correct for, because raw magnetometer readings just aren't reliably accurate to much
+//  better than 5-15 degrees on a real phone (see the "sync to a known object" feature this
+//  shipped alongside, which exists precisely because that hardware limit is real and
+//  irreducible in software).
 //
-//  FOLLOW-UP FIX: the first version of this fix averaged a blind fixed time window right
-//  as the view appeared, which is exactly while the user is still raising/aiming the phone
-//  -- and separately, SkyViewportARView started its AR session immediately on creation,
-//  before that average had even finished. .gravity alignment anchors its zero-orientation
-//  reference to whichever direction the device faces at the exact moment session.run() is
-//  called, so those two moments need to refer to the same instant; they didn't, which
-//  produced an alignment error that also changed from launch to launch (whatever motion was
-//  in progress each time happened to differ). Fixed by waiting for the device to actually
-//  settle before trusting a heading sample (see captureInitialTrueHeading below), and by
-//  SkyViewportARView deferring session.run() until that settled heading is in hand -- see
-//  SkyViewportARView.beginTracking(initialHeadingDegrees:).
+//  ARKit is gone now (see SkyViewportARView.swift's header comment for why -- it was never
+//  actually useful here, since nothing in this feature is anchored to real-world position,
+//  only direction). This file is now the ONLY thing driving the sky dome's orientation: a
+//  single continuous CMDeviceMotion stream, north-referenced, publishing both heading and
+//  tilt every frame for as long as Live Sky mode is open. There is no "capture once and
+//  freeze" step anymore -- the camera always reflects whatever the phone is actually doing
+//  right now, which means there's nothing for it to fall out of sync with over time, and it
+//  works identically whether the sky is visible or not: day or night, indoors or out.
 
 import Foundation
 import CoreMotion
@@ -42,114 +32,75 @@ import CoreLocation
 import Combine
 
 class SkyMotionManager: ObservableObject {
-    /// Drives the continuous "VIEWPORT TILT PITCH" HUD readout. A separate CMMotionManager
-    /// instance from headingCaptureManager below -- each one only ever runs a single
-    /// reference frame at a time, and pitch streaming needs to keep running independently
-    /// of (and outlive) the brief one-shot heading capture.
-    private let pitchMotionManager = CMMotionManager()
-    /// Used only for the one-shot true-heading sample at session start -- always stopped
-    /// right after, so it can never itself become a source of continuous compass jitter.
-    private let headingCaptureManager = CMMotionManager()
-
+    private let motionManager = CMMotionManager()
+    
+    /// Raw CMAttitude pitch in degrees -- 0 when the device lies flat on a table, 90 when
+    /// held upright/vertical. Drives the "VIEWPORT TILT PITCH" HUD readout directly, and (via
+    /// SkyViewportARViewContainer.pitchDegrees) the camera's own tilt. Kept under its
+    /// original name so the HUD call site didn't need to change. This was never part of any
+    /// jitter/alignment bug -- it comes purely from gravity (accelerometer) and the
+    /// gyroscope, with no compass/magnetometer involvement at all, so it's always been
+    /// trustworthy on its own.
     @Published var currentAltitude: Double = 0.0
-
-    /// Continuous pitch-only stream. Deliberately uses .xArbitraryZVertical, which has no
-    /// compass/magnetometer involvement at all -- pitch comes purely from gravity
-    /// (accelerometer) and the gyroscope, so this readout was never actually part of the
-    /// jitter bug and doesn't need to change to fix it.
+    
+    /// Continuously-updated compass heading in degrees (0-360), true- or magnetic-north
+    /// referenced depending on location authorization (see engageSensorStreaming). Lightly
+    /// smoothed over a short rolling window (see recentHeadingSamples below) to iron out
+    /// ordinary magnetometer sample noise -- Core Motion's own sensor fusion already does
+    /// most of this, but since this value now feeds the camera directly every frame (instead
+    /// of ARKit mediating it), a small extra guard against jitter costs nothing and is worth
+    /// keeping.
+    @Published var currentHeadingDegrees: Double = 0.0
+    
+    /// False until the first valid heading sample arrives. LiveSkyViewfinderOverlay's
+    /// stabilization veil waits on this instead of a fixed timer or a one-shot capture
+    /// completion -- there's no "capture" step to wait on anymore, just "has a real reading
+    /// come in yet."
+    @Published var isHeadingAvailable = false
+    
+    private var recentHeadingSamples: [Double] = []
+    private let smoothingWindowSize = 5
+    
     func engageSensorStreaming() {
-        guard pitchMotionManager.isDeviceMotionAvailable else { return }
-        pitchMotionManager.deviceMotionUpdateInterval = 1.0 / 30.0
-        pitchMotionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: .main) { [weak self] motionData, _ in
-            guard let self, let data = motionData else { return }
-            let pitchDegrees = data.attitude.pitch * (180.0 / .pi)
-            DispatchQueue.main.async {
-                self.currentAltitude = pitchDegrees
-            }
-        }
-    }
-
-    func disengageSensorStreaming() {
-        pitchMotionManager.stopDeviceMotionUpdates()
-    }
-
-    /// Captures ONE heading value -- not a stream -- for SkyViewportARView to rotate its
-    /// celestial sphere by exactly once, right before its AR session actually starts (see
-    /// SkyViewportARView.beginTracking(initialHeadingDegrees:) -- the two are deliberately
-    /// coupled, see that method's doc comment for why).
-    ///
-    /// BUG FIX: this used to just average a fixed 0.6s window of samples unconditionally.
-    /// But this fires the moment Live Sky mode opens, while the user is very likely still
-    /// raising/aiming the phone -- averaging blindly through that motion captured whatever
-    /// direction they happened to be sweeping through, not where they actually ended up
-    /// pointing, which is exactly why the sky came out rotated to some arbitrary-seeming
-    /// offset that also differed between launches (different motion each time the view
-    /// opened). Now it waits for the device's rotation rate to actually settle down before
-    /// trusting any samples, with a capped max wait so a shaky hand can't hang the sky map
-    /// forever.
-    func captureInitialTrueHeading(completion: @escaping (Double) -> Void) {
-        guard headingCaptureManager.isDeviceMotionAvailable else {
-            completion(0)
-            return
-        }
-
+        guard motionManager.isDeviceMotionAvailable else { return }
+        
         // .xTrueNorthZVertical requires location access so Core Motion can calculate the
         // difference between magnetic and true north (this is Core Motion's own documented
         // requirement, not a guess) -- fall back to magnetic north rather than fail outright
         // if that isn't available. A few degrees of declination error is a much smaller
-        // problem than the sky dome never getting aligned at all.
+        // problem than the sky dome never getting aligned at all, and the sync-to-object
+        // feature can absorb it either way.
         let status = CLLocationManager().authorizationStatus
         let locationAuthorized = status == .authorizedWhenInUse || status == .authorizedAlways
         let referenceFrame: CMAttitudeReferenceFrame = locationAuthorized ? .xTrueNorthZVertical : .xMagneticNorthZVertical
-
-        // Tuning: requiredStableSamples * update interval is roughly how long the device
-        // must sit still before its heading is trusted (~0.27s at 30Hz); rotationRate is in
-        // rad/s, so 0.12 is a gentle hand tremor, not a real aiming movement. maxWait is the
-        // hard ceiling if the user just can't hold it still -- falls back to whatever's been
-        // sampled so far rather than hanging indefinitely.
-        let stabilityThreshold = 0.12
-        let requiredStableSamples = 8
-        let maxWait: TimeInterval = 3.0
-        let startTime = Date()
-
-        var stableRun: [Double] = []
-        var allSamples: [Double] = []
-        var didComplete = false
-
-        headingCaptureManager.deviceMotionUpdateInterval = 1.0 / 30.0
-        headingCaptureManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { [weak self] motionData, _ in
-            guard let self, !didComplete, let data = motionData else { return }
+        
+        motionManager.deviceMotionUpdateInterval = 1.0 / 60.0
+        motionManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { [weak self] motionData, _ in
+            guard let self, let data = motionData else { return }
+            
+            self.currentAltitude = data.attitude.pitch * (180.0 / .pi)
+            
             // heading is documented to come back negative specifically to mean "invalid"
             // (rather than something that needs +360 wraparound) -- skip those samples
-            // instead of folding them into the average.
+            // instead of folding them into the smoothed value.
             let heading = data.heading
-            if heading >= 0 {
-                allSamples.append(heading)
-                if allSamples.count > 90 { allSamples.removeFirst() }
-
-                let rotationMagnitude = sqrt(
-                    data.rotationRate.x * data.rotationRate.x +
-                    data.rotationRate.y * data.rotationRate.y +
-                    data.rotationRate.z * data.rotationRate.z
-                )
-                if rotationMagnitude < stabilityThreshold {
-                    stableRun.append(heading)
-                } else {
-                    stableRun.removeAll()
-                }
+            guard heading >= 0 else { return }
+            
+            self.recentHeadingSamples.append(heading)
+            if self.recentHeadingSamples.count > self.smoothingWindowSize {
+                self.recentHeadingSamples.removeFirst()
             }
-
-            let isStable = stableRun.count >= requiredStableSamples
-            let timedOut = Date().timeIntervalSince(startTime) >= maxWait
-            guard isStable || timedOut else { return }
-
-            didComplete = true
-            self.headingCaptureManager.stopDeviceMotionUpdates()
-            let finalSamples = isStable ? stableRun : allSamples
-            completion(Self.circularMeanDegrees(finalSamples))
+            self.currentHeadingDegrees = Self.circularMeanDegrees(self.recentHeadingSamples)
+            self.isHeadingAvailable = true
         }
     }
-
+    
+    func disengageSensorStreaming() {
+        motionManager.stopDeviceMotionUpdates()
+        recentHeadingSamples.removeAll()
+        isHeadingAvailable = false
+    }
+    
     /// Plain averaging breaks across the 0°/360° seam (359° and 1° should average to 0°, not
     /// 180°) -- averaging each sample's sine/cosine components instead is immune to wherever
     /// that seam happens to land.
