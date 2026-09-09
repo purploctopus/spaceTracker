@@ -25,12 +25,52 @@ struct AstronautRecord: Decodable, Identifiable {
     let nationality: [NationalityInfo]
     let agency: AgencyInfo?
     let launch_designator: String?
+    // 💡 FEAT-16: the feed already carries these -- they just weren't being decoded.
+    let image: AstronautImage?
+    let time_in_space: String?
+    let in_space: Bool?
+    let first_flight: String?
+    let wiki: String?
+
+    /// time_in_space arrives as an ISO 8601 duration ("P412DT7H12M30S") -- real recorded
+    /// flight time as of whenever this feed was last generated, not a live ticking
+    /// counter. Presented as "career" time in the UI rather than implying second-by-second
+    /// accuracy it doesn't have.
+    var daysInSpace: Int? {
+        Self.parseISO8601DurationDays(time_in_space)
+    }
+
+    static func parseISO8601DurationDays(_ duration: String?) -> Int? {
+        guard let duration, duration.hasPrefix("P") else { return nil }
+        guard let dIndex = duration.firstIndex(of: "D") else { return 0 }
+        let start = duration.index(after: duration.startIndex)
+        guard start < dIndex, let days = Int(duration[start..<dIndex]) else { return nil }
+        return days
+    }
+}
+
+struct AstronautImage: Decodable {
+    let image_url: String
+    let thumbnail_url: String?
 }
 
 struct NationalityInfo: Decodable {
     let id: Int
     let name: String
     let alpha_2_code: String
+
+    /// Regional-indicator flag emoji built from the ISO 3166-1 alpha-2 code -- standard
+    /// technique (each letter maps to a regional indicator symbol two code points above
+    /// its ASCII value; a compliant renderer combines the pair into a flag glyph).
+    var flagEmoji: String {
+        let regionalIndicatorBase: UInt32 = 127397
+        var scalars = String.UnicodeScalarView()
+        for scalar in alpha_2_code.uppercased().unicodeScalars {
+            guard let flagScalar = Unicode.Scalar(regionalIndicatorBase + scalar.value) else { continue }
+            scalars.append(flagScalar)
+        }
+        return scalars.isEmpty ? "🏳️" : String(scalars)
+    }
 }
 
 struct AgencyInfo: Decodable {
@@ -132,9 +172,21 @@ struct SpacecraftRosterCardView: View {
                 } else {
                     ForEach(crewList) { astronaut in
                         HStack(spacing: 6) {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 9))
-                                .foregroundColor(.gray)
+                            AsyncImage(url: URL(string: astronaut.image?.thumbnail_url ?? astronaut.image?.image_url ?? "")) { phase in
+                                if case .success(let img) = phase {
+                                    img.resizable().aspectRatio(contentMode: .fill)
+                                } else {
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                            .frame(width: 14, height: 14)
+                            .clipShape(Circle())
+                            if let flag = astronaut.nationality.first?.flagEmoji {
+                                Text(flag)
+                                    .font(.system(size: 10))
+                            }
                             Text(astronaut.name.uppercased())
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(.gray)
@@ -173,36 +225,53 @@ struct SpacecraftDetailSheet: View {
     
     @Environment(\.dismiss) var dismiss
     
-    // 💡 LOCAL TELEMETRY ENGINE: Keeps the app fast by hardcoding stable operational logs
-    private var missionData: (days: String, speed: String, commander: String, expedition: String, nations: String, summary: String) {
+    // 💡 BUG-02 FIX: commander name, expedition designator, and days-in-orbit used to be
+    // hardcoded strings presented as if live -- they went stale the moment crew rotated.
+    // Days-in-orbit is now computed from each station's real assembly/launch date, so it's
+    // correct every time this opens. Commander/expedition had no clean free live source,
+    // so rather than keep inventing specifics, those rows are gone -- replaced by real
+    // per-astronaut detail in the crew section below. Velocity/period are genuine physical
+    // constants for the station's altitude, not per-crew facts, so those stay as-is.
+    private var missionData: (daysInOrbit: String, speed: String, summary: String) {
         let name = craftName.uppercased()
         if name.contains("INTERNATIONAL") || name.contains("ISS") {
             return (
-                "10,100+ DAYS",
+                Self.daysSinceAnchor(year: 1998, month: 11, day: 20), // Zarya, first ISS module in orbit
                 "VELOCITY: 27,560 KM/H // PERIOD: 92.8 MIN",
-                "OLEG KONONENKO",
-                "NASA / ROSCOSMOS EXPEDITION 71/72",
-                "USA, RUS, JPN, DEU, GBR",
                 "THE ISS IS A COLLABORATIVE MULTINATIONAL HABITATION OUTPOST CONDUCTING MICROGRAVITY BIOLOGY, SPACE WEATHER RADIATION MODELLING, AND LONG-DURATION FLIGHT COUNTERMEASURES."
             )
         } else if name.contains("TIANGONG") || name.contains("CHINESE") || name.contains("CSS") {
             return (
-                "1,900+ DAYS",
+                Self.daysSinceAnchor(year: 2021, month: 4, day: 29), // Tianhe core module launch
                 "VELOCITY: 27,610 KM/H // PERIOD: 91.5 MIN",
-                "YE GUANGFU",
-                "CMSA SHENZHOU-18 / SHENZHOU-19",
-                "CHN",
                 "THE TIANGONG SECTOR COMPRISES A THREE-MODULE T-SHAPE HUB FOR ADVANCED MATERIAL SCIENCE COMBUSTION AND LOW-EARTH ORBIT ASTROPHYSICS PHENOMENA MONITORING."
             )
         }
         return (
             "VARIABLE",
             "VELOCITY: 27,500 KM/H",
-            "CREW COMMANDER ASSIGNED",
-            "TRANSIT OPERATION",
-            "INTL",
             "EXPERIMENTAL HIGH-VELOCITY TRANSIT FLIGHT COMPONENT CLEARING ORBITAL PATHS."
         )
+    }
+
+    /// Real elapsed days from a fixed historical anchor to today -- correct on every open,
+    /// unlike the frozen string this replaces.
+    private static func daysSinceAnchor(year: Int, month: Int, day: Int) -> String {
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        guard let anchorDate = Calendar.current.date(from: components) else { return "VARIABLE" }
+        let days = Calendar.current.dateComponents([.day], from: anchorDate, to: Date()).day ?? 0
+        return "\(days)+ DAYS"
+    }
+
+    /// Real nationalities from the actual current crew, replacing BUG-02's hardcoded
+    /// string that couldn't reflect crew rotation.
+    private var nationsPresent: String {
+        let names = crewList.compactMap { $0.nationality.first?.name }
+        let unique = Array(Set(names)).sorted()
+        return unique.isEmpty ? "UNKNOWN" : unique.joined(separator: ", ").uppercased()
     }
     
     // 💡 CROSS-REFERENCE RADAR ENGINE: Matches the tapped card with existing satellite pass logs
@@ -256,9 +325,8 @@ struct SpacecraftDetailSheet: View {
                                 .foregroundColor(.yellow)
                             
                             VStack(spacing: 0) {
-                                telemetryRow(label: "DAYS IN CONTINUOUS ORBIT", value: missionData.days)
+                                telemetryRow(label: "DAYS IN CONTINUOUS ORBIT", value: missionData.daysInOrbit)
                                 telemetryRow(label: "CURRENT SPEED VECTOR", value: missionData.speed)
-                                telemetryRow(label: "ACTIVE COMMANDER LOG", value: missionData.commander)
                             }
                             .border(Color.white.opacity(0.1), width: 1)
                         }
@@ -283,22 +351,21 @@ struct SpacecraftDetailSheet: View {
                                 .foregroundColor(.yellow)
                             
                             VStack(spacing: 0) {
-                                telemetryRow(label: "EXPEDITION DESIGNATION", value: missionData.expedition)
-                                telemetryRow(label: "NATIONALITIES PRESENT", value: missionData.nations)
+                                telemetryRow(label: "NATIONALITIES PRESENT", value: nationsPresent)
                             }
                             .border(Color.white.opacity(0.1), width: 1)
                             
-                            // Crew Manifest Text Sub-List
-                            VStack(alignment: .leading, spacing: 6) {
+                            // Crew Manifest -- real per-astronaut detail (FEAT-16): photo,
+                            // flag, agency, and recorded career time in space, replacing
+                            // the plain name-only bullet list.
+                            VStack(alignment: .leading, spacing: 10) {
                                 Text("LOGGED INHABITANTS:")
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundColor(.secondary)
                                     .padding(.top, 4)
                                 
                                 ForEach(crewList) { astronaut in
-                                    Text("• \(astronaut.name.uppercased())")
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundColor(.gray)
+                                    astronautRow(astronaut)
                                 }
                             }
                             .padding(.horizontal, 4)
@@ -329,5 +396,52 @@ struct SpacecraftDetailSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.01))
         .overlay(Rectangle().stroke(Color.white.opacity(0.04), lineWidth: 0.5))
+    }
+
+    /// Real per-astronaut detail (FEAT-16): photo, nationality flag, agency, and recorded
+    /// career time in space -- everything the feed already provides but the roster used to
+    /// throw away in favor of a bare uppercase name.
+    private func astronautRow(_ astronaut: Astronaut) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            AsyncImage(url: URL(string: astronaut.image?.thumbnail_url ?? astronaut.image?.image_url ?? "")) { phase in
+                if case .success(let img) = phase {
+                    img.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    Color.white.opacity(0.06)
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                        )
+                }
+            }
+            .frame(width: 32, height: 32)
+            .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    if let flag = astronaut.nationality.first?.flagEmoji {
+                        Text(flag)
+                            .font(.system(size: 12))
+                    }
+                    Text(astronaut.name.uppercased())
+                        .font(.system(.caption, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                }
+                HStack(spacing: 8) {
+                    if let agencyAbbrev = astronaut.agency?.abbrev {
+                        Text(agencyAbbrev)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.cyan)
+                    }
+                    if let days = astronaut.daysInSpace {
+                        Text("\(days) DAYS IN SPACE (CAREER)")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
+        }
     }
 }

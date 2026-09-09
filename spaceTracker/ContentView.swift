@@ -207,6 +207,23 @@ struct ContentView: View {
         }
         .accessibilityLabel("Notification Settings")
     }
+
+    /// Earth Watch's tab icon mirrors whichever third of the globe the user is actually
+    /// standing on -- SF Symbols only ships three globe rotations (Americas,
+    /// Europe/Africa, Asia/Australia -- there's no standalone per-continent icon), so
+    /// this buckets by longitude into those three. Defaults to the Americas view, which
+    /// also happens to match the app's own fallback location (Madison, WI) whenever a
+    /// real location fix hasn't resolved yet.
+    private var earthWatchTabIconName: String {
+        switch universalLongitude {
+        case -170..<(-30):
+            return "globe.americas.fill"
+        case -30..<60:
+            return "globe.europe.africa.fill"
+        default:
+            return "globe.asia.australia.fill"
+        }
+    }
     @State private var showAcknowledgements = false
     @State private var showConditionsExplainer = false
     @State private var showSettings = false
@@ -823,68 +840,6 @@ struct ContentView: View {
         }
     }
     
-    // Isolates human crew rendering to guarantee swift compiling
-    private var liveHumansInSpaceChannelBlock: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("CURRENT HUMANS IN SPACE (\(crewViewModel.totalHumansInOrbit) ACTIVE)")
-                .font(.system(.caption, design: .monospaced).weight(.bold))
-                .foregroundColor(.cyan)
-                .tracking(2)
-                .padding(.horizontal)
-            
-            if crewViewModel.isLoading {
-                Text("SYNCHRONIZING OPEN MANIFEST...")
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.gray)
-                    .padding(.horizontal)
-            } else if let error = crewViewModel.errorMessage {
-                Text(error)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.red)
-                    .padding(.horizontal)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        if !crewViewModel.issCrew.isEmpty {
-                            SpacecraftRosterCardView(craftName: "International Space Station", crewList: crewViewModel.issCrew)
-                                .onTapGesture {
-                                    selectedSpacecraftCrewName = "International Space Station"
-                                }
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel("International Space Station crew")
-                                .accessibilityHint("Opens details")
-                                .accessibilityAddTraits(.isButton)
-                        }
-                        
-                        if !crewViewModel.tiangongCrew.isEmpty {
-                            SpacecraftRosterCardView(craftName: "Tiangong Space Station", crewList: crewViewModel.tiangongCrew)
-                                .onTapGesture {
-                                    selectedSpacecraftCrewName = "Tiangong Space Station"
-                                }
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel("Tiangong Space Station crew")
-                                .accessibilityHint("Opens details")
-                                .accessibilityAddTraits(.isButton)
-                        }
-                        
-                        if !crewViewModel.otherCrew.isEmpty {
-                            SpacecraftRosterCardView(craftName: "Experimental Transits", crewList: crewViewModel.otherCrew)
-                            .onTapGesture {
-                                selectedSpacecraftCrewName = "Experimental Transits"
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("Experimental Transits crew")
-                            .accessibilityHint("Opens details")
-                            .accessibilityAddTraits(.isButton)
-                        }
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal)
-                }
-            }
-        }
-    }
-    
     // Extracted the location entry box to fix the layout freeze
     private var universalLocationSearchBox: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1493,16 +1448,11 @@ struct ContentView: View {
                             annualMeteorShowerChannelBlock
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, 24) // 💡 Separates the meteor timelines from the asteroid radar matrix above it
-                            Divider()
-                                .background(Color.cyan)
-                            // THE 3D ORBITAL INTERCEPT RADAR MAP CONTAINER
-                            SpaceStationRadarChannelView()
-                                .padding(.top, 24)
-                            // 🛰️ 5. LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK
-                            liveHumansInSpaceChannelBlock
-                                .padding(.top, 24)
-                            Divider()
-                                .background(Color.cyan)
+                            // 💡 FEAT-13: Space Station Tracker + Humans in Space moved to
+                            // the new Earth Watch tab -- see EarthWatchView.swift. Both are
+                            // really the same idea Earth Watch is built around (Earth with
+                            // something plotted on/around it), so they belong there rather
+                            // than in this manifest-of-upcoming-events dashboard.
                         } // Closes the outermost VStack inside ScrollView
                         .padding(.top, 24)
                         .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
@@ -1804,6 +1754,34 @@ struct ContentView: View {
             .navigationViewStyle(.stack)
             .tabItem {
                 Label("Space News", systemImage: "newspaper")
+            }
+
+            // ==============================================================================
+            // CHANNEL TAB 4: EARTH WATCH
+            // ==============================================================================
+            NavigationView {
+                EarthWatchView(
+                    crewViewModel: crewViewModel,
+                    selectedSpacecraftCrewName: $selectedSpacecraftCrewName,
+                    userLatitude: universalLatitude,
+                    userLongitude: universalLongitude
+                )
+                .navigationTitle("EARTH WATCH")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        settingsToolbarButton
+                    }
+                    if !adEngine.hasPermanentAdFree {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            adFreeToolbarButton
+                        }
+                    }
+                }
+            }
+            .navigationViewStyle(.stack)
+            .tabItem {
+                Label("Earth Watch", systemImage: earthWatchTabIconName)
             }
         }
         // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
