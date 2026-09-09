@@ -6,6 +6,8 @@
 	<string>Launch Screen</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires back camera access to display the interactive 3D star map view.</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-1070603260872166~2504508868</string>
 	<key>NSAppTransportSecurity</key>

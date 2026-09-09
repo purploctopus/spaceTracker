@@ -68,24 +68,6 @@ private func visibilityTier(magnitude: Double, limitingMagnitude: Double) -> Vis
     }
 }
 
-/// Wraps a heading into the standard 0..<360 compass range -- used any time a raw heading
-/// plus a correction offset might land outside that range (e.g. 350° + 20° = 370°).
-private func normalizedDegrees(_ degrees: Double) -> Double {
-    var result = degrees.truncatingRemainder(dividingBy: 360.0)
-    if result < 0 { result += 360.0 }
-    return result
-}
-
-/// Wraps an angle DIFFERENCE into -180...180 rather than 0..<360, so e.g. "target at 10°,
-/// phone reading 350°" comes out as a +20° correction, not -340°. Used by the SYNC feature to
-/// turn "true azimuth minus raw reading" into the smallest possible correction.
-private func normalizedAngleDelta(_ degrees: Double) -> Double {
-    var result = degrees.truncatingRemainder(dividingBy: 360.0)
-    if result > 180 { result -= 360.0 }
-    if result < -180 { result += 360.0 }
-    return result
-}
-
 /// Formats an AU distance alongside an approximate mileage, since "142 million miles" reads
 /// more concretely than "1.53 AU" for most people glancing at a live overlay. Branches on
 /// scale because the Moon (~0.0026 AU, ~239,000 mi) would otherwise round to a misleading
@@ -209,20 +191,6 @@ struct LiveSkyViewfinderOverlay: View {
         y: UIScreen.main.bounds.height / 2
     )
     
-    // ARCHITECTURE CHANGE: there's no more one-shot heading capture or ARKit tracking-state
-    // to watch (see SkyMotionManager.swift and SkyViewportARView.swift's header comments) --
-    // the camera now reads SkyMotionManager's continuous heading/pitch directly every frame.
-    //
-    // Raw compass hardware still isn't perfectly accurate on its own (5-15° of real-world
-    // error is normal, not a bug -- see SYNC below), so this stores a user-set correction,
-    // persisted across launches since a given phone's magnetic environment (case, internal
-    // hardware) tends to stay fairly consistent day to day. Applied additively to the raw
-    // heading before it ever reaches the camera.
-    @AppStorage("liveSkyHeadingCorrectionDegrees") private var headingCorrectionDegrees: Double = 0.0
-    /// Brief on-screen confirmation right after tapping SYNC -- separate from the persisted
-    /// correction above so it can fade on its own timer without needing to touch that value.
-    @State private var showSyncConfirmation = false
-    
     var body: some View {
         ZStack {
             // 1. Core AR Engine Canvas (100% Intact)
@@ -230,8 +198,6 @@ struct LiveSkyViewfinderOverlay: View {
                 celestialCatalog: visiblePlanetsCatalog,
                 projectedScreenPlots: $projectedScreenPlots,
                 currentCrosshairTarget: $currentCrosshairTarget,
-                headingDegrees: normalizedDegrees(motionEngine.currentHeadingDegrees + headingCorrectionDegrees),
-                pitchDegrees: motionEngine.currentAltitude,
                 reticleCenter: reticleCenter
             )
             .ignoresSafeArea()
@@ -305,17 +271,6 @@ struct LiveSkyViewfinderOverlay: View {
                         Text(activeNavigationTarget != nil ? "TARGET MODE: GUIDED TRACKING ACTIVE [\(activeNavigationTarget!)]" : "TARGET MODE: FREE-LOOK SCAN")
                             .font(.system(.caption2, design: .monospaced))
                             .foregroundColor(activeNavigationTarget != nil ? .green : .secondary)
-                        
-                        // Live, continuously-updating compass heading (no longer a one-shot
-                        // capture -- see SkyMotionManager's header comment) plus whatever SYNC
-                        // correction is currently active, so it's always visible whether the
-                        // pointing looks right or not, instead of only surfacing this during a
-                        // manual comparison test.
-                        if motionEngine.isHeadingAvailable {
-                            Text("HEADING: \(Int(motionEngine.currentHeadingDegrees.rounded()))°" + (headingCorrectionDegrees != 0 ? "  •  SYNC \(headingCorrectionDegrees > 0 ? "+" : "")\(Int(headingCorrectionDegrees.rounded()))°" : ""))
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundColor(.yellow)
-                        }
                     }
                     
                     Spacer()
@@ -342,22 +297,6 @@ struct LiveSkyViewfinderOverlay: View {
                 }
                 .padding()
                 .background(Color.black.opacity(0.4))
-                
-                // No more ARKit tracking-state messages ("relocalizing", "hold steady", etc.)
-                // -- a plain compass+gyro stream doesn't have those failure modes. The only
-                // thing left worth surfacing is the device simply not having a compass at all.
-                if !isStabilizingEngine && !motionEngine.isHeadingAvailable {
-                    Text("COMPASS UNAVAILABLE ON THIS DEVICE")
-                        .font(.system(.caption2, design: .monospaced))
-                        .fontWeight(.bold)
-                        .foregroundColor(.yellow)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.6))
-                        .cornerRadius(4)
-                        .padding(.top, 8)
-                        .transition(.opacity)
-                }
                 
                 Spacer()
 
@@ -420,32 +359,8 @@ struct LiveSkyViewfinderOverlay: View {
                     // activeNavigationTarget above, which only concerns the guided-tracking
                     // needle for a manually selected target.
                     if let lockedTarget = currentCrosshairTarget {
-                        VStack(spacing: 6) {
-                            TargetInfoReadout(target: lockedTarget, moonBrightnessPenalty: moonBrightnessPenalty)
-                            
-                            // Compass hardware has a real, irreducible accuracy floor (see
-                            // syncToLockedTarget's doc comment) -- this is the escape hatch:
-                            // center a known object, tell the app "this is right," and every
-                            // future frame trusts that over the raw sensor until synced again.
-                            if showSyncConfirmation {
-                                Text("SYNCED TO \(lockedTarget.name)")
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.green)
-                                    .transition(.opacity)
-                            } else {
-                                Button(action: { syncToLockedTarget() }) {
-                                    Text("SYNC TO \(lockedTarget.name)")
-                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(Color.cyan.opacity(0.15))
-                                        .foregroundColor(.cyan)
-                                        .cornerRadius(4)
-                                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.cyan.opacity(0.5), lineWidth: 1))
-                                }
-                            }
-                        }
-                        .transition(.opacity)
+                        TargetInfoReadout(target: lockedTarget, moonBrightnessPenalty: moonBrightnessPenalty)
+                            .transition(.opacity)
                     }
                 }
                 .animation(.easeInOut(duration: 0.2), value: currentCrosshairTarget)
@@ -612,21 +527,8 @@ struct LiveSkyViewfinderOverlay: View {
             }
         }
         .onAppear {
-            // Continuous now -- there's no separate one-shot capture step anymore (see
-            // SkyMotionManager's header comment). The veil below waits for the first real
-            // sample via isHeadingAvailable instead of a capture-completion callback.
-            motionEngine.engageSensorStreaming()
-        }
-        // BUG FIX (historical): the veil used to lift on a blind fixed 1.5s timer, then later
-        // on a one-shot heading-capture completion. Now that heading is just a continuous
-        // stream with no discrete "done" moment, the veil waits on isHeadingAvailable
-        // flipping true for the first time -- i.e. the first real sensor sample, however long
-        // that takes on a given device -- rather than guessing a duration.
-        .onChange(of: motionEngine.isHeadingAvailable) { _, newValue in
-            guard newValue else { return }
-            // Small minimum so the veil never flashes instantly even on a fast resolve --
-            // purely cosmetic, doesn't gate correctness.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            motionEngine.engageSensorStreaming(with: visiblePlanetsCatalog)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     isStabilizingEngine = false
                 }
@@ -650,30 +552,6 @@ struct LiveSkyViewfinderOverlay: View {
         .navigationBarHidden(true)
         .sheet(item: $selectedProfile) { profile in
             CelestialDetailSheet(profile: profile)
-        }
-    }
-    
-    /// SYNC: raw compass hardware just isn't reliably accurate to much better than 5-15° on
-    /// a real phone (see SkyMotionManager's header comment) -- no amount of software fixes
-    /// that. Every established stargazing app either lives with that error or gives the user
-    /// a way to correct it manually by pointing at something bright and unmistakable; this is
-    /// that feature. Called only while a named body is locked in the crosshair (see the SYNC
-    /// button below), so `currentCrosshairTarget!.azimuth` is that object's real catalog
-    /// azimuth -- the correction needed is just the gap between that true value and whatever
-    /// raw heading the compass is reporting right now, replacing (not stacking onto) any
-    /// previous correction, since this is meant as a fresh "this is correct, trust it" anchor
-    /// each time, not a cumulative nudge.
-    private func syncToLockedTarget() {
-        guard let target = currentCrosshairTarget else { return }
-        headingCorrectionDegrees = normalizedAngleDelta(target.azimuth - motionEngine.currentHeadingDegrees)
-        
-        withAnimation(.easeInOut(duration: 0.2)) {
-            showSyncConfirmation = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeInOut(duration: 0.4)) {
-                showSyncConfirmation = false
-            }
         }
     }
     
