@@ -78,6 +78,12 @@ struct LaunchCardView: View {
                 .padding(.top, 4)
             }
 
+            HStack {
+                Spacer()
+                Text("❯")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan.opacity(0.45))
+            }
         }
         .padding(horizontalSizeClass == .regular ? 16 : 12)
         // ✅ RESPONSIVE: Binds the structural layout frame constraints to the dynamic size-class property

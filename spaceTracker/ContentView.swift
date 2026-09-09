@@ -378,16 +378,20 @@ struct ContentView: View {
                         
                         // Simple, punchy, high-utility titles
                         HStack(alignment: .bottom) {
+                            // 💡 The CTA ("open this") is now the dominant line and
+                            // "point device to find planets" the supporting caption --
+                            // previously it was the other way around, so the eye landed on
+                            // an instruction rather than the invitation to tap.
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("OPEN LIVE INTERACTIVE SKY MAP")
-                                    .font(.system(.caption2, design: .monospaced))
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.cyan)
-                                
-                                Text("POINT DEVICE TO FIND PLANETS")
                                     .font(.system(.subheadline, design: .default))
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
+                                
+                                Text("POINT DEVICE TO FIND PLANETS")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.cyan)
                             }
                             
                             Spacer()
@@ -395,12 +399,19 @@ struct ContentView: View {
                             // Reticle scope graphic icon anchor -- swaps to a spinner while
                             // ensureTelemetryLoaded is in flight (see the button's action above)
                             // so the tap gives immediate feedback instead of a silent pause.
-                            if isPreparingSkyMap {
-                                ProgressView()
-                                    .tint(.cyan)
-                            } else {
-                                Image(systemName: "scope")
-                                    .font(.title2)
+                            // Trailing "❯" matches the tap-affordance glyph already used
+                            // elsewhere in the app (e.g. "TAP FOR FIELD BRIEFING ❯").
+                            HStack(spacing: 6) {
+                                if isPreparingSkyMap {
+                                    ProgressView()
+                                        .tint(.cyan)
+                                } else {
+                                    Image(systemName: "scope")
+                                        .font(.title2)
+                                        .foregroundColor(.cyan)
+                                }
+                                Text("❯")
+                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
                                     .foregroundColor(.cyan)
                             }
                         }
@@ -1271,26 +1282,37 @@ struct ContentView: View {
                                     )
                                     
                                     HStack(alignment: .bottom) {
+                                        // 💡 The CTA ("open this") is now the dominant line and
+                                        // "point device to find planets" the supporting caption --
+                                        // previously it was the other way around, so the eye
+                                        // landed on an instruction rather than the invitation to tap.
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text("OPEN LIVE INTERACTIVE SKY MAP")
-                                                .font(.system(.caption2, design: .monospaced))
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.cyan)
-                                            
-                                            Text("POINT DEVICE TO FIND PLANETS")
                                                 .font(.system(.subheadline, design: .default))
                                                 .fontWeight(.bold)
                                                 .foregroundColor(.white)
+                                            
+                                            Text("POINT DEVICE TO FIND PLANETS")
+                                                .font(.system(.caption2, design: .monospaced))
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.cyan)
                                         }
                                         
                                         Spacer()
                                         
-                                        if isPreparingSkyMap {
-                                            ProgressView()
-                                                .tint(.cyan)
-                                        } else {
-                                            Image(systemName: "scope")
-                                                .font(.title2)
+                                        // Trailing "❯" matches the tap-affordance glyph already
+                                        // used elsewhere in the app (e.g. "TAP FOR FIELD BRIEFING ❯").
+                                        HStack(spacing: 6) {
+                                            if isPreparingSkyMap {
+                                                ProgressView()
+                                                    .tint(.cyan)
+                                            } else {
+                                                Image(systemName: "scope")
+                                                    .font(.title2)
+                                                    .foregroundColor(.cyan)
+                                            }
+                                            Text("❯")
+                                                .font(.system(size: 14, weight: .bold, design: .monospaced))
                                                 .foregroundColor(.cyan)
                                         }
                                     }

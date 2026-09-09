@@ -423,6 +423,13 @@ struct SatelliteCardView: View {
                     .font(.system(size: horizontalSizeClass == .regular ? 11 : 10, design: .monospaced))
             }
             .foregroundColor(.gray)
+
+            HStack {
+                Spacer()
+                Text("❯")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan.opacity(0.45))
+            }
         }
         .padding(horizontalSizeClass == .regular ? 16 : 14)
         // ✅ RESPONSIVE: Locked smoothly to size-class boundaries instead of a static point value

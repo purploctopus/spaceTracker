@@ -124,6 +124,13 @@ struct MeteorShowerCardView: View {
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(rating.isPoor ? .orange : .green)
             }
+
+            HStack {
+                Spacer()
+                Text("❯")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan.opacity(0.45))
+            }
         }
         .padding(14)
         .frame(width: 230, alignment: .leading)

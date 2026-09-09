@@ -145,6 +145,13 @@ struct SpacecraftRosterCardView: View {
             
             // Upper ceiling push spring
             Spacer(minLength: 0)
+
+            HStack {
+                Spacer()
+                Text("❯")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan.opacity(0.45))
+            }
         }
         .padding(14)
         // 💡 FIXED: Zero hardcoded pixel parameters. Stretches completely dynamically to fill layout space context safely.
