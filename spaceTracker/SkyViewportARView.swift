@@ -14,6 +14,11 @@ import SceneKit
 // ==============================================================================
 class SkyViewportARView: UIView {
     let arView = ARSCNView()
+    /// Kept as a property (not just a local in populateARSkyDome) so applyHeadingOffset
+    /// below can rotate the whole dome after the fact, once SkyMotionManager's one-shot
+    /// true-heading capture completes -- see that file's header comment for why this
+    /// replaced the old continuous-compass jitter.
+    private var celestialSphereNode: SCNNode?
     
     init(celestialCatalog: [APIPlanetItem]) {
         super.init(frame: .zero)
@@ -24,7 +29,15 @@ class SkyViewportARView: UIView {
         arView.automaticallyUpdatesLighting = false
         
         let configuration = ARWorldTrackingConfiguration()
-        configuration.worldAlignment = .gravityAndHeading
+        // BUG FIX: was .gravityAndHeading, which keeps ARKit's own world orientation tied to
+        // a *continuous* live magnetometer reading for as long as the session runs -- any
+        // magnetic interference (a desk, nearby electronics, an iPad's own magnetic
+        // case/keyboard/Pencil) directly wobbled the whole scene, even at rest. .gravity
+        // uses only gravity (accelerometer) plus ARKit's gyro/visual tracking -- no ongoing
+        // compass input at all. The one-time north alignment .gravity gives up is restored
+        // separately via applyHeadingOffset(degrees:), called once real-world heading is
+        // known (see SkyMotionManager.captureInitialTrueHeading).
+        configuration.worldAlignment = .gravity
         
         arView.frame = self.bounds
         arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -41,12 +54,26 @@ class SkyViewportARView: UIView {
     
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
+    /// Applies the ONE-TIME true-north alignment captured by
+    /// SkyMotionManager.captureInitialTrueHeading, rotating the whole sky dome to match the
+    /// compass bearing the device actually faced when the AR session started -- needed now
+    /// that worldAlignment is .gravity, which (unlike .gravityAndHeading) has no absolute
+    /// heading reference of its own. Safe to call more than once; each call just re-sets the
+    /// same absolute rotation, it doesn't accumulate.
+    func applyHeadingOffset(degrees: Double) {
+        let radians = Float(degrees * .pi / 180.0)
+        // Same sign convention as each individual object's own yaw below (-azRad) -- negating
+        // here makes a sphere-wide offset behave exactly like an object-level azimuth would.
+        celestialSphereNode?.eulerAngles.y = -radians
+    }
+    
     private func populateARSkyDome(catalog: [APIPlanetItem], inside scene: SCNScene) {
         let domeRadius: Float = 25.0
         
         let celestialSphereNode = SCNNode()
         celestialSphereNode.name = "CELESTIAL_SPHERE_SHELL"
         scene.rootNode.addChildNode(celestialSphereNode)
+        self.celestialSphereNode = celestialSphereNode
         
         // 🔬 MANDATORY FORENSIC GRAPHICS PRINTS - PERMANENTLY RETAINED AND RESTORED
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -137,6 +164,14 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
     let celestialCatalog: [APIPlanetItem]
     @Binding var projectedScreenPlots: [ScreenProjectedObject]
     @Binding var currentCrosshairTarget: TargetLockMatch?
+    /// Nil until SkyMotionManager.captureInitialTrueHeading finishes its one-shot sample;
+    /// applied to the AR dome the moment it arrives (see makeUIView/updateUIView below).
+    var headingOffsetDegrees: Double?
+    /// Set from Coordinator.session(_:cameraDidChangeTrackingState:) so the SwiftUI layer
+    /// can tell the user when ARKit's own visual tracking has degraded (e.g. pointed at a
+    /// featureless patch of sky/ceiling with nothing for it to visually lock onto) instead
+    /// of silently drifting with no explanation.
+    @Binding var trackingStatusMessage: String?
     
     /// The actual measured center of the on-screen reticle ring, in the same coordinate
     /// space as `arView.projectPoint(_:)` output (i.e. the AR view's own top-left-origin
@@ -148,13 +183,25 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
     
     func makeUIView(context: Context) -> SkyViewportARView {
         let view = SkyViewportARView(celestialCatalog: celestialCatalog)
+        // Setting .delegate alone is sufficient -- ARSCNViewDelegate inherits from
+        // ARSessionObserver and ARSCNView forwards session-status callbacks (tracking
+        // state, interruptions, etc.) to it automatically. Separately assigning
+        // view.arView.session.delegate would risk stepping on whatever ARSCNView's own
+        // internals rely on that property for -- deliberately not doing that here.
         view.arView.delegate = context.coordinator
         context.coordinator.reticleCenter = reticleCenter
+        if let headingOffsetDegrees {
+            view.applyHeadingOffset(degrees: headingOffsetDegrees)
+        }
         return view
     }
     
     func updateUIView(_ uiView: SkyViewportARView, context: Context) {
         context.coordinator.reticleCenter = reticleCenter
+        context.coordinator.parent = self
+        if let headingOffsetDegrees {
+            uiView.applyHeadingOffset(degrees: headingOffsetDegrees)
+        }
     }
     
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -166,6 +213,38 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
         init(_ parent: SkyViewportARViewContainer) {
             self.parent = parent
             self.reticleCenter = parent.reticleCenter
+        }
+        
+        // ARSCNViewDelegate inherits from ARSessionObserver, which declares this --
+        // ARSCNView forwards it here automatically since this Coordinator is set as
+        // arView.delegate (see makeUIView), no separate session.delegate assignment
+        // needed. Surfaces ARKit's own read on tracking quality (e.g. pointed at a
+        // blank ceiling/sky with nothing visually distinctive to lock onto -- one of the
+        // worst-case scenes for camera-based tracking) instead of leaving the jitter/drift
+        // that produces unexplained on screen.
+        func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
+            let message: String?
+            switch camera.trackingState {
+            case .normal:
+                message = nil
+            case .notAvailable:
+                message = "TRACKING UNAVAILABLE"
+            case .limited(.initializing):
+                // Already covered by the app's own stabilization veil right after this view
+                // appears -- no need for a second, redundant "loading" message here.
+                message = nil
+            case .limited(.relocalizing):
+                message = "RELOCALIZING…"
+            case .limited(.excessiveMotion):
+                message = "HOLD STEADY"
+            case .limited(.insufficientFeatures):
+                message = "POINT AT A MORE DETAILED AREA TO STABILIZE"
+            @unknown default:
+                message = nil
+            }
+            DispatchQueue.main.async { [weak self] in
+                self?.parent.trackingStatusMessage = message
+            }
         }
         
         func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {

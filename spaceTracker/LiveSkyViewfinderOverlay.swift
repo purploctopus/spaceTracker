@@ -191,6 +191,15 @@ struct LiveSkyViewfinderOverlay: View {
         y: UIScreen.main.bounds.height / 2
     )
     
+    // BUG FIX: nil until SkyMotionManager.captureInitialTrueHeading resolves (~0.6s after
+    // this view appears, safely hidden behind the stabilization veil below) -- see
+    // SkyMotionManager.swift's header comment for the full jitter/drift story this fixes.
+    @State private var trueHeadingOffsetDegrees: Double? = nil
+    // Set by SkyViewportARViewContainer when ARKit's own tracking quality degrades (e.g.
+    // pointed at a featureless patch of sky/ceiling) -- surfaced to the user instead of
+    // silently jittering with no explanation.
+    @State private var trackingStatusMessage: String? = nil
+    
     var body: some View {
         ZStack {
             // 1. Core AR Engine Canvas (100% Intact)
@@ -198,6 +207,8 @@ struct LiveSkyViewfinderOverlay: View {
                 celestialCatalog: visiblePlanetsCatalog,
                 projectedScreenPlots: $projectedScreenPlots,
                 currentCrosshairTarget: $currentCrosshairTarget,
+                headingOffsetDegrees: trueHeadingOffsetDegrees,
+                trackingStatusMessage: $trackingStatusMessage,
                 reticleCenter: reticleCenter
             )
             .ignoresSafeArea()
@@ -297,6 +308,20 @@ struct LiveSkyViewfinderOverlay: View {
                 }
                 .padding()
                 .background(Color.black.opacity(0.4))
+                
+                if let trackingStatusMessage {
+                    Text(trackingStatusMessage)
+                        .font(.system(.caption2, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.yellow)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.black.opacity(0.6))
+                        .cornerRadius(4)
+                        .padding(.top, 8)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.2), value: trackingStatusMessage)
+                }
                 
                 Spacer()
 
@@ -527,7 +552,13 @@ struct LiveSkyViewfinderOverlay: View {
             }
         }
         .onAppear {
-            motionEngine.engageSensorStreaming(with: visiblePlanetsCatalog)
+            motionEngine.engageSensorStreaming()
+            // One-shot -- NOT a continuous compass feed. Fires once, ~0.6s in, comfortably
+            // inside the 1.5s stabilization veil below so the dome's heading correction is
+            // never visibly seen snapping into place.
+            motionEngine.captureInitialTrueHeading { heading in
+                trueHeadingOffsetDegrees = heading
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     isStabilizingEngine = false
