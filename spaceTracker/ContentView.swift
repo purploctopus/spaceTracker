@@ -196,8 +196,19 @@ struct ContentView: View {
             )
         }
     }
+
+    /// Settings entry point (FEAT-02) -- reachable from every tab's toolbar, same as
+    /// adFreeToolbarButton above, since notification preferences aren't tied to any one screen.
+    private var settingsToolbarButton: some View {
+        Button(action: { showSettings = true }) {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.cyan)
+        }
+    }
     @State private var showAcknowledgements = false
     @State private var showConditionsExplainer = false
+    @State private var showSettings = false
     @StateObject private var newsViewModel = SpaceNewsViewModel()
     @State private var selectedArticle: SpaceNewsArticle? = nil
     @StateObject private var stargazerViewModel = StargazerViewModel()
@@ -1384,6 +1395,9 @@ struct ContentView: View {
                                     ToolbarItem(placement: .principal) {
                                         principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
                                     }
+                                    ToolbarItem(placement: .navigationBarLeading) {
+                                        settingsToolbarButton
+                                    }
                                     // 💡 Persistent, low-key entry point into the voluntary
                                     // "Go Ad-Free" sheet — nothing forces this open, it's
                                     // just always reachable for whoever goes looking for it.
@@ -1696,6 +1710,9 @@ struct ContentView: View {
                 // this tab had no toolbar of its own at all, so the button only ever
                 // appeared when Home Command happened to be the active tab.
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        settingsToolbarButton
+                    }
                     if !adEngine.hasPermanentAdFree {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             adFreeToolbarButton
@@ -1722,6 +1739,9 @@ struct ContentView: View {
                     .padding(.bottom, 60)
                 }
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        settingsToolbarButton
+                    }
                     if !adEngine.hasPermanentAdFree {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             adFreeToolbarButton
@@ -1744,6 +1764,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showAcknowledgements) {
             AcknowledgementsView()
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(notificationEngine: notificationEngine)
         }
     }
 

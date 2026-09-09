@@ -75,6 +75,18 @@ class NotificationManager: ObservableObject {
         }
     }
 
+    /// Re-checks the current system permission without prompting -- unlike
+    /// requestPermission(), this never shows the native dialog, so it's safe to call every
+    /// time SettingsView appears (e.g. after the user backgrounds the app to flip the
+    /// switch in iOS Settings and comes back) without risking a surprise re-prompt.
+    func refreshAuthorizationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                self.isAuthorized = settings.authorizationStatus == .authorized
+            }
+        }
+    }
+
     func scheduleDailyBriefing(launches: [SpaceLaunch], satellites: [SatellitePass], meteorShowers: [MeteorShower]) {
         // 💡 FIX: this used to call removeAllPendingNotificationRequests(), which also wiped
         // every per-event alert scheduleEventAlerts() had just scheduled below, every single
