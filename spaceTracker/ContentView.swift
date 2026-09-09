@@ -638,6 +638,12 @@ struct ContentView: View {
     }
 
     // 💡 THE 7-DAY MANIFEST ENGINE: Calculates tracking windows for the next 7 days
+    /// FEAT-03: launches from the last 48 hours through the next 7 days. Previously this
+    /// only looked forward from `now`, so a launch vanished from every card the instant it
+    /// happened -- no way to reread details or rewatch the stream afterward. The lower bound
+    /// moved back 48 hours so a completed launch stays visible for a couple of days; nothing
+    /// else needed to change, since LaunchCountdownView already renders "LAUNCH OPERATIONAL /
+    /// LIFTOFF PAST" once a target date is behind it instead of a broken countdown.
     private var upcomingManifest: [SpaceLaunch] {
         viewModel.launches.filter { launch in
             guard let netString = launch.net else { return false }
@@ -656,9 +662,10 @@ struct ContentView: View {
             // Core structural boundary conditions
             let now = Date()
             guard let sevenDaysFromNow = Calendar.current.date(byAdding: .day, value: 7, to: now) else { return false }
+            guard let fortyEightHoursAgo = Calendar.current.date(byAdding: .hour, value: -48, to: now) else { return false }
             
-            // Capture any target operations scheduled between right now and next week
-            return validDate >= now && validDate <= sevenDaysFromNow
+            // Capture any target operations from the last 48 hours through next week
+            return validDate >= fortyEightHoursAgo && validDate <= sevenDaysFromNow
         }
     }
     
@@ -1168,7 +1175,7 @@ struct ContentView: View {
 
     private var upcoming7DayMissionsChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("UPCOMING 7-DAY LAUNCHES")
+            Text("LAUNCHES: PAST 48H \u{2192} NEXT 7 DAYS")
                 .font(.system(.caption, design: .monospaced).weight(.bold))
                 .foregroundColor(.cyan)
                 .tracking(2)
