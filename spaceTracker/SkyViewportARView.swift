@@ -173,14 +173,19 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
             
             var temporaryPlots: [ScreenProjectedObject] = []
             
-            // Named bodies (planets, the Moon, and naked-eye stars with a real name rather than
-            // just a HIP catalog number -- see isMajorLabelBody/hasPermanentLabel in
-            // populateARSkyDome) get their own closest-match tracking, separate from the general
-            // "anything under the reticle" tracking below. That way a named object anywhere
-            // inside the lock radius always outranks a closer but unnamed background star,
-            // instead of pure on-screen distance deciding the winner.
-            var closestNamedNode: SCNNode? = nil
-            var closestNamedDistance: Float = Float.infinity
+            // BUG FIX: the previous version lumped planets/the Moon and named stars into one
+            // "named" pool and just picked whichever was closest to dead-center within it --
+            // which meant a bright named star (Regulus, Procyon, whatever's nearby) could
+            // still beat Jupiter for the lock if it happened to land a few pixels closer to
+            // the exact reticle center, even with Jupiter comfortably inside the ring. That's
+            // backwards: planets and the Moon are the actual point of this app and should
+            // never lose to an ordinary star merely on pixel distance. Three strict tiers now,
+            // each only consulted if every tier above it is empty within the lock radius:
+            // planets/Moon, then named stars, then everything else (HIP-numbered/unnamed).
+            var closestPlanetOrMoonNode: SCNNode? = nil
+            var closestPlanetOrMoonDistance: Float = Float.infinity
+            var closestNamedStarNode: SCNNode? = nil
+            var closestNamedStarDistance: Float = Float.infinity
             var closestAnyNode: SCNNode? = nil
             var closestAnyDistance: Float = Float.infinity
             
@@ -200,6 +205,7 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
                         let screenX = CGFloat(screenPoint.x)
                         let screenY = CGFloat(screenPoint.y)
                         let isNamedBody = node.value(forKey: "hasPermanentLabel") as? Bool == true
+                        let isPlanetOrMoon = packet.classification == "PLANET" || packet.classification == "MOON"
                         
                         if isNamedBody {
                             temporaryPlots.append(ScreenProjectedObject(
@@ -216,10 +222,15 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
                         
                         guard distanceToCenter < 35.0 else { return }
                         
-                        if isNamedBody {
-                            if distanceToCenter < closestNamedDistance {
-                                closestNamedDistance = distanceToCenter
-                                closestNamedNode = node
+                        if isPlanetOrMoon {
+                            if distanceToCenter < closestPlanetOrMoonDistance {
+                                closestPlanetOrMoonDistance = distanceToCenter
+                                closestPlanetOrMoonNode = node
+                            }
+                        } else if isNamedBody {
+                            if distanceToCenter < closestNamedStarDistance {
+                                closestNamedStarDistance = distanceToCenter
+                                closestNamedStarNode = node
                             }
                         } else if distanceToCenter < closestAnyDistance {
                             closestAnyDistance = distanceToCenter
@@ -229,9 +240,11 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
                 }
             }
             
-            // A named body anywhere in the lock radius always wins; only fall back to the
-            // nearest unnamed star when nothing named is under the reticle at all.
-            let activeLockNode = closestNamedNode ?? closestAnyNode
+            // Strict tier order: any planet/Moon in the lock radius wins outright, regardless
+            // of exactly how close it is to center relative to a star also in the radius.
+            // Only fall through to named stars, then to anything else, when the tier above is
+            // completely empty.
+            let activeLockNode = closestPlanetOrMoonNode ?? closestNamedStarNode ?? closestAnyNode
             
             DispatchQueue.main.async {
                 self.parent.projectedScreenPlots = temporaryPlots
