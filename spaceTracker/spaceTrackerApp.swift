@@ -76,7 +76,12 @@ struct spaceTrackerApp: App {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
                                 if adEngine.canShowTransitionAd() {
                                     adEngine.markTransitionAdShown()
-                                    adEngine.showAdFromKeyWindow()
+                                    // CHANGED: used to call showAdFromKeyWindow() directly here,
+                                    // firing the rewarded interstitial and silently granting its
+                                    // 24h reward with no in-app explanation. triggerAutoAdPrompt()
+                                    // surfaces the same voluntary choice sheet the toolbar icon
+                                    // opens instead, so this is a choice, not a surprise.
+                                    adEngine.triggerAutoAdPrompt()
                                 }
                             }
                         } else {

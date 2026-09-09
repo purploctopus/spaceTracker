@@ -150,6 +150,19 @@ struct ContentView: View {
     // taps. See spaceTrackerApp.swift for the transition trigger.
     @EnvironmentObject var adEngine: AdMobEngine
     @State private var showAdPromptOverlay = false
+
+    /// Toolbar badge text for the ad-free entry point -- the real IAP price when nothing's
+    /// unlocked yet, so the icon reads as a buy button instead of decoration, or "UNTIL h:mm"
+    /// while today's temporary window is active, so its state is visible at a glance without
+    /// opening the sheet.
+    private var adFreeToolbarLabelText: String {
+        if adEngine.hasTemporaryAdFreeActive, let expiresAt = adEngine.temporaryAdFreeExpiresAt {
+            let formatter = DateFormatter()
+            formatter.timeStyle = .short
+            return "UNTIL \(formatter.string(from: expiresAt))"
+        }
+        return adEngine.premiumProduct?.displayPrice ?? "$2.99"
+    }
     @State private var showAcknowledgements = false
     @State private var showConditionsExplainer = false
     @StateObject private var newsViewModel = SpaceNewsViewModel()
@@ -1175,6 +1188,16 @@ struct ContentView: View {
                                 longitude: hardwareLng
                             )
                         }
+                        // Bridges AdMobEngine.shouldAutoPresentAdPrompt (set by the cold-launch
+                        // ad-break trigger in spaceTrackerApp.swift) into this view's own local
+                        // showAdPromptOverlay state, so the automatic trigger surfaces the exact
+                        // same voluntary sheet the toolbar icon opens, rather than firing an ad
+                        // directly with no explanation.
+                        .onChange(of: adEngine.shouldAutoPresentAdPrompt) { _, shouldPresent in
+                            if shouldPresent {
+                                showAdPromptOverlay = true
+                            }
+                        }
                     
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
@@ -1273,9 +1296,13 @@ struct ContentView: View {
                                     if !adEngine.hasPermanentAdFree {
                                         ToolbarItem(placement: .navigationBarTrailing) {
                                             Button(action: { showAdPromptOverlay = true }) {
-                                                Image(systemName: "tv.slash")
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundColor(.cyan)
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: adEngine.hasTemporaryAdFreeActive ? "checkmark.seal.fill" : "tv.slash")
+                                                        .font(.system(size: 14, weight: .semibold))
+                                                    Text(adFreeToolbarLabelText)
+                                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                                }
+                                                .foregroundColor(.cyan)
                                             }
                                         }
                                     }
@@ -1344,10 +1371,12 @@ struct ContentView: View {
                             onTriggerAd: {
                                 adEngine.showAdFromKeyWindow {
                                     showAdPromptOverlay = false
+                                    adEngine.shouldAutoPresentAdPrompt = false
                                 }
                             },
                             onDismiss: {
                                 showAdPromptOverlay = false
+                                adEngine.shouldAutoPresentAdPrompt = false
                             }
                         )
                         .transition(.opacity.animation(.easeInOut))

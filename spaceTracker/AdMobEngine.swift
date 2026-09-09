@@ -45,6 +45,13 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
     @Published var hasTemporaryAdFreeActive = false
     @Published var temporaryAdFreeExpiresAt: Date?
 
+    /// Set by the cold-launch ad-break trigger (see spaceTrackerApp.swift) to ask ContentView
+    /// to present AdPromptOverlayView -- the same voluntary "watch ad for 24h / buy forever"
+    /// sheet the toolbar icon opens -- instead of silently firing a rewarded interstitial and
+    /// granting its reward with no in-app explanation. ContentView resets this back to false
+    /// once it has surfaced the sheet.
+    @Published var shouldAutoPresentAdPrompt = false
+
     /// Whether ads should currently be suppressed anywhere in the app, for the many call
     /// sites that only care about the combined answer (transition ads, App Open ads, etc.)
     /// and don't need to distinguish *why*. UI code that needs to tell the two states apart
@@ -243,6 +250,16 @@ class AdMobEngine: NSObject, ObservableObject, FullScreenContentDelegate {
 
     func markTransitionAdShown() {
         UserDefaults.standard.set(Date(), forKey: "last_transition_ad_shown_at")
+    }
+
+    /// Called by the cold-launch ad-break trigger instead of showAdFromKeyWindow(). Surfaces
+    /// the voluntary choice sheet rather than playing the ad directly -- see
+    /// shouldAutoPresentAdPrompt's doc comment for why. Not @MainActor-isolated, matching
+    /// every other method in this class -- callers (currently only the DispatchQueue.main
+    /// closure in spaceTrackerApp.swift) are responsible for already being on the main thread,
+    /// same as showAdFromKeyWindow()/markTransitionAdShown() above.
+    func triggerAutoAdPrompt() {
+        shouldAutoPresentAdPrompt = true
     }
 
     private var rewardedInterstitialLoadAttempts = 0
