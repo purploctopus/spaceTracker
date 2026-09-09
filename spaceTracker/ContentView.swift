@@ -238,6 +238,9 @@ struct ContentView: View {
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
     @StateObject private var locationProvider = DeviceLocationProvider()
     @ObservedObject private var favoritesStore = FavoritesStore.shared
+    // FEAT-15: persisted order for the Home Command channel blocks below --
+    // reordered from Settings > Dashboard Layout.
+    @ObservedObject private var dashboardLayoutStore = DashboardLayoutStore.shared
 
 
     // 💡 RESPONSIVE ATMOSPHERIC CELL MATRIX: Stacks vertically on iPhone, aligns horizontally on iPad
@@ -1262,6 +1265,33 @@ struct ContentView: View {
         }
     }
 
+    // FEAT-15: renders whichever channel block the enum case names, so the Home
+    // Command scroll below can iterate `dashboardLayoutStore.channelOrder` instead of
+    // hardcoding one fixed sequence of blocks.
+    @ViewBuilder
+    private func dashboardChannelView(for channel: DashboardChannel) -> some View {
+        switch channel {
+        case .missions:
+            VStack(alignment: .leading, spacing: 8) {
+                upcoming7DayMissionsChannelBlock
+                // MASTER ACCESS CHANNEL ROADWAY LINK -- travels with Missions since
+                // it's a launch-provider index, not an independent channel of its own.
+                VStack(alignment: .leading, spacing: 2) {
+                    NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
+                        MasterAccessChannelRowView(launches: viewModel.launches)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+        case .satellites:
+            visibleSatellitesChannelBlock
+        case .asteroids:
+            nasaAsteroidRadarChannelBlock
+        case .meteorShowers:
+            annualMeteorShowerChannelBlock
+        }
+    }
+
     var body: some View {
         TabView {
             NavigationView {
@@ -1399,58 +1429,22 @@ struct ContentView: View {
                                 .background(Color.cyan)
                                 .padding(.top, 8)
                             
-                            // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL (Includes your company filter buttons and horizontal cards)
-                            upcoming7DayMissionsChannelBlock
-                                .toolbar {
-                                    ToolbarItem(placement: .principal) {
-                                        principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
-                                    }
-                                    ToolbarItem(placement: .navigationBarLeading) {
-                                        settingsToolbarButton
-                                    }
-                                    // 💡 Persistent, low-key entry point into the voluntary
-                                    // "Go Ad-Free" sheet — nothing forces this open, it's
-                                    // just always reachable for whoever goes looking for it.
-                                    // 💡 Keys off hasPermanentAdFree specifically, not the
-                                    // combined isPremiumUnlocked — this icon should stay
-                                    // visible through an active temporary ad-free window
-                                    // (there's still a reason to tap it: buying permanently),
-                                    // only disappearing once ads are actually gone for good.
-                                    if !adEngine.hasPermanentAdFree {
-                                        ToolbarItem(placement: .navigationBarTrailing) {
-                                            adFreeToolbarButton
-                                        }
-                                    }
+                            // 🛰️ FEAT-15: dashboard channel blocks (missions/roadway
+                            // link, satellites, asteroids, meteor showers) render in
+                            // dashboardLayoutStore's order instead of a fixed sequence, so
+                            // whatever someone checks most gets reordered to the top from
+                            // Settings > Dashboard Layout. The toolbar that used to hang off
+                            // the missions block moved to the ScrollView itself below, since
+                            // it needs to stay put regardless of where missions lands.
+                            ForEach(Array(dashboardLayoutStore.channelOrder.enumerated()), id: \.element) { index, channel in
+                                dashboardChannelView(for: channel)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.top, index == 0 ? 0 : 24)
+                                if index < dashboardLayoutStore.channelOrder.count - 1 {
+                                    Divider()
+                                        .background(Color.cyan)
                                 }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            // 3. MASTER ACCESS CHANNEL ROADWAY LINK (Pulls tight under the launch tracks thanks to parent spacing: 8)
-                            VStack(alignment: .leading, spacing: 2) {
-                                NavigationLink(destination: ProviderIndexView(launches: viewModel.launches)) {
-                                    MasterAccessChannelRowView(launches: viewModel.launches)
-                                }
-                                .buttonStyle(PlainButtonStyle())
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            Divider()
-                                .background(Color.cyan)
-                            
-                            // 🛰️ 2. VISIBLE OVERHEAD SATELLITES WATCH MODULE (NEXT 48 HOURS)
-                            visibleSatellitesChannelBlock
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 24)
-                            Divider()
-                                .background(Color.cyan)
-                            // 🛰️ 3. NASA NEAR-EARTH ASTEROID INTERCEPT RADAR STREAM (7-DAY MANIFEST)
-                            nasaAsteroidRadarChannelBlock
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 24) // 💡 Pushes the title text down away from the satellite cards above it so it matches its cards
-                            Divider()
-                                .background(Color.cyan)
-                            // 🛰️ 4. ANNUAL METEOR SHOWER LOOKAHEAD MANIFEST CHANNEL
-                            annualMeteorShowerChannelBlock
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 24) // 💡 Separates the meteor timelines from the asteroid radar matrix above it
                             // 💡 FEAT-13: Space Station Tracker + Humans in Space moved to
                             // the new Earth Watch tab -- see EarthWatchView.swift. Both are
                             // really the same idea Earth Watch is built around (Earth with
@@ -1461,6 +1455,27 @@ struct ContentView: View {
                         .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
                     } // Closes ScrollView
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .principal) {
+                            principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
+                        }
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            settingsToolbarButton
+                        }
+                        // 💡 Persistent, low-key entry point into the voluntary
+                        // "Go Ad-Free" sheet — nothing forces this open, it's
+                        // just always reachable for whoever goes looking for it.
+                        // 💡 Keys off hasPermanentAdFree specifically, not the
+                        // combined isPremiumUnlocked — this icon should stay
+                        // visible through an active temporary ad-free window
+                        // (there's still a reason to tap it: buying permanently),
+                        // only disappearing once ads are actually gone for good.
+                        if !adEngine.hasPermanentAdFree {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                adFreeToolbarButton
+                            }
+                        }
+                    }
                     .toolbarBackground(.hidden, for: .navigationBar)
                     
                     VStack {

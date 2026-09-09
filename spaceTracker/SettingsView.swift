@@ -11,6 +11,9 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var notificationEngine: NotificationManager
     @ObservedObject private var favorites = FavoritesStore.shared
+    // FEAT-15: the dashboard reorder sheet lives here, off a single row below.
+    @ObservedObject private var dashboardLayout = DashboardLayoutStore.shared
+    @State private var showDashboardReorderSheet = false
     @Environment(\.dismiss) var dismiss
 
     private let leadTimeOptions = [5, 10, 15, 30, 60]
@@ -64,6 +67,36 @@ struct SettingsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
                     .cornerRadius(8)
 
+                    sectionHeader("DASHBOARD LAYOUT")
+                    Button(action: { showDashboardReorderSheet = true }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "arrow.up.arrow.down.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.cyan)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("REORDER HOME COMMAND")
+                                    .font(.system(.footnote, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                Text(dashboardLayout.channelOrder.map { $0.title }.joined(separator: " · "))
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(.gray)
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .background(Color(red: 0.06, green: 0.06, blue: 0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .cornerRadius(8)
+
                     sectionHeader("QUIET HOURS")
                     VStack(spacing: 0) {
                         toggleRow(
@@ -100,6 +133,9 @@ struct SettingsView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle("NOTIFICATIONS")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showDashboardReorderSheet) {
+                DashboardReorderSheetView(layoutStore: dashboardLayout)
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }

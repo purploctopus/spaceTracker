@@ -61,6 +61,13 @@
 			);
 			target = 8056A75C3051F19D00529AA5 /* spaceTrackerWidgetsExtension */;
 		};
+		8056A77F3051F4FF00529AA5 /* Exceptions for "spaceTracker" folder in "spaceTrackerWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SharedSpaceTelemetry.swift,
+			);
+			target = 8056A75C3051F19D00529AA5 /* spaceTrackerWidgetsExtension */;
+		};
 		8068C9B92FE33E36001E1DDE /* Exceptions for "spaceTracker" folder in "spaceTracker" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -83,6 +90,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				8068C9B92FE33E36001E1DDE /* Exceptions for "spaceTracker" folder in "spaceTracker" target */,
+				8056A77F3051F4FF00529AA5 /* Exceptions for "spaceTracker" folder in "spaceTrackerWidgetsExtension" target */,
 			);
 			path = spaceTracker;
 			sourceTree = "<group>";
@@ -305,7 +313,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = PurplOctopus.spaceTracker.spaceTrackerWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -336,7 +344,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = PurplOctopus.spaceTracker.spaceTrackerWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -497,7 +505,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = PurplOctopus.spaceTracker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -535,7 +543,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = PurplOctopus.spaceTracker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
