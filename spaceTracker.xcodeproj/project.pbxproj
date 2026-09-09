@@ -12,17 +12,55 @@
 		800933A73041BBED00CFB57C /* SwiftAA in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A63041BBED00CFB57C /* SwiftAA */; };
 		800933AA3045C21700CFB57C /* SatelliteKit in Frameworks */ = {isa = PBXBuildFile; productRef = 800933A93045C21700CFB57C /* SatelliteKit */; };
 		8052EF133017A10600CA4AE8 /* StoreKitTestCertificate.cer in Resources */ = {isa = PBXBuildFile; fileRef = 8052EF123017A10600CA4AE8 /* StoreKitTestCertificate.cer */; };
+		8056A7603051F19D00529AA5 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8056A75F3051F19D00529AA5 /* WidgetKit.framework */; };
+		8056A7623051F19D00529AA5 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8056A7613051F19D00529AA5 /* SwiftUI.framework */; };
+		8056A7733051F19F00529AA5 /* spaceTrackerWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8056A75D3051F19D00529AA5 /* spaceTrackerWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		80B0623A2FFD8C5600990CBD /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 80B062392FFD8C5600990CBD /* GoogleMobileAds */; };
 		80B062912FFEA6E700990CBD /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 80B062902FFEA6E700990CBD /* Products.storekit */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		8056A7713051F19F00529AA5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8068C9982FE33592001E1DDE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8056A75C3051F19D00529AA5;
+			remoteInfo = spaceTrackerWidgetsExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8056A7783051F19F00529AA5 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8056A7733051F19F00529AA5 /* spaceTrackerWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		8052EF123017A10600CA4AE8 /* StoreKitTestCertificate.cer */ = {isa = PBXFileReference; lastKnownFileType = file; path = StoreKitTestCertificate.cer; sourceTree = "<group>"; };
+		8056A75D3051F19D00529AA5 /* spaceTrackerWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = spaceTrackerWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8056A75F3051F19D00529AA5 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		8056A7613051F19D00529AA5 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		8056A7793051F22C00529AA5 /* spaceTrackerWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = spaceTrackerWidgetsExtension.entitlements; sourceTree = "<group>"; };
 		8068C9A02FE33592001E1DDE /* spaceTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = spaceTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		80B062902FFEA6E700990CBD /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8056A7773051F19F00529AA5 /* Exceptions for "spaceTrackerWidgets" folder in "spaceTrackerWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8056A75C3051F19D00529AA5 /* spaceTrackerWidgetsExtension */;
+		};
 		8068C9B92FE33E36001E1DDE /* Exceptions for "spaceTracker" folder in "spaceTracker" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -33,6 +71,14 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		8056A7633051F19D00529AA5 /* spaceTrackerWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8056A7773051F19F00529AA5 /* Exceptions for "spaceTrackerWidgets" folder in "spaceTrackerWidgetsExtension" target */,
+			);
+			path = spaceTrackerWidgets;
+			sourceTree = "<group>";
+		};
 		8068C9A22FE33592001E1DDE /* spaceTracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -44,6 +90,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		8056A75A3051F19D00529AA5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8056A7623051F19D00529AA5 /* SwiftUI.framework in Frameworks */,
+				8056A7603051F19D00529AA5 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8068C99D2FE33592001E1DDE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -59,12 +114,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		8056A75E3051F19D00529AA5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8056A75F3051F19D00529AA5 /* WidgetKit.framework */,
+				8056A7613051F19D00529AA5 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		8068C9972FE33592001E1DDE = {
 			isa = PBXGroup;
 			children = (
+				8056A7793051F22C00529AA5 /* spaceTrackerWidgetsExtension.entitlements */,
 				80B062902FFEA6E700990CBD /* Products.storekit */,
 				8052EF123017A10600CA4AE8 /* StoreKitTestCertificate.cer */,
 				8068C9A22FE33592001E1DDE /* spaceTracker */,
+				8056A7633051F19D00529AA5 /* spaceTrackerWidgets */,
+				8056A75E3051F19D00529AA5 /* Frameworks */,
 				8068C9A12FE33592001E1DDE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -73,6 +140,7 @@
 			isa = PBXGroup;
 			children = (
 				8068C9A02FE33592001E1DDE /* spaceTracker.app */,
+				8056A75D3051F19D00529AA5 /* spaceTrackerWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,6 +148,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		8056A75C3051F19D00529AA5 /* spaceTrackerWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8056A7743051F19F00529AA5 /* Build configuration list for PBXNativeTarget "spaceTrackerWidgetsExtension" */;
+			buildPhases = (
+				8056A7593051F19D00529AA5 /* Sources */,
+				8056A75A3051F19D00529AA5 /* Frameworks */,
+				8056A75B3051F19D00529AA5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				8056A7633051F19D00529AA5 /* spaceTrackerWidgets */,
+			);
+			name = spaceTrackerWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = spaceTrackerWidgetsExtension;
+			productReference = 8056A75D3051F19D00529AA5 /* spaceTrackerWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		8068C99F2FE33592001E1DDE /* spaceTracker */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8068C9AB2FE33593001E1DDE /* Build configuration list for PBXNativeTarget "spaceTracker" */;
@@ -87,10 +177,12 @@
 				8068C99C2FE33592001E1DDE /* Sources */,
 				8068C99D2FE33592001E1DDE /* Frameworks */,
 				8068C99E2FE33592001E1DDE /* Resources */,
+				8056A7783051F19F00529AA5 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8056A7723051F19F00529AA5 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				8068C9A22FE33592001E1DDE /* spaceTracker */,
@@ -114,9 +206,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2650;
+				LastSwiftUpdateCheck = 2660;
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
+					8056A75C3051F19D00529AA5 = {
+						CreatedOnToolsVersion = 26.6;
+					};
 					8068C99F2FE33592001E1DDE = {
 						CreatedOnToolsVersion = 26.5;
 					};
@@ -142,11 +237,19 @@
 			projectRoot = "";
 			targets = (
 				8068C99F2FE33592001E1DDE /* spaceTracker */,
+				8056A75C3051F19D00529AA5 /* spaceTrackerWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		8056A75B3051F19D00529AA5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8068C99E2FE33592001E1DDE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -159,6 +262,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		8056A7593051F19D00529AA5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8068C99C2FE33592001E1DDE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -168,7 +278,77 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		8056A7723051F19F00529AA5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8056A75C3051F19D00529AA5 /* spaceTrackerWidgetsExtension */;
+			targetProxy = 8056A7713051F19F00529AA5 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		8056A7753051F19F00529AA5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = spaceTrackerWidgetsExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 44T63GQX3B;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = spaceTrackerWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = spaceTrackerWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = PurplOctopus.spaceTracker.spaceTrackerWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8056A7763051F19F00529AA5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = spaceTrackerWidgetsExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 44T63GQX3B;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = spaceTrackerWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = spaceTrackerWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = PurplOctopus.spaceTracker.spaceTrackerWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		8068C9A92FE33593001E1DDE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -371,6 +551,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		8056A7743051F19F00529AA5 /* Build configuration list for PBXNativeTarget "spaceTrackerWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8056A7753051F19F00529AA5 /* Debug */,
+				8056A7763051F19F00529AA5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		8068C99B2FE33592001E1DDE /* Build configuration list for PBXProject "spaceTracker" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

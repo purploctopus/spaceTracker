@@ -4,6 +4,8 @@
 <dict>
 	<key>UILaunchStoryboardName</key>
 	<string>Launch Screen</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app requires back camera access to display the interactive 3D star map view.</string>
 	<key>GADApplicationIdentifier</key>

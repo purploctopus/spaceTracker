@@ -1601,6 +1601,12 @@ struct ContentView: View {
                         satellites: satViewModel.visiblePasses,
                         meteorShowers: meteorViewModel.upcomingShowers
                     )
+
+                    // 6. FEAT-04/FEAT-05: publish the "what's next" snapshot for the Home/Lock
+                    // Screen widget, and start/update/end a Live Activity if a launch or pass
+                    // is currently inside its final window. Same already-fetched arrays as
+                    // step 5 above -- no separate fetch of its own.
+                    LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
                 }
                 // satViewModel.requestPasses() above resolves asynchronously (it waits on a
                 // CLLocationManager delegate callback), so visiblePasses is very often still
@@ -1612,6 +1618,7 @@ struct ContentView: View {
                         satellites: satViewModel.visiblePasses,
                         meteorShowers: meteorViewModel.upcomingShowers
                     )
+                    LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
                 }
                 .task {
                     print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
