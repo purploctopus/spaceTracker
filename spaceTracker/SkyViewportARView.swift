@@ -220,7 +220,15 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
                         let dy = Float(screenY - targetCenterPoint.y)
                         let distanceToCenter = sqrt(dx*dx + dy*dy)
                         
-                        guard distanceToCenter < 35.0 else { return }
+                        // BUG FIX: this was 35pt, but the reticle ring actually drawn on
+                        // screen (LiveSkyViewfinderOverlay's inner Circle) has a 100pt
+                        // diameter -- a 50pt radius. That 15pt gap meant an object could sit
+                        // visibly inside the ring a person is looking at while still not
+                        // counting as "in the bullseye" for lock purposes, letting a star
+                        // outside the visual ring but inside this tighter threshold win by
+                        // default even with a planet plainly inside the circle on screen.
+                        // Matches the drawn ring exactly now.
+                        guard distanceToCenter < 50.0 else { return }
                         
                         if isPlanetOrMoon {
                             if distanceToCenter < closestPlanetOrMoonDistance {
