@@ -63,6 +63,7 @@ struct LaunchCardView: View {
                                 .foregroundColor(favorites.isProviderFavorite(providerName) ? .yellow : .gray.opacity(0.5))
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel(favorites.isProviderFavorite(providerName) ? "Unfollow \(providerName)" : "Follow \(providerName)")
                     }
                 }
             }

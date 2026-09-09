@@ -393,6 +393,7 @@ struct SatelliteCardView: View {
                         .foregroundColor(favorites.isSatelliteFavorite(sat.id) ? .yellow : .gray.opacity(0.5))
                 }
                 .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel(favorites.isSatelliteFavorite(sat.id) ? "Unfollow \(sat.name)" : "Follow \(sat.name)")
             }
             
             Text(sat.localDisplayTime.uppercased())
@@ -565,6 +566,9 @@ struct SatelliteDetailSheet: View {
                     .onTapGesture {
                         presentFullScreenHUD = true
                     }
+                    .accessibilityLabel("Full screen tactical view")
+                    .accessibilityHint("Opens a larger radar display")
+                    .accessibilityAddTraits(.isButton)
                     
                     VStack(spacing: 0) {
                         telemetryRow(label: "ORIGIN REALM", value: missionProfile.country)

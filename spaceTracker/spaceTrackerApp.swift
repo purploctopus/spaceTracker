@@ -27,6 +27,17 @@ struct spaceTrackerApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(adEngine)
+                // 💡 FEAT-12 (accessibility pass): most of this app's type is either a fixed
+                // pixel size that never scales, or a semantic style (.caption, .subheadline,
+                // etc.) inside dense, fixed-width telemetry cards designed around today's
+                // sizes. Letting Dynamic Type run all the way to the accessibility sizes
+                // (AX1-AX5) would badly overflow and clip those cards -- that's a real
+                // per-screen layout project, not something safe to do blind in one pass.
+                // Capping the range at .xxxLarge is the honest middle ground for now: someone
+                // who bumps their system text size up still gets larger, more readable text
+                // throughout, without the worst of that breakage. Full support for the
+                // accessibility sizes is real follow-up work, not done here.
+                .dynamicTypeSize(.large ... .xxxLarge)
                 .onAppear {
                     //UserDefaults.standard.removeObject(forKey: "user_purchased_ad_free_forever")
                     //UserDefaults.standard.removeObject(forKey: "last_successful_ad_unlock_timestamp")

@@ -211,6 +211,7 @@ struct AsteroidCardView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .padding(.trailing, 4)
+                .accessibilityLabel(favorites.isAsteroidFavorite(asteroid.id) ? "Unfollow \(asteroid.name)" : "Follow \(asteroid.name)")
                 
                 if asteroid.is_potentially_hazardous_asteroid {
                     Text("⚠️ HAZARD")

@@ -205,6 +205,7 @@ struct ContentView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.cyan)
         }
+        .accessibilityLabel("Notification Settings")
     }
     @State private var showAcknowledgements = false
     @State private var showConditionsExplainer = false
@@ -374,6 +375,7 @@ struct ContentView: View {
                     Spacer(minLength: 4)
                     Text("❯")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .accessibilityHidden(true)
                 }
                 .foregroundColor(.orange)
                 .padding(.horizontal, 12)
@@ -386,6 +388,8 @@ struct ContentView: View {
                 .cornerRadius(6)
             }
             .buttonStyle(PlainButtonStyle())
+            .accessibilityLabel("Location unavailable, showing Madison, Wisconsin")
+            .accessibilityHint("Opens Settings so you can enable location access")
             .padding(.horizontal)
             .padding(.bottom, 4)
         }
@@ -491,6 +495,9 @@ struct ContentView: View {
                     .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Open live interactive sky map")
+                .accessibilityHint("Point your device at the sky to find planets")
                 .padding(.bottom, 8)
                 
                 HStack(spacing: 16) {
@@ -742,6 +749,10 @@ struct ContentView: View {
                                 .onTapGesture {
                                     selectedMeteorShower = shower
                                 }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(shower.name) meteor shower")
+                                .accessibilityHint("Opens details")
+                                .accessibilityAddTraits(.isButton)
                         }
                     }
                     .padding(.horizontal)
@@ -792,6 +803,10 @@ struct ContentView: View {
                             .onTapGesture {
                                 selectedAsteroidTarget = asteroid
                             }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(asteroid.name), asteroid")
+                            .accessibilityHint("Opens details")
+                            .accessibilityAddTraits(.isButton)
                         }
                     }
                     .padding(.horizontal)
@@ -835,6 +850,10 @@ struct ContentView: View {
                                 .onTapGesture {
                                     selectedSpacecraftCrewName = "International Space Station"
                                 }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("International Space Station crew")
+                                .accessibilityHint("Opens details")
+                                .accessibilityAddTraits(.isButton)
                         }
                         
                         if !crewViewModel.tiangongCrew.isEmpty {
@@ -842,6 +861,10 @@ struct ContentView: View {
                                 .onTapGesture {
                                     selectedSpacecraftCrewName = "Tiangong Space Station"
                                 }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("Tiangong Space Station crew")
+                                .accessibilityHint("Opens details")
+                                .accessibilityAddTraits(.isButton)
                         }
                         
                         if !crewViewModel.otherCrew.isEmpty {
@@ -849,6 +872,10 @@ struct ContentView: View {
                             .onTapGesture {
                                 selectedSpacecraftCrewName = "Experimental Transits"
                             }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Experimental Transits crew")
+                            .accessibilityHint("Opens details")
+                            .accessibilityAddTraits(.isButton)
                         }
                     }
                     .fixedSize(horizontal: false, vertical: true)
@@ -980,6 +1007,10 @@ struct ContentView: View {
                                 .onTapGesture {
                                     selectedSatellitePass = sat
                                 }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(sat.name) pass at \(sat.localDisplayTime)")
+                                .accessibilityHint("Opens details")
+                                .accessibilityAddTraits(.isButton)
                         }
                     }
                     .padding(.horizontal)
@@ -1263,6 +1294,10 @@ struct ContentView: View {
                                 .onTapGesture {
                                     selectedSpaceLaunch = launch
                                 }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(launch.name)")
+                                .accessibilityHint("Opens details")
+                                .accessibilityAddTraits(.isButton)
                             }
                         }
                         .padding(.horizontal)
@@ -1402,6 +1437,9 @@ struct ContentView: View {
                                 .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Open live interactive sky map")
+                            .accessibilityHint("Point your device at the sky to find planets")
                             
                             // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL (Includes your company filter buttons and horizontal cards)
                             upcoming7DayMissionsChannelBlock
