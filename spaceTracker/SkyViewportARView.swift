@@ -42,7 +42,11 @@ class SkyViewportARView: UIView {
         scnView.scene = scene
         scnView.backgroundColor = .black
         scnView.antialiasingMode = .multisampling4X
-        scnView.automaticallyUpdatesLighting = false
+        // automaticallyUpdatesLighting was an ARSCNView-only property (it toggles ARKit's
+        // camera-image-based light estimation, which needs a live camera feed to estimate
+        // from) -- doesn't exist on plain SCNView, and doesn't need a replacement here: every
+        // dot's material below sets its own .emission, so it's self-illuminating and doesn't
+        // depend on any scene light existing at all.
         
         // The "camera rig" -- a plain SCNNode with an SCNCamera attached, not tied to any
         // ARKit session. Its rotation is set every frame by Coordinator.renderer below, read
