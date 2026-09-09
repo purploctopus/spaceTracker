@@ -451,6 +451,19 @@ struct SatelliteDetailSheet: View {
 
     let location: String
     let userHeading: Double // ✅ FIXED: Explicitly added this plain primitive variable
+
+    /// Caller's best-known coordinate (real GPS fix, or the Madison, WI fallback — see
+    /// isUsingFallbackLocation below). Replaces a `CLLocationManager().location?.coordinate`
+    /// read that used to happen right here: a fresh CLLocationManager instance has no
+    /// authorization and no time to acquire a fix, so that read was essentially always nil,
+    /// silently falling back to Madison every time regardless of the user's real permission
+    /// state or actual location.
+    let knownLatitude: Double
+    let knownLongitude: Double
+    /// True when knownLatitude/knownLongitude is the Madison, WI fallback rather than a real
+    /// device fix, so this sheet can tell the user the weather readout below is approximate.
+    let isUsingFallbackLocation: Bool
+
     @Environment(\.dismiss) var dismiss
     
     // Curated telemetry database for your 11 high-visibility targets
@@ -546,6 +559,9 @@ struct SatelliteDetailSheet: View {
                         telemetryRow(label: "LAUNCH TIMELINE", value: missionProfile.launched)
                         telemetryRow(label: "PLATFORM TYPE", value: missionProfile.type)
                         telemetryRow(label: "OBSERVER LOCATION", value: location.isEmpty ? "CURRENT POSITION" : location.uppercased())
+                        if isUsingFallbackLocation {
+                            telemetryRow(label: "LOCATION SOURCE", value: "APPROXIMATE — ENABLE LOCATION")
+                        }
                         telemetryRow(label: "FLIGHT TRAJECTORY", value: sat.travelDirection.uppercased())
                         telemetryRow(label: "MAX ELEVATION", value: "\(Int(sat.peakElevationDegrees))° ANGLE")
                         telemetryRow(label: "WINDOW DURATION", value: "\(sat.durationMinutes) MINUTES")
@@ -580,9 +596,7 @@ struct SatelliteDetailSheet: View {
         }
         // 💡 SECURE TASK MODIFIER HOOK: Triggers background telemetry download exactly on overlay bootup
         .task {
-            let lat = CLLocationManager().location?.coordinate.latitude ?? 43.0731
-            let lng = CLLocationManager().location?.coordinate.longitude ?? -89.4012
-            await weatherEngine.fetchStargazingWeather(lat: lat, lng: lng, targetISO8601Date: sat.utcTimeISO)
+            await weatherEngine.fetchStargazingWeather(lat: knownLatitude, lng: knownLongitude, targetISO8601Date: sat.utcTimeISO)
         }
     }
     

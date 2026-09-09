@@ -33,10 +33,15 @@ final class DeviceLocationProvider: NSObject, ObservableObject, CLLocationManage
     // objectWillChange — that synthesis is unreliable for NSObject-subclassing types
     // (needed here for CLLocationManagerDelegate), which is what triggered "does not
     // conform to protocol 'ObservableObject'" despite conforming to it correctly.
-    // Nothing here needs to actually .send() through it — this class has no @Published
-    // state driving UI, it's purely an async location-fetch helper — it just needs to
-    // exist to satisfy @StateObject's requirement.
+    // isUsingFallbackLocation below is @Published and fires through this exact publisher
+    // (the compiler's enclosing-instance subscript for @Published targets whatever
+    // objectWillChange the type exposes, synthesized or, as here, hand-declared).
     let objectWillChange = ObservableObjectPublisher()
+
+    /// True once `currentLocation()` has resolved and no real device fix was available.
+    /// Callers use this to tell the user the data on screen is approximate (fallback
+    /// coordinate) rather than silently presenting it as their real location.
+    @Published var isUsingFallbackLocation: Bool = false
 
     private let manager = CLLocationManager()
     private var cachedLocation: CLLocationCoordinate2D?
@@ -65,6 +70,7 @@ final class DeviceLocationProvider: NSObject, ObservableObject, CLLocationManage
         let result = await task.value
         inFlightTask = nil
         cachedLocation = result
+        isUsingFallbackLocation = (result == nil)
         return result
     }
 
@@ -330,6 +336,49 @@ struct ContentView: View {
         .padding(.bottom, 8)
     }
     
+    // ==============================================================================
+    // 📍 LOCATION FALLBACK BANNER
+    // ==============================================================================
+    /// Shown whenever locationProvider couldn't get a real device fix, so weather,
+    /// meteor outlook, and sky map data on screen is approximate (Madison, WI) rather
+    /// than silently presented as the user's real location. Tapping it opens Settings
+    /// so the user can grant location access.
+    @ViewBuilder
+    private var locationFallbackBanner: some View {
+        if locationProvider.isUsingFallbackLocation {
+            Button(action: {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "location.slash.fill")
+                        .font(.caption)
+                    Text("LOCATION UNAVAILABLE — SHOWING MADISON, WI. TAP TO ENABLE.")
+                        .font(.system(.caption2, design: .monospaced))
+                        .fontWeight(.bold)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    Text("❯")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(.orange)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.orange.opacity(0.4), lineWidth: 1)
+                )
+                .cornerRadius(6)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.horizontal)
+            .padding(.bottom, 4)
+        }
+    }
+
     // ==============================================================================
     // 🪐 STARGAZER OBSERVATION SYSTEM DASHBOARD CHANNEL BLOCK
     // ==============================================================================
@@ -1239,6 +1288,7 @@ struct ContentView: View {
                     
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
+                            locationFallbackBanner
                             stargazingConditionsHeaderBar
                                 .padding(.top, 16) // 💡 Clears the frame constraints of the absolutely positioned Daily Command header box
                             Divider()
@@ -1497,6 +1547,12 @@ struct ContentView: View {
                     if resolvedCoordinate == nil {
                         print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
                     }
+                    // 💡 BUG FIX: universalLatitude/Longitude previously only ever moved when the
+                    // user ran a manual city search, so every location-aware view silently read
+                    // the Madison, WI default even after a real GPS fix came back. Sync it here
+                    // so it reflects the actual resolved (or fallback) coordinate app-wide.
+                    universalLatitude = hardwareLat
+                    universalLongitude = hardwareLng
                     meteorViewModel.generateOutlook(userLatitude: hardwareLat)
                     
                     // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
@@ -1553,7 +1609,10 @@ struct ContentView: View {
                     sat: pass,
                     weatherEngine: weatherViewModel,
                     location: satViewModel.locationName,
-                    userHeading: satViewModel.currentHeading
+                    userHeading: satViewModel.currentHeading,
+                    knownLatitude: universalLatitude,
+                    knownLongitude: universalLongitude,
+                    isUsingFallbackLocation: locationProvider.isUsingFallbackLocation
                 )
             }
             .sheet(isPresented: $showLiveVideoTelemetrySheet) {
@@ -1586,6 +1645,7 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 8) {
+                            locationFallbackBanner
                             stargazerDashboardChannelBlock
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, 24)
