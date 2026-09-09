@@ -8,6 +8,10 @@
 
 import Foundation
 import Combine
+// SwiftUI is where move(fromOffsets:toOffset:) actually lives (a RangeReplaceableCollection
+// extension SwiftUI adds for List/ForEach onMove reordering) -- without this import the
+// call in move(fromOffsets:toOffset:) below fails with a cascade of missing-symbol errors.
+import SwiftUI
 
 /// One reorderable section of the Home Command dashboard. Cases are the actual channel
 /// blocks ContentView renders in its big VStack -- the "hero" elements above them (the
