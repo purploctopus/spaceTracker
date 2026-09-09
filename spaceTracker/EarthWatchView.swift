@@ -15,6 +15,7 @@
 
 import SwiftUI
 import CoreLocation
+import Combine
 
 // MARK: - EPIC image model
 
@@ -114,6 +115,7 @@ struct EarthWatchView: View {
 
     @State private var manuallySelectedImage: EarthEPICImage? = nil
     @State private var showNearestToMe = false
+    @State private var showZoomedImage = false
 
     private var displayedImage: EarthEPICImage? {
         if showNearestToMe {
@@ -170,25 +172,43 @@ struct EarthWatchView: View {
                 .foregroundColor(.red)
                 .padding(.horizontal)
         } else if let image = displayedImage {
-            AsyncImage(url: URL(string: image.imageUrl)) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().aspectRatio(1, contentMode: .fit)
-                case .failure:
-                    Color.white.opacity(0.05).aspectRatio(1, contentMode: .fit)
-                        .overlay(
-                            Text("IMAGE UNAVAILABLE")
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundColor(.gray)
-                        )
-                default:
-                    Color.white.opacity(0.05).aspectRatio(1, contentMode: .fit)
-                        .overlay(ProgressView().tint(.cyan))
+            ZStack(alignment: .bottomTrailing) {
+                AsyncImage(url: URL(string: image.imageUrl)) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().aspectRatio(1, contentMode: .fit)
+                    case .failure:
+                        Color.white.opacity(0.05).aspectRatio(1, contentMode: .fit)
+                            .overlay(
+                                Text("IMAGE UNAVAILABLE")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(.gray)
+                            )
+                    default:
+                        Color.white.opacity(0.05).aspectRatio(1, contentMode: .fit)
+                            .overlay(ProgressView().tint(.cyan))
+                    }
                 }
+                .clipShape(Circle())
+
+                Image(systemName: "arrow.up.left.and.arrow.down.right.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(.cyan)
+                    .background(Circle().fill(Color.black.opacity(0.65)))
+                    .padding(.trailing, 40)
+                    .padding(.bottom, 4)
             }
-            .clipShape(Circle())
             .padding(.horizontal, 32)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                showZoomedImage = true
+            }
             .accessibilityLabel("Earth as seen from NASA's EPIC camera aboard DSCOVR")
+            .accessibilityHint("Double tap to view full screen and zoom")
+            .accessibilityAddTraits(.isButton)
+            .fullScreenCover(isPresented: $showZoomedImage) {
+                ZoomableEarthImageView(imageUrl: image.imageUrl)
+            }
 
             if let captureDate = image.captureDate {
                 Text("CAPTURED \(captureDate.formatted(date: .abbreviated, time: .shortened)) UTC")
@@ -316,6 +336,114 @@ struct HumansInSpaceRosterView: View {
                     .padding(.horizontal)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Full-screen zoomable EPIC image viewer
+
+/// Pinch to zoom (clamped 1x-5x), drag to pan once zoomed, double-tap to toggle between
+/// fit and a 3x zoom. EPIC's natural-color images are 2048x2048, so there's real detail
+/// here worth zooming into -- this isn't just blowing up a small thumbnail.
+struct ZoomableEarthImageView: View {
+    let imageUrl: String
+    @Environment(\.dismiss) var dismiss
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    private let minScale: CGFloat = 1.0
+    private let maxScale: CGFloat = 5.0
+    private let doubleTapScale: CGFloat = 3.0
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            AsyncImage(url: URL(string: imageUrl)) { phase in
+                switch phase {
+                case .success(let img):
+                    img
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .scaleEffect(scale)
+                        .offset(offset)
+                        .gesture(magnificationGesture)
+                        .simultaneousGesture(dragGesture)
+                        .onTapGesture(count: 2, perform: toggleDoubleTapZoom)
+                case .failure:
+                    Text("IMAGE UNAVAILABLE")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.gray)
+                default:
+                    ProgressView().tint(.cyan)
+                }
+            }
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(.white.opacity(0.9))
+                            .background(Circle().fill(Color.black.opacity(0.4)))
+                    }
+                    .padding()
+                    .accessibilityLabel("Close")
+                }
+                Spacer()
+            }
+        }
+        .statusBarHidden()
+    }
+
+    private var magnificationGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                scale = min(max(lastScale * value, minScale), maxScale)
+            }
+            .onEnded { _ in
+                lastScale = scale
+                if scale <= minScale {
+                    resetZoom()
+                }
+            }
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                guard scale > minScale else { return }
+                offset = CGSize(
+                    width: lastOffset.width + value.translation.width,
+                    height: lastOffset.height + value.translation.height
+                )
+            }
+            .onEnded { _ in
+                lastOffset = offset
+            }
+    }
+
+    private func toggleDoubleTapZoom() {
+        withAnimation(.spring()) {
+            if scale > minScale {
+                resetZoom()
+            } else {
+                scale = doubleTapScale
+                lastScale = doubleTapScale
+            }
+        }
+    }
+
+    private func resetZoom() {
+        withAnimation(.spring()) {
+            scale = minScale
+            lastScale = minScale
+            offset = .zero
+            lastOffset = .zero
         }
     }
 }

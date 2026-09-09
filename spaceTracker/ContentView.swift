@@ -1395,6 +1395,9 @@ struct ContentView: View {
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel("Open live interactive sky map")
                             .accessibilityHint("Point your device at the sky to find planets")
+                            Divider()
+                                .background(Color.cyan)
+                                .padding(.top, 8)
                             
                             // 🛰️ 1. UPCOMING 7-DAY MISSIONS MANIFEST CHANNEL (Includes your company filter buttons and horizontal cards)
                             upcoming7DayMissionsChannelBlock
@@ -1728,7 +1731,35 @@ struct ContentView: View {
             }
 
             // ==============================================================================
-            // CHANNEL TAB 3: SPACE NEWS
+            // CHANNEL TAB 3: EARTH WATCH
+            // ==============================================================================
+            NavigationView {
+                EarthWatchView(
+                    crewViewModel: crewViewModel,
+                    selectedSpacecraftCrewName: $selectedSpacecraftCrewName,
+                    userLatitude: universalLatitude,
+                    userLongitude: universalLongitude
+                )
+                .navigationTitle("EARTH WATCH")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        settingsToolbarButton
+                    }
+                    if !adEngine.hasPermanentAdFree {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            adFreeToolbarButton
+                        }
+                    }
+                }
+            }
+            .navigationViewStyle(.stack)
+            .tabItem {
+                Label("Earth Watch", systemImage: earthWatchTabIconName)
+            }
+
+            // ==============================================================================
+            // CHANNEL TAB 4: SPACE NEWS
             // ==============================================================================
             NavigationView {
                 ScrollView(showsIndicators: false) {
@@ -1754,34 +1785,6 @@ struct ContentView: View {
             .navigationViewStyle(.stack)
             .tabItem {
                 Label("Space News", systemImage: "newspaper")
-            }
-
-            // ==============================================================================
-            // CHANNEL TAB 4: EARTH WATCH
-            // ==============================================================================
-            NavigationView {
-                EarthWatchView(
-                    crewViewModel: crewViewModel,
-                    selectedSpacecraftCrewName: $selectedSpacecraftCrewName,
-                    userLatitude: universalLatitude,
-                    userLongitude: universalLongitude
-                )
-                .navigationTitle("EARTH WATCH")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        settingsToolbarButton
-                    }
-                    if !adEngine.hasPermanentAdFree {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            adFreeToolbarButton
-                        }
-                    }
-                }
-            }
-            .navigationViewStyle(.stack)
-            .tabItem {
-                Label("Earth Watch", systemImage: earthWatchTabIconName)
             }
         }
         // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
