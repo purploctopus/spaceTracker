@@ -191,9 +191,10 @@ struct LiveSkyViewfinderOverlay: View {
         y: UIScreen.main.bounds.height / 2
     )
     
-    // BUG FIX: nil until SkyMotionManager.captureInitialTrueHeading resolves (~0.6s after
-    // this view appears, safely hidden behind the stabilization veil below) -- see
-    // SkyMotionManager.swift's header comment for the full jitter/drift story this fixes.
+    // BUG FIX: nil until SkyMotionManager.captureInitialTrueHeading resolves (waits for
+    // the device to settle, capped at 3s -- not a fixed delay), safely hidden behind the
+    // stabilization veil below via the onChange that watches this. See
+    // SkyMotionManager.swift's header comment for the full jitter/alignment story.
     @State private var trueHeadingOffsetDegrees: Double? = nil
     // Set by SkyViewportARViewContainer when ARKit's own tracking quality degrades (e.g.
     // pointed at a featureless patch of sky/ceiling) -- surfaced to the user instead of
@@ -553,13 +554,24 @@ struct LiveSkyViewfinderOverlay: View {
         }
         .onAppear {
             motionEngine.engageSensorStreaming()
-            // One-shot -- NOT a continuous compass feed. Fires once, ~0.6s in, comfortably
-            // inside the 1.5s stabilization veil below so the dome's heading correction is
-            // never visibly seen snapping into place.
+            // One-shot -- NOT a continuous compass feed. See SkyMotionManager's header
+            // comment: this now waits for the device to actually settle before resolving, so
+            // it's no longer on a fixed clock -- the veil below waits on it via onChange
+            // rather than assuming it's always done within some fixed delay.
             motionEngine.captureInitialTrueHeading { heading in
                 trueHeadingOffsetDegrees = heading
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        }
+        // BUG FIX: the veil used to lift on a blind fixed 1.5s timer regardless of whether
+        // the AR dome's one-time heading alignment (and therefore its session start -- see
+        // SkyViewportARView.beginTracking) had actually happened yet. captureInitialTrueHeading
+        // no longer resolves on a fixed clock (it waits for the device to settle, up to a 3s
+        // ceiling), so the veil now waits on that real signal instead of guessing a duration.
+        .onChange(of: trueHeadingOffsetDegrees) { _, newValue in
+            guard newValue != nil else { return }
+            // Small minimum so the veil never flashes instantly even on a fast resolve --
+            // purely cosmetic, unlike the old delay this doesn't gate correctness.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     isStabilizingEngine = false
                 }

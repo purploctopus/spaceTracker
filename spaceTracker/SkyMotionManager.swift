@@ -21,9 +21,20 @@
 //       however many degrees of local magnetic declination apply, on top of the jitter.
 //  Fix: ARKit now uses plain .gravity alignment with no continuous compass input at all
 //  (see SkyViewportARView.swift), and the sky dome is aligned to real-world north exactly
-//  ONCE, at session start, using a short averaged (and, where location access allows it,
-//  declination-corrected) heading sample captured here. After that one-time alignment,
-//  ARKit's own gyro/visual tracking -- not the magnetometer -- holds the scene steady.
+//  ONCE using a heading sample captured here. After that one-time alignment, ARKit's own
+//  gyro/visual tracking -- not the magnetometer -- holds the scene steady.
+//
+//  FOLLOW-UP FIX: the first version of this fix averaged a blind fixed time window right
+//  as the view appeared, which is exactly while the user is still raising/aiming the phone
+//  -- and separately, SkyViewportARView started its AR session immediately on creation,
+//  before that average had even finished. .gravity alignment anchors its zero-orientation
+//  reference to whichever direction the device faces at the exact moment session.run() is
+//  called, so those two moments need to refer to the same instant; they didn't, which
+//  produced an alignment error that also changed from launch to launch (whatever motion was
+//  in progress each time happened to differ). Fixed by waiting for the device to actually
+//  settle before trusting a heading sample (see captureInitialTrueHeading below), and by
+//  SkyViewportARView deferring session.run() until that settled heading is in hand -- see
+//  SkyViewportARView.beginTracking(initialHeadingDegrees:).
 
 import Foundation
 import CoreMotion
@@ -62,13 +73,20 @@ class SkyMotionManager: ObservableObject {
         pitchMotionManager.stopDeviceMotionUpdates()
     }
 
-    /// Captures ONE averaged heading value -- not a stream -- for SkyViewportARView to
-    /// rotate its celestial sphere by exactly once at session start. Averaging over a short
-    /// window (rather than trusting a single instantaneous sample) rides out ordinary
-    /// magnetometer noise; using true north -- when location access lets Core Motion
-    /// correct for local magnetic declination -- matches the true-north convention every
-    /// catalog azimuth already uses, instead of leaving the sky dome rotated off by however
-    /// many degrees of declination apply at the user's location.
+    /// Captures ONE heading value -- not a stream -- for SkyViewportARView to rotate its
+    /// celestial sphere by exactly once, right before its AR session actually starts (see
+    /// SkyViewportARView.beginTracking(initialHeadingDegrees:) -- the two are deliberately
+    /// coupled, see that method's doc comment for why).
+    ///
+    /// BUG FIX: this used to just average a fixed 0.6s window of samples unconditionally.
+    /// But this fires the moment Live Sky mode opens, while the user is very likely still
+    /// raising/aiming the phone -- averaging blindly through that motion captured whatever
+    /// direction they happened to be sweeping through, not where they actually ended up
+    /// pointing, which is exactly why the sky came out rotated to some arbitrary-seeming
+    /// offset that also differed between launches (different motion each time the view
+    /// opened). Now it waits for the device's rotation rate to actually settle down before
+    /// trusting any samples, with a capped max wait so a shaky hand can't hang the sky map
+    /// forever.
     func captureInitialTrueHeading(completion: @escaping (Double) -> Void) {
         guard headingCaptureManager.isDeviceMotionAvailable else {
             completion(0)
@@ -84,20 +102,51 @@ class SkyMotionManager: ObservableObject {
         let locationAuthorized = status == .authorizedWhenInUse || status == .authorizedAlways
         let referenceFrame: CMAttitudeReferenceFrame = locationAuthorized ? .xTrueNorthZVertical : .xMagneticNorthZVertical
 
-        var samples: [Double] = []
-        let sampleWindow: TimeInterval = 0.6
+        // Tuning: requiredStableSamples * update interval is roughly how long the device
+        // must sit still before its heading is trusted (~0.27s at 30Hz); rotationRate is in
+        // rad/s, so 0.12 is a gentle hand tremor, not a real aiming movement. maxWait is the
+        // hard ceiling if the user just can't hold it still -- falls back to whatever's been
+        // sampled so far rather than hanging indefinitely.
+        let stabilityThreshold = 0.12
+        let requiredStableSamples = 8
+        let maxWait: TimeInterval = 3.0
+        let startTime = Date()
+
+        var stableRun: [Double] = []
+        var allSamples: [Double] = []
+        var didComplete = false
+
         headingCaptureManager.deviceMotionUpdateInterval = 1.0 / 30.0
-        headingCaptureManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { motionData, _ in
+        headingCaptureManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { [weak self] motionData, _ in
+            guard let self, !didComplete, let data = motionData else { return }
             // heading is documented to come back negative specifically to mean "invalid"
             // (rather than something that needs +360 wraparound) -- skip those samples
             // instead of folding them into the average.
-            guard let heading = motionData?.heading, heading >= 0 else { return }
-            samples.append(heading)
-        }
+            let heading = data.heading
+            if heading >= 0 {
+                allSamples.append(heading)
+                if allSamples.count > 90 { allSamples.removeFirst() }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + sampleWindow) { [weak self] in
-            self?.headingCaptureManager.stopDeviceMotionUpdates()
-            completion(Self.circularMeanDegrees(samples))
+                let rotationMagnitude = sqrt(
+                    data.rotationRate.x * data.rotationRate.x +
+                    data.rotationRate.y * data.rotationRate.y +
+                    data.rotationRate.z * data.rotationRate.z
+                )
+                if rotationMagnitude < stabilityThreshold {
+                    stableRun.append(heading)
+                } else {
+                    stableRun.removeAll()
+                }
+            }
+
+            let isStable = stableRun.count >= requiredStableSamples
+            let timedOut = Date().timeIntervalSince(startTime) >= maxWait
+            guard isStable || timedOut else { return }
+
+            didComplete = true
+            self.headingCaptureManager.stopDeviceMotionUpdates()
+            let finalSamples = isStable ? stableRun : allSamples
+            completion(Self.circularMeanDegrees(finalSamples))
         }
     }
 

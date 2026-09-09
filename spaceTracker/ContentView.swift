@@ -979,16 +979,16 @@ struct ContentView: View {
     
     // Accepts the size class as a parameter to maximize layout readability
     private func principalToolbarHeaderTitleStack(sizeClass: UserInterfaceSizeClass?) -> some View {
-        HStack(alignment: .center, spacing: sizeClass == .regular ? 24 : 14) {
+        HStack(alignment: .center, spacing: sizeClass == .regular ? 24 : 8) {
             
             // 🚀 LEFT LOGO APERTURE
             Image("logo_transparent")
                 .resizable()
                 .renderingMode(.template)
                 .aspectRatio(contentMode: .fit)
-                .frame(width: sizeClass == .regular ? 48 : 38, height: sizeClass == .regular ? 48 : 38)
+                .frame(width: sizeClass == .regular ? 48 : 30, height: sizeClass == .regular ? 48 : 30)
                 .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
-                .padding(sizeClass == .regular ? 6 : 4)
+                .padding(sizeClass == .regular ? 6 : 3)
                 .background(Color.init(red: 0.4, green: 0.8, blue: 0.9).opacity(0.05))
                 .cornerRadius(4)
                 .overlay(
@@ -997,11 +997,21 @@ struct ContentView: View {
                 )
             
             // 🚀 CENTRAL CALL SIGN WITH LIVE HARDWARE SYSTEM STATUS BEACON
+            // 💡 BUG FIX: on iPhone this principal toolbar item has to share the nav bar with
+            // BOTH the settings gear (leading) and the ad-free pill (trailing), leaving it far
+            // less width than the .regular/iPad layout ever has to deal with -- "DAILY COMMAND"
+            // was hard-truncating to "D…" as a result. lineLimit+minimumScaleFactor here let it
+            // shrink gracefully instead of clipping, the status line is a shorter string on
+            // compact so it doesn't force the truncation on its own, and the dead-weight
+            // trailing spacer that used to mirror the .regular layout's data matrix is gone on
+            // compact (see below) so that width goes back to this VStack instead.
             VStack(alignment: .center, spacing: 4) {
                 Text("DAILY COMMAND")
-                    .font(.system(size: sizeClass == .regular ? 24 : 18, weight: .black, design: .monospaced))
+                    .font(.system(size: sizeClass == .regular ? 24 : 15, weight: .black, design: .monospaced))
                     .foregroundColor(.white)
-                    .tracking(sizeClass == .regular ? 6 : 3)
+                    .tracking(sizeClass == .regular ? 6 : 1.5)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 
                 HStack(spacing: 5) {
                     Circle()
@@ -1009,10 +1019,14 @@ struct ContentView: View {
                         .frame(width: 6, height: 6)
                         .shadow(color: connectivityMonitor.isSystemOnline ? Color.green.opacity(0.5) : Color.red.opacity(0.5), radius: 3)
                     
-                    Text(connectivityMonitor.isSystemOnline ? "ORBITLOG LINK OPERATIONAL" : "ORBITLOG DISCONNECTED")
+                    Text(sizeClass == .regular
+                         ? (connectivityMonitor.isSystemOnline ? "ORBITLOG LINK OPERATIONAL" : "ORBITLOG DISCONNECTED")
+                         : (connectivityMonitor.isSystemOnline ? "LINK OK" : "LINK DOWN"))
                         .font(.system(size: sizeClass == .regular ? 9 : 8, weight: .bold, design: .monospaced))
                         .foregroundColor(connectivityMonitor.isSystemOnline ? .gray : .red)
                         .tracking(1.5)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                     
                     // 💡 Open-source acknowledgements — placed here specifically because
                     // this status line, unlike the SYS.VER/RADAR block below, renders on
@@ -1047,14 +1061,16 @@ struct ContentView: View {
                 .foregroundColor(.gray)
                 .opacity(0.65)
                 .frame(width: 170, alignment: .leading) // 💡 FIXED: Changed alignment boundary frame to .leading
-            } else {
-                Spacer()
-                    .frame(width: 24)
             }
+            // 💡 BUG FIX: this used to be `else { Spacer().frame(width: 24) }` on compact --
+            // a fixed-width spacer that existed only to visually balance the .regular layout's
+            // right-side data matrix, but on iPhone it was eating into the very little width
+            // left for the title after the settings gear and ad-free pill toolbar items take
+            // their share. Dropping it on compact gives that width back to "DAILY COMMAND".
 
         }
-        .padding(.horizontal, sizeClass == .regular ? 20 : 14)
-        .padding(.vertical, sizeClass == .regular ? 18 : 14)
+        .padding(.horizontal, sizeClass == .regular ? 20 : 10)
+        .padding(.vertical, sizeClass == .regular ? 18 : 10)
         .background(Color.black.opacity(0.25))
         .overlay(
             VStack {

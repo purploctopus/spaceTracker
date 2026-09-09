@@ -14,11 +14,12 @@ import SceneKit
 // ==============================================================================
 class SkyViewportARView: UIView {
     let arView = ARSCNView()
-    /// Kept as a property (not just a local in populateARSkyDome) so applyHeadingOffset
-    /// below can rotate the whole dome after the fact, once SkyMotionManager's one-shot
-    /// true-heading capture completes -- see that file's header comment for why this
-    /// replaced the old continuous-compass jitter.
+    /// Kept as a property (not just a local in populateARSkyDome) so beginTracking below
+    /// can rotate the whole dome once SkyMotionManager's one-shot true-heading capture
+    /// completes -- see that file's header comment for the full jitter/alignment story.
     private var celestialSphereNode: SCNNode?
+    private let configuration = ARWorldTrackingConfiguration()
+    private var hasBegunTracking = false
     
     init(celestialCatalog: [APIPlanetItem]) {
         super.init(frame: .zero)
@@ -28,15 +29,13 @@ class SkyViewportARView: UIView {
         arView.antialiasingMode = .multisampling4X
         arView.automaticallyUpdatesLighting = false
         
-        let configuration = ARWorldTrackingConfiguration()
         // BUG FIX: was .gravityAndHeading, which keeps ARKit's own world orientation tied to
         // a *continuous* live magnetometer reading for as long as the session runs -- any
         // magnetic interference (a desk, nearby electronics, an iPad's own magnetic
         // case/keyboard/Pencil) directly wobbled the whole scene, even at rest. .gravity
         // uses only gravity (accelerometer) plus ARKit's gyro/visual tracking -- no ongoing
         // compass input at all. The one-time north alignment .gravity gives up is restored
-        // separately via applyHeadingOffset(degrees:), called once real-world heading is
-        // known (see SkyMotionManager.captureInitialTrueHeading).
+        // separately via beginTracking(initialHeadingDegrees:) below.
         configuration.worldAlignment = .gravity
         
         arView.frame = self.bounds
@@ -44,7 +43,9 @@ class SkyViewportARView: UIView {
         self.addSubview(arView)
         
         populateARSkyDome(catalog: celestialCatalog, inside: arView.scene)
-        arView.session.run(configuration)
+        // NOTE: arView.session.run(configuration) is deliberately NOT called here -- see
+        // beginTracking(initialHeadingDegrees:) below for why starting it immediately (before
+        // a trustworthy heading was known) was the root of a second alignment bug.
     }
     
     override func layoutSubviews() {
@@ -54,13 +55,30 @@ class SkyViewportARView: UIView {
     
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
-    /// Applies the ONE-TIME true-north alignment captured by
-    /// SkyMotionManager.captureInitialTrueHeading, rotating the whole sky dome to match the
-    /// compass bearing the device actually faced when the AR session started -- needed now
-    /// that worldAlignment is .gravity, which (unlike .gravityAndHeading) has no absolute
-    /// heading reference of its own. Safe to call more than once; each call just re-sets the
-    /// same absolute rotation, it doesn't accumulate.
-    func applyHeadingOffset(degrees: Double) {
+    /// Rotates the sky dome to the given true-north-relative heading, THEN starts the AR
+    /// session -- in that order, and coupled into one call deliberately.
+    ///
+    /// BUG FIX: .gravity world alignment anchors its zero-orientation reference to whichever
+    /// direction the device is physically facing at the *exact moment* session.run() is
+    /// called. The first version of this fix called session.run() immediately in init (i.e.
+    /// the instant this view was created) and separately applied a heading captured up to a
+    /// few seconds later, once SkyMotionManager finished averaging -- two different moments,
+    /// during the exact window the user is still raising/aiming the phone. That mismatch is
+    /// what caused the sky to render rotated to an arbitrary-seeming offset that also changed
+    /// between launches. Calling this only once a trustworthy heading is already in hand
+    /// keeps session start and heading capture pinned to (as near as possible) the same
+    /// instant. Idempotent -- only the first call actually starts tracking.
+    func beginTracking(initialHeadingDegrees: Double) {
+        guard !hasBegunTracking else { return }
+        hasBegunTracking = true
+        applyHeadingOffset(degrees: initialHeadingDegrees)
+        arView.session.run(configuration)
+    }
+    
+    /// Rotates the whole sky dome to the given true-north-relative heading. Broken out from
+    /// beginTracking above so it stays a single-purpose, independently testable rotation --
+    /// beginTracking is what actually decides *when* it's safe to apply.
+    private func applyHeadingOffset(degrees: Double) {
         let radians = Float(degrees * .pi / 180.0)
         // Same sign convention as each individual object's own yaw below (-azRad) -- negating
         // here makes a sphere-wide offset behave exactly like an object-level azimuth would.
@@ -191,7 +209,7 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
         view.arView.delegate = context.coordinator
         context.coordinator.reticleCenter = reticleCenter
         if let headingOffsetDegrees {
-            view.applyHeadingOffset(degrees: headingOffsetDegrees)
+            view.beginTracking(initialHeadingDegrees: headingOffsetDegrees)
         }
         return view
     }
@@ -200,7 +218,7 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
         context.coordinator.reticleCenter = reticleCenter
         context.coordinator.parent = self
         if let headingOffsetDegrees {
-            uiView.applyHeadingOffset(degrees: headingOffsetDegrees)
+            uiView.beginTracking(initialHeadingDegrees: headingOffsetDegrees)
         }
     }
     
