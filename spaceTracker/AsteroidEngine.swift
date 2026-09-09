@@ -203,6 +203,18 @@ struct AsteroidCardView: View {
                     .lineLimit(1)
                 
                 Spacer()
+
+                // 💡 FEAT-08: share this asteroid as a short text summary via the native share
+                // sheet -- upper-right corner alongside the star/hazard badge, so it doesn't
+                // add card height.
+                ShareLink(item: ShareContentBuilder.shareText(for: asteroid)) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.cyan.opacity(0.7))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.trailing, 6)
+                .accessibilityLabel("Share \(asteroid.name)")
                 
                 Button(action: { favorites.toggleAsteroid(asteroid.id) }) {
                     Image(systemName: favorites.isAsteroidFavorite(asteroid.id) ? "star.fill" : "star")
@@ -286,16 +298,7 @@ struct AsteroidCardView: View {
                 }
             }
 
-            // 💡 FEAT-08: share this asteroid as a short text summary via the native share sheet.
             HStack {
-                ShareLink(item: ShareContentBuilder.shareText(for: asteroid)) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.cyan.opacity(0.7))
-                }
-                .buttonStyle(PlainButtonStyle())
-                .accessibilityLabel("Share \(asteroid.name)")
-
                 Spacer()
                 Text("❯")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))

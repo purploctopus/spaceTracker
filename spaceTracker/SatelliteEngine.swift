@@ -394,6 +394,18 @@ struct SatelliteCardView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .accessibilityLabel(favorites.isSatelliteFavorite(sat.id) ? "Unfollow \(sat.name)" : "Follow \(sat.name)")
+
+                Spacer()
+
+                // 💡 FEAT-08: share this pass as a short text summary via the native share
+                // sheet -- upper-right corner of this same row, so it doesn't add card height.
+                ShareLink(item: ShareContentBuilder.shareText(for: sat)) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.cyan.opacity(0.7))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel("Share \(sat.name)")
             }
             
             Text(sat.localDisplayTime.uppercased())
@@ -437,16 +449,7 @@ struct SatelliteCardView: View {
             }
             .foregroundColor(.gray)
 
-            // 💡 FEAT-08: share this pass as a short text summary via the native share sheet.
             HStack {
-                ShareLink(item: ShareContentBuilder.shareText(for: sat)) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.cyan.opacity(0.7))
-                }
-                .buttonStyle(PlainButtonStyle())
-                .accessibilityLabel("Share \(sat.name)")
-
                 Spacer()
                 Text("❯")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))

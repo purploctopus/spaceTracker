@@ -34,10 +34,27 @@ struct LaunchCardView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 1. Core Mission Schedule Track Timestamp
-            Text(launch.localLaunchTimeDisplay.uppercased())
-                .font(.system(size: horizontalSizeClass == .regular ? 13 : 11, design: .monospaced))
-                .foregroundColor(.yellow)
+            // 1. Core Mission Schedule Track Timestamp -- share button sits in this same row,
+            // pinned to the upper-right corner, so it doesn't add a new row / extra height.
+            HStack {
+                Text(launch.localLaunchTimeDisplay.uppercased())
+                    .font(.system(size: horizontalSizeClass == .regular ? 13 : 11, design: .monospaced))
+                    .foregroundColor(.yellow)
+
+                Spacer()
+
+                // 💡 FEAT-08: share this launch as a short text summary via the native share
+                // sheet. Nested inside the card's own tap-to-open-detail area the same way the
+                // star favorite button below already is -- SwiftUI hit-tests the more specific
+                // control first, so this doesn't also trigger the detail sheet.
+                ShareLink(item: ShareContentBuilder.shareText(for: launch)) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.cyan.opacity(0.7))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel("Share \(launch.name)")
+            }
             
             // 2. Identification Configurations Block
             VStack(alignment: .leading, spacing: 2) {
@@ -94,19 +111,7 @@ struct LaunchCardView: View {
                 .padding(.top, 4)
             }
 
-            // 💡 FEAT-08: share this launch as a short text summary via the native share
-            // sheet. Nested inside the card's own tap-to-open-detail area the same way the
-            // star favorite button above already is -- SwiftUI hit-tests the more specific
-            // control first, so this doesn't also trigger the detail sheet.
             HStack {
-                ShareLink(item: ShareContentBuilder.shareText(for: launch)) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.cyan.opacity(0.7))
-                }
-                .buttonStyle(PlainButtonStyle())
-                .accessibilityLabel("Share \(launch.name)")
-
                 Spacer()
                 Text("❯")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
