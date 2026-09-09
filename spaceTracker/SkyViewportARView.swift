@@ -42,14 +42,6 @@ class SkyViewportARView: UIView {
         scnView.scene = scene
         scnView.backgroundColor = .black
         scnView.antialiasingMode = .multisampling4X
-        // ARSCNView renders continuously by default, driven by the AR session's own frame
-        // updates -- plain SCNView does NOT: left at its default, it only redraws when
-        // something in the scene graph itself changes, so the per-frame delegate callback
-        // that rotates the camera (Coordinator.renderer below) would almost never fire, and
-        // the view would appear frozen on whatever was rendered at creation. isPlaying = true
-        // puts it in a continuous render loop at the display's refresh rate instead, the same
-        // way a video player stays in a "playing" state rather than showing one frame.
-        scnView.isPlaying = true
         // automaticallyUpdatesLighting was an ARSCNView-only property (it toggles ARKit's
         // camera-image-based light estimation, which needs a live camera feed to estimate
         // from) -- doesn't exist on plain SCNView, and doesn't need a replacement here: every
@@ -73,11 +65,28 @@ class SkyViewportARView: UIView {
         self.addSubview(scnView)
         
         populateARSkyDome(catalog: celestialCatalog, inside: scene)
+        
+        // ARSCNView renders continuously by default, driven by the AR session's own frame
+        // updates -- plain SCNView does NOT: left at its default, it only redraws when
+        // something in the scene graph itself changes, so the per-frame delegate callback
+        // that rotates the camera (Coordinator.renderer below) would almost never fire, and
+        // the view would appear frozen on whatever was rendered at creation. isPlaying = true
+        // puts it in a continuous render loop at the display's refresh rate instead, the same
+        // way a video player stays in a "playing" state rather than showing one frame.
+        //
+        // FOLLOW-UP FIX: originally set at the very top of this initializer, before scnView
+        // even had a real frame or was in the view hierarchy -- that produced a black screen
+        // until the app was backgrounded and foregrounded again, which forces iOS to kick the
+        // Metal render loop back into gear. Setting it here (after the view has a real frame
+        // and a superview) avoids needing that kick in the first place; also reasserted in
+        // layoutSubviews below in case this view is ever reused/re-added to a new hierarchy.
+        scnView.isPlaying = true
     }
     
     override func layoutSubviews() {
         super.layoutSubviews()
         scnView.frame = self.bounds
+        scnView.isPlaying = true
     }
     
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

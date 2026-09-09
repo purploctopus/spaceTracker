@@ -25,6 +25,20 @@
 //  freeze" step anymore -- the camera always reflects whatever the phone is actually doing
 //  right now, which means there's nothing for it to fall out of sync with over time, and it
 //  works identically whether the sky is visible or not: day or night, indoors or out.
+//
+//  FOLLOW-UP FIX: the first version of this rewrite smoothed heading over a tiny 5-sample
+//  rolling window (~80ms at 60Hz) before handing it straight to the camera every frame. That
+//  is nowhere near enough damping for raw magnetometer output -- with ARKit gone, nothing was
+//  left to absorb ordinary compass noise the way ARKit's own visual-inertial fusion used to
+//  (it wasn't only smoothing position; it was also cross-checking rotation against the gyro
+//  and visual features, which damps compass jitter far more than a short average can). The
+//  result was the sky visibly jumping around even with the phone dead still on a desk --
+//  worse than the ORIGINAL .gravityAndHeading jitter bug this whole rewrite exists to fix,
+//  because at least ARKit was damping that. Fixed with a proper exponential moving average
+//  (see smoothedHeadingSin/Cos and smoothedPitch below) instead of a fixed window: it reacts
+//  quickly to real movement but heavily damps frame-to-frame sensor noise, the same category
+//  of filter real compass apps use. The smoothing constants below are a first reasonable
+//  pass, not something verified on a real device -- they may need tuning.
 
 import Foundation
 import CoreMotion
@@ -34,22 +48,18 @@ import Combine
 class SkyMotionManager: ObservableObject {
     private let motionManager = CMMotionManager()
     
-    /// Raw CMAttitude pitch in degrees -- 0 when the device lies flat on a table, 90 when
-    /// held upright/vertical. Drives the "VIEWPORT TILT PITCH" HUD readout directly, and (via
+    /// Filtered pitch in degrees -- 0 when the device lies flat on a table, 90 when held
+    /// upright/vertical. Drives the "VIEWPORT TILT PITCH" HUD readout directly, and (via
     /// SkyViewportARViewContainer.pitchDegrees) the camera's own tilt. Kept under its
-    /// original name so the HUD call site didn't need to change. This was never part of any
-    /// jitter/alignment bug -- it comes purely from gravity (accelerometer) and the
-    /// gyroscope, with no compass/magnetometer involvement at all, so it's always been
-    /// trustworthy on its own.
+    /// original name so the HUD call site didn't need to change. This axis was never part of
+    /// the original jitter bug (it's gravity/gyro based, no magnetometer), but now that it
+    /// drives continuous 3D rendering every frame instead of an occasionally-glanced-at HUD
+    /// number, it gets the same light exponential smoothing as heading as a precaution.
     @Published var currentAltitude: Double = 0.0
     
-    /// Continuously-updated compass heading in degrees (0-360), true- or magnetic-north
-    /// referenced depending on location authorization (see engageSensorStreaming). Lightly
-    /// smoothed over a short rolling window (see recentHeadingSamples below) to iron out
-    /// ordinary magnetometer sample noise -- Core Motion's own sensor fusion already does
-    /// most of this, but since this value now feeds the camera directly every frame (instead
-    /// of ARKit mediating it), a small extra guard against jitter costs nothing and is worth
-    /// keeping.
+    /// Continuously-updated, exponentially-smoothed compass heading in degrees (0-360), true-
+    /// or magnetic-north referenced depending on location authorization (see
+    /// engageSensorStreaming below).
     @Published var currentHeadingDegrees: Double = 0.0
     
     /// False until the first valid heading sample arrives. LiveSkyViewfinderOverlay's
@@ -58,8 +68,23 @@ class SkyMotionManager: ObservableObject {
     /// come in yet."
     @Published var isHeadingAvailable = false
     
-    private var recentHeadingSamples: [Double] = []
-    private let smoothingWindowSize = 5
+    // Exponential moving average state. Heading is filtered as sine/cosine components rather
+    // than the raw degrees value -- filtering the angle directly breaks across the 0°/360°
+    // seam (359° smoothing toward 1° would incorrectly ease through 180° instead of straight
+    // across zero); filtering its unit-circle components sidesteps that entirely, the same
+    // trick the old fixed-window circular mean used, just applied continuously instead of
+    // over a fixed batch of samples.
+    private var smoothedHeadingSin: Double?
+    private var smoothedHeadingCos: Double?
+    private var smoothedPitchDegrees: Double?
+    
+    // Smoothing factor per update (0-1): lower = smoother but slower to react, higher =
+    // snappier but noisier. At the ~60Hz update rate set below, 0.12 works out to roughly an
+    // 0.1s time constant -- heavy enough to flatten ordinary compass noise, still well within
+    // "feels responsive" for someone panning a phone across the sky. Pitch gets a lighter
+    // touch since its underlying sensor (gravity + gyro) was never the noisy one.
+    private let headingSmoothingFactor = 0.12
+    private let pitchSmoothingFactor = 0.25
     
     func engageSensorStreaming() {
         guard motionManager.isDeviceMotionAvailable else { return }
@@ -78,7 +103,13 @@ class SkyMotionManager: ObservableObject {
         motionManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { [weak self] motionData, _ in
             guard let self, let data = motionData else { return }
             
-            self.currentAltitude = data.attitude.pitch * (180.0 / .pi)
+            let rawPitch = data.attitude.pitch * (180.0 / .pi)
+            if let previousPitch = self.smoothedPitchDegrees {
+                self.smoothedPitchDegrees = previousPitch + self.pitchSmoothingFactor * (rawPitch - previousPitch)
+            } else {
+                self.smoothedPitchDegrees = rawPitch
+            }
+            self.currentAltitude = self.smoothedPitchDegrees ?? rawPitch
             
             // heading is documented to come back negative specifically to mean "invalid"
             // (rather than something that needs +360 wraparound) -- skip those samples
@@ -86,31 +117,28 @@ class SkyMotionManager: ObservableObject {
             let heading = data.heading
             guard heading >= 0 else { return }
             
-            self.recentHeadingSamples.append(heading)
-            if self.recentHeadingSamples.count > self.smoothingWindowSize {
-                self.recentHeadingSamples.removeFirst()
+            let headingRadians = heading * .pi / 180.0
+            let sample = (sin: sin(headingRadians), cos: cos(headingRadians))
+            if let previousSin = self.smoothedHeadingSin, let previousCos = self.smoothedHeadingCos {
+                self.smoothedHeadingSin = previousSin + self.headingSmoothingFactor * (sample.sin - previousSin)
+                self.smoothedHeadingCos = previousCos + self.headingSmoothingFactor * (sample.cos - previousCos)
+            } else {
+                self.smoothedHeadingSin = sample.sin
+                self.smoothedHeadingCos = sample.cos
             }
-            self.currentHeadingDegrees = Self.circularMeanDegrees(self.recentHeadingSamples)
+            
+            var filteredHeading = atan2(self.smoothedHeadingSin ?? sample.sin, self.smoothedHeadingCos ?? sample.cos) * (180.0 / .pi)
+            if filteredHeading < 0 { filteredHeading += 360.0 }
+            self.currentHeadingDegrees = filteredHeading
             self.isHeadingAvailable = true
         }
     }
     
     func disengageSensorStreaming() {
         motionManager.stopDeviceMotionUpdates()
-        recentHeadingSamples.removeAll()
+        smoothedHeadingSin = nil
+        smoothedHeadingCos = nil
+        smoothedPitchDegrees = nil
         isHeadingAvailable = false
-    }
-    
-    /// Plain averaging breaks across the 0°/360° seam (359° and 1° should average to 0°, not
-    /// 180°) -- averaging each sample's sine/cosine components instead is immune to wherever
-    /// that seam happens to land.
-    private static func circularMeanDegrees(_ degrees: [Double]) -> Double {
-        guard !degrees.isEmpty else { return 0 }
-        let radians = degrees.map { $0 * .pi / 180.0 }
-        let sumSin = radians.reduce(0.0) { $0 + sin($1) }
-        let sumCos = radians.reduce(0.0) { $0 + cos($1) }
-        var mean = atan2(sumSin, sumCos) * (180.0 / .pi)
-        if mean < 0 { mean += 360.0 }
-        return mean
     }
 }
