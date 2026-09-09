@@ -1574,6 +1574,25 @@ struct ContentView: View {
                         satellites: satViewModel.visiblePasses,
                         meteorShowers: meteorViewModel.upcomingShowers
                     )
+
+                    // 5. Per-event alerts (FEAT-01): launch T-minus, pass-about-to-start, and
+                    // meteor shower peak alerts, on top of the daily digest above.
+                    notificationEngine.scheduleEventAlerts(
+                        launches: viewModel.launches,
+                        satellites: satViewModel.visiblePasses,
+                        meteorShowers: meteorViewModel.upcomingShowers
+                    )
+                }
+                // satViewModel.requestPasses() above resolves asynchronously (it waits on a
+                // CLLocationManager delegate callback), so visiblePasses is very often still
+                // empty at the point scheduleEventAlerts() runs just above. Re-run it once
+                // passes actually arrive so pass alerts aren't silently skipped every launch.
+                .onChange(of: satViewModel.visiblePasses.count) { _, _ in
+                    notificationEngine.scheduleEventAlerts(
+                        launches: viewModel.launches,
+                        satellites: satViewModel.visiblePasses,
+                        meteorShowers: meteorViewModel.upcomingShowers
+                    )
                 }
                 .task {
                     print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
