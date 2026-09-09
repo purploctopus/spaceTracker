@@ -180,6 +180,7 @@ struct AsteroidCardView: View {
     let asteroid: Asteroid
     let userLatitude: Double
     let userLongitude: Double
+    @ObservedObject private var favorites = FavoritesStore.shared
     
     // 💡 THE COMPILER SAVIOR: Move all complex lookup math completely out of the body view layout tree! [1.1]
     private var liveVisibility: (text: String, isVisibleNow: Bool, isTooDim: Bool) {
@@ -202,6 +203,14 @@ struct AsteroidCardView: View {
                     .lineLimit(1)
                 
                 Spacer()
+                
+                Button(action: { favorites.toggleAsteroid(asteroid.id) }) {
+                    Image(systemName: favorites.isAsteroidFavorite(asteroid.id) ? "star.fill" : "star")
+                        .font(.system(size: 12))
+                        .foregroundColor(favorites.isAsteroidFavorite(asteroid.id) ? .yellow : .gray.opacity(0.5))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.trailing, 4)
                 
                 if asteroid.is_potentially_hazardous_asteroid {
                     Text("⚠️ HAZARD")

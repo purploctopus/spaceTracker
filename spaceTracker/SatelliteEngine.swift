@@ -362,6 +362,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
 struct SatelliteCardView: View {
     let sat: SatellitePass
     let location: String
+    @ObservedObject private var favorites = FavoritesStore.shared
     
     // ✅ RESPONSIVE: Listens directly to the device window width size class environment
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
@@ -377,11 +378,22 @@ struct SatelliteCardView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(sat.name.uppercased())
-                .font(.system(horizontalSizeClass == .regular ? .body : .subheadline, design: .monospaced))
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .lineLimit(1)
+            HStack(spacing: 4) {
+                Text(sat.name.uppercased())
+                    .font(.system(horizontalSizeClass == .regular ? .body : .subheadline, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                // 💡 FEAT-06: star this satellite to follow it -- scopes pass alerts to just
+                // the satellites followed once at least one is starred.
+                Button(action: { favorites.toggleSatellite(sat.id) }) {
+                    Image(systemName: favorites.isSatelliteFavorite(sat.id) ? "star.fill" : "star")
+                        .font(.system(size: 10))
+                        .foregroundColor(favorites.isSatelliteFavorite(sat.id) ? .yellow : .gray.opacity(0.5))
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
             
             Text(sat.localDisplayTime.uppercased())
                 .font(.system(horizontalSizeClass == .regular ? .subheadline : .caption, design: .monospaced))

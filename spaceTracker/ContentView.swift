@@ -219,6 +219,7 @@ struct ContentView: View {
     
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
     @StateObject private var locationProvider = DeviceLocationProvider()
+    @ObservedObject private var favoritesStore = FavoritesStore.shared
 
 
     // 💡 RESPONSIVE ATMOSPHERIC CELL MATRIX: Stacks vertically on iPhone, aligns horizontally on iPad
@@ -1187,7 +1188,10 @@ struct ContentView: View {
                     launch.launch_service_provider?.name ?? "UNKNOWN PROVIDER"
                 }
                 let uniqueSet = Set(extractedNames)
-                return ["ALL OPERATIONS"] + uniqueSet.sorted()
+                // FEAT-06: only worth showing once something's actually been starred --
+                // an empty "FAVORITES" chip that just says "nothing here" isn't useful.
+                let favoritesChip = favoritesStore.favoriteProviders.isEmpty ? [] : ["★ FAVORITES"]
+                return ["ALL OPERATIONS"] + favoritesChip + uniqueSet.sorted()
             }()
             
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1222,6 +1226,9 @@ struct ContentView: View {
                 let filteredManifest = upcomingManifest.filter { launch in
                     if selectedAgencyFilter == "ALL OPERATIONS" { return true }
                     let providerName = launch.launch_service_provider?.name ?? "UNKNOWN PROVIDER"
+                    if selectedAgencyFilter == "★ FAVORITES" {
+                        return favoritesStore.isProviderFavorite(providerName)
+                    }
                     return providerName == selectedAgencyFilter
                 }
                 

@@ -185,8 +185,18 @@ class NotificationManager: ObservableObject {
                 isoFormatter.date(from: string) ?? isoFormatterNoFraction.date(from: string)
             }
 
+            // FEAT-06: once at least one provider is starred, scope launch alerts to just
+            // those providers instead of every launch in the manifest. Empty favorites means
+            // no one's opted in yet, so behavior is unchanged -- everything still alerts.
+            let favoriteProviders = FavoritesStore.shared.favoriteProviders
+
             if self.launchAlertsEnabled {
                 let upcoming = launches
+                    .filter { launch in
+                        guard !favoriteProviders.isEmpty else { return true }
+                        guard let providerName = launch.launch_service_provider?.name else { return false }
+                        return favoriteProviders.contains(providerName)
+                    }
                     .compactMap { launch -> (SpaceLaunch, Date)? in
                         guard let netString = launch.net, let date = parseISO(netString) else { return nil }
                         return (launch, date)
@@ -205,8 +215,14 @@ class NotificationManager: ObservableObject {
                 }
             }
 
+            // Same opt-in scoping for satellite passes, keyed on the satellite's stable id.
+            let favoriteSatellites = FavoritesStore.shared.favoriteSatellites
+
             if self.passAlertsEnabled {
                 let upcoming = satellites
+                    .filter { sat in
+                        favoriteSatellites.isEmpty || favoriteSatellites.contains(sat.id)
+                    }
                     .compactMap { sat -> (SatellitePass, Date)? in
                         guard let date = parseISO(sat.utcTimeISO) else { return nil }
                         return (sat, date)

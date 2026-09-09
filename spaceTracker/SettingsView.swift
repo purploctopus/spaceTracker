@@ -10,6 +10,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var notificationEngine: NotificationManager
+    @ObservedObject private var favorites = FavoritesStore.shared
     @Environment(\.dismiss) var dismiss
 
     private let leadTimeOptions = [5, 10, 15, 30, 60]
@@ -67,6 +68,13 @@ struct SettingsView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundColor(.gray)
                         .padding(.horizontal, 4)
+
+                    if !favorites.favoriteProviders.isEmpty || !favorites.favoriteSatellites.isEmpty {
+                        Text("★ NOTE: YOU'VE STARRED SPECIFIC PROVIDERS AND/OR SATELLITES, SO LAUNCH AND PASS ALERTS ONLY FIRE FOR THOSE. UNSTAR EVERYTHING TO GET ALERTS FOR ALL OF THEM AGAIN.")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundColor(.yellow)
+                            .padding(.horizontal, 4)
+                    }
                 }
                 .padding()
                 .padding(.bottom, 40)

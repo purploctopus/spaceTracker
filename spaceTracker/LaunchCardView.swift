@@ -15,6 +15,8 @@ struct LaunchCardView: View {
     
     // 💡 FIXED: Injected parameter action line allows data to flow up to your root views safely
     let onWatchTap: (String) -> Void
+
+    @ObservedObject private var favorites = FavoritesStore.shared
     
     // ✅ RESPONSIVE: Listens to the environment window layout size category
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
@@ -46,10 +48,23 @@ struct LaunchCardView: View {
                     .lineLimit(2)
                 
                 // 💡 FIXED: Safely unwraps the provider name checking model optionals seamlessly
-                Text(launch.launch_service_provider?.name?.uppercased() ?? "GLOBAL RANGE")
-                    .font(.system(horizontalSizeClass == .regular ? .caption : .caption2, design: .monospaced))
-                    .foregroundColor(.blue)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(launch.launch_service_provider?.name?.uppercased() ?? "GLOBAL RANGE")
+                        .font(.system(horizontalSizeClass == .regular ? .caption : .caption2, design: .monospaced))
+                        .foregroundColor(.blue)
+                        .lineLimit(1)
+
+                    // 💡 FEAT-06: star this provider to follow it -- scopes launch alerts and
+                    // the dashboard's "FAVORITES" filter chip to just the providers followed.
+                    if let providerName = launch.launch_service_provider?.name {
+                        Button(action: { favorites.toggleProvider(providerName) }) {
+                            Image(systemName: favorites.isProviderFavorite(providerName) ? "star.fill" : "star")
+                                .font(.system(size: 9))
+                                .foregroundColor(favorites.isProviderFavorite(providerName) ? .yellow : .gray.opacity(0.5))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
             }
             
             // 💡 THE INJECTED RADAR COUNTDOWN TICKER: Tracks days, hours, and minutes to T-0
