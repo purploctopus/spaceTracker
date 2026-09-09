@@ -1520,26 +1520,6 @@ struct ContentView: View {
                         }
                     }
                     .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
-                    
-                    // 💡 Voluntary "Go Ad-Free" sheet — reached via the persistent entry point
-                    // (see the header button below), never as a forced interrupt.
-                    if showAdPromptOverlay {
-                        AdPromptOverlayView(
-                            adEngine: adEngine,
-                            actionLabel: "Ad-Free Access",
-                            onTriggerAd: {
-                                adEngine.showAdFromKeyWindow {
-                                    showAdPromptOverlay = false
-                                    adEngine.shouldAutoPresentAdPrompt = false
-                                }
-                            },
-                            onDismiss: {
-                                showAdPromptOverlay = false
-                                adEngine.shouldAutoPresentAdPrompt = false
-                            }
-                        )
-                        .transition(.opacity.animation(.easeInOut))
-                    }
                     // 💡 THE CONDITIONS BRIEFING POPUP: Dimmed backdrop with a clean, centralized terminal box
                     if showConditionsExplainer {
                         ZStack {
@@ -1856,6 +1836,35 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(notificationEngine: notificationEngine)
+        }
+        // 💡 BUG FIX: this used to be rendered as a plain `if` inside Home Command's own
+        // ZStack, so tapping the ad-free pill on Star Gazers/Earth Watch/Space News set
+        // the same showAdPromptOverlay flag, but nothing on THOSE tabs' subtrees ever drew
+        // it -- TabView only keeps the active tab's content on screen, so the sheet was
+        // invisible everywhere except Home Command. Hoisted to a TabView-level .overlay so
+        // it renders identically no matter which tab is active. Attached here (not as a
+        // .fullScreenCover) specifically so it stacks *underneath* the Live Sky
+        // .fullScreenCover above: a fullScreenCover always covers everything beneath it,
+        // overlay included, so this can never appear on top of the live sky view even if
+        // both flags happen to be true at once.
+        .overlay {
+            if showAdPromptOverlay {
+                AdPromptOverlayView(
+                    adEngine: adEngine,
+                    actionLabel: "Ad-Free Access",
+                    onTriggerAd: {
+                        adEngine.showAdFromKeyWindow {
+                            showAdPromptOverlay = false
+                            adEngine.shouldAutoPresentAdPrompt = false
+                        }
+                    },
+                    onDismiss: {
+                        showAdPromptOverlay = false
+                        adEngine.shouldAutoPresentAdPrompt = false
+                    }
+                )
+                .transition(.opacity.animation(.easeInOut))
+            }
         }
     }
 
