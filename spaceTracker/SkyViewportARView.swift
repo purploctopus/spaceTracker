@@ -80,9 +80,17 @@ class SkyViewportARView: UIView {
     /// beginTracking is what actually decides *when* it's safe to apply.
     private func applyHeadingOffset(degrees: Double) {
         let radians = Float(degrees * .pi / 180.0)
-        // Same sign convention as each individual object's own yaw below (-azRad) -- negating
-        // here makes a sphere-wide offset behave exactly like an object-level azimuth would.
-        celestialSphereNode?.eulerAngles.y = -radians
+        // NOT the same sign as an individual object's -azRad below, and that's the point.
+        // Each object's -azRad *constructs* a direction from a bearing (forward rotated by
+        // -bearing). This offset does the opposite job: it *undoes* the arbitrary rotation
+        // between the sphere's north-aligned local frame and the AR world frame (whose -Z axis
+        // is simply whatever compass heading the device happened to face when the session
+        // started). Undoing a rotation takes its inverse, i.e. the *positive* angle here, not
+        // the negated one -- worked through from first principles after the sphere still came
+        // out ~2x the capture heading off of correct (a clean 180 when capture heading was
+        // near 90/270), which only happens when this sign is flipped relative to -azRad rather
+        // than matching it.
+        celestialSphereNode?.eulerAngles.y = radians
     }
     
     private func populateARSkyDome(catalog: [APIPlanetItem], inside scene: SCNScene) {
