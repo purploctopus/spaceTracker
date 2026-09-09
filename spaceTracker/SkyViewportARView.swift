@@ -172,8 +172,17 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
             guard let arView = renderer as? ARSCNView else { return }
             
             var temporaryPlots: [ScreenProjectedObject] = []
-            var activeLockNode: SCNNode? = nil
-            var closestDistance: Float = Float.infinity
+            
+            // Named bodies (planets, the Moon, and naked-eye stars with a real name rather than
+            // just a HIP catalog number -- see isMajorLabelBody/hasPermanentLabel in
+            // populateARSkyDome) get their own closest-match tracking, separate from the general
+            // "anything under the reticle" tracking below. That way a named object anywhere
+            // inside the lock radius always outranks a closer but unnamed background star,
+            // instead of pure on-screen distance deciding the winner.
+            var closestNamedNode: SCNNode? = nil
+            var closestNamedDistance: Float = Float.infinity
+            var closestAnyNode: SCNNode? = nil
+            var closestAnyDistance: Float = Float.infinity
             
             let targetCenterPoint = self.reticleCenter
             
@@ -190,8 +199,9 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
                     if screenPoint.z > 0 && screenPoint.z < 1.0 {
                         let screenX = CGFloat(screenPoint.x)
                         let screenY = CGFloat(screenPoint.y)
+                        let isNamedBody = node.value(forKey: "hasPermanentLabel") as? Bool == true
                         
-                        if node.value(forKey: "hasPermanentLabel") as? Bool == true {
+                        if isNamedBody {
                             temporaryPlots.append(ScreenProjectedObject(
                                 name: packet.name,
                                 classification: packet.classification,
@@ -204,13 +214,24 @@ struct SkyViewportARViewContainer: UIViewRepresentable {
                         let dy = Float(screenY - targetCenterPoint.y)
                         let distanceToCenter = sqrt(dx*dx + dy*dy)
                         
-                        if distanceToCenter < 35.0 && distanceToCenter < closestDistance {
-                            closestDistance = distanceToCenter
-                            activeLockNode = node
+                        guard distanceToCenter < 35.0 else { return }
+                        
+                        if isNamedBody {
+                            if distanceToCenter < closestNamedDistance {
+                                closestNamedDistance = distanceToCenter
+                                closestNamedNode = node
+                            }
+                        } else if distanceToCenter < closestAnyDistance {
+                            closestAnyDistance = distanceToCenter
+                            closestAnyNode = node
                         }
                     }
                 }
             }
+            
+            // A named body anywhere in the lock radius always wins; only fall back to the
+            // nearest unnamed star when nothing named is under the reticle at all.
+            let activeLockNode = closestNamedNode ?? closestAnyNode
             
             DispatchQueue.main.async {
                 self.parent.projectedScreenPlots = temporaryPlots
