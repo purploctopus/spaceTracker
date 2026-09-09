@@ -286,7 +286,16 @@ struct AsteroidCardView: View {
                 }
             }
 
+            // 💡 FEAT-08: share this asteroid as a short text summary via the native share sheet.
             HStack {
+                ShareLink(item: ShareContentBuilder.shareText(for: asteroid)) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.cyan.opacity(0.7))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel("Share \(asteroid.name)")
+
                 Spacer()
                 Text("❯")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))

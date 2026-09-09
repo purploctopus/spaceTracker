@@ -437,7 +437,16 @@ struct SatelliteCardView: View {
             }
             .foregroundColor(.gray)
 
+            // 💡 FEAT-08: share this pass as a short text summary via the native share sheet.
             HStack {
+                ShareLink(item: ShareContentBuilder.shareText(for: sat)) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.cyan.opacity(0.7))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel("Share \(sat.name)")
+
                 Spacer()
                 Text("❯")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
