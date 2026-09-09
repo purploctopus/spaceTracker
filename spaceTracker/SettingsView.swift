@@ -64,6 +64,24 @@ struct SettingsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
                     .cornerRadius(8)
 
+                    sectionHeader("QUIET HOURS")
+                    VStack(spacing: 0) {
+                        toggleRow(
+                            icon: "moon.zzz.fill",
+                            title: "QUIET HOURS",
+                            subtitle: "Don't send launch/pass/meteor alerts overnight",
+                            isOn: $notificationEngine.quietHoursEnabled
+                        )
+                        if notificationEngine.quietHoursEnabled {
+                            Divider().background(Color.white.opacity(0.08))
+                            hourRow(label: "STARTS AT", hour: $notificationEngine.quietHoursStartHour)
+                            hourRow(label: "ENDS AT", hour: $notificationEngine.quietHoursEndHour)
+                        }
+                    }
+                    .background(Color(red: 0.06, green: 0.06, blue: 0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .cornerRadius(8)
+
                     Text("ALERTS ARE SCHEDULED FROM WHATEVER LAUNCH, PASS, AND METEOR SHOWER DATA HAS ALREADY LOADED. REOPEN THE APP TO REFRESH THEM AGAINST THE LATEST SCHEDULE.")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundColor(.gray)
@@ -183,6 +201,24 @@ struct SettingsView: View {
             Picker("", selection: minutes) {
                 ForEach(leadTimeOptions, id: \.self) { value in
                     Text("\(value) MIN").tag(value)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(.cyan)
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
+    }
+
+    private func hourRow(label: String, hour: Binding<Int>) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundColor(.gray)
+            Spacer()
+            Picker("", selection: hour) {
+                ForEach(0..<24, id: \.self) { value in
+                    Text(String(format: "%02d:00", value)).tag(value)
                 }
             }
             .pickerStyle(.menu)

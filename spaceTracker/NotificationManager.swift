@@ -34,6 +34,21 @@ class NotificationManager: ObservableObject {
         didSet { UserDefaults.standard.set(passLeadMinutes, forKey: Keys.passLeadMinutes) }
     }
 
+    // MARK: - Quiet hours
+    // Best practice for local alerts: don't wake someone up for a launch or pass at 3 AM.
+    // When enabled, any per-event alert whose fire time falls inside this window is simply
+    // not scheduled (skipped, not delayed -- a "look up now" alert that fires hours late is
+    // useless). The daily 8 AM briefing is unaffected; it never fires overnight anyway.
+    @Published var quietHoursEnabled: Bool {
+        didSet { UserDefaults.standard.set(quietHoursEnabled, forKey: Keys.quietHoursEnabled) }
+    }
+    @Published var quietHoursStartHour: Int {
+        didSet { UserDefaults.standard.set(quietHoursStartHour, forKey: Keys.quietHoursStartHour) }
+    }
+    @Published var quietHoursEndHour: Int {
+        didSet { UserDefaults.standard.set(quietHoursEndHour, forKey: Keys.quietHoursEndHour) }
+    }
+
     private enum Keys {
         static let launchAlertsEnabled = "notif_launchAlertsEnabled"
         static let passAlertsEnabled = "notif_passAlertsEnabled"
@@ -41,6 +56,9 @@ class NotificationManager: ObservableObject {
         static let dailyBriefingEnabled = "notif_dailyBriefingEnabled"
         static let launchLeadMinutes = "notif_launchLeadMinutes"
         static let passLeadMinutes = "notif_passLeadMinutes"
+        static let quietHoursEnabled = "notif_quietHoursEnabled"
+        static let quietHoursStartHour = "notif_quietHoursStartHour"
+        static let quietHoursEndHour = "notif_quietHoursEndHour"
     }
 
     // iOS caps an app at 64 pending local notifications system-wide, shared across every
@@ -60,6 +78,11 @@ class NotificationManager: ObservableObject {
         self.dailyBriefingEnabled = defaults.object(forKey: Keys.dailyBriefingEnabled) as? Bool ?? true
         self.launchLeadMinutes = defaults.object(forKey: Keys.launchLeadMinutes) as? Int ?? 15
         self.passLeadMinutes = defaults.object(forKey: Keys.passLeadMinutes) as? Int ?? 5
+        // Default window: 10 PM-8 AM local time, on by default so new installs don't get
+        // buzzed overnight without asking; easy to switch off entirely in Settings.
+        self.quietHoursEnabled = defaults.object(forKey: Keys.quietHoursEnabled) as? Bool ?? true
+        self.quietHoursStartHour = defaults.object(forKey: Keys.quietHoursStartHour) as? Int ?? 22
+        self.quietHoursEndHour = defaults.object(forKey: Keys.quietHoursEndHour) as? Int ?? 8
     }
 
     func requestPermission() {
@@ -207,6 +230,7 @@ class NotificationManager: ObservableObject {
 
                 for (launch, netDate) in upcoming {
                     let fireDate = netDate.addingTimeInterval(-Double(self.launchLeadMinutes * 60))
+                    guard !self.isWithinQuietHours(fireDate) else { continue }
                     let content = UNMutableNotificationContent()
                     content.title = "🚀 LAUNCH ALERT"
                     content.body = "\(launch.name) lifts off in \(self.launchLeadMinutes) minutes."
@@ -233,6 +257,7 @@ class NotificationManager: ObservableObject {
 
                 for (sat, passDate) in upcoming {
                     let fireDate = passDate.addingTimeInterval(-Double(self.passLeadMinutes * 60))
+                    guard !self.isWithinQuietHours(fireDate) else { continue }
                     let content = UNMutableNotificationContent()
                     content.title = "🛰️ PASS ALERT"
                     content.body = "\(sat.name) is overhead in \(self.passLeadMinutes) minutes — look \(sat.travelDirection)."
@@ -262,6 +287,7 @@ class NotificationManager: ObservableObject {
                     fireComponents.hour = 20
                     fireComponents.minute = 0
                     guard let fireDate = Calendar.current.date(from: fireComponents), fireDate > now else { continue }
+                    guard !self.isWithinQuietHours(fireDate) else { continue }
 
                     let content = UNMutableNotificationContent()
                     content.title = "☄️ METEOR SHOWER PEAK"
@@ -270,6 +296,20 @@ class NotificationManager: ObservableObject {
                     self.scheduleOneTime(identifier: "meteor-\(shower.name)-\(shower.peakDateStr)", content: content, fireDate: fireDate, center: center)
                 }
             }
+        }
+    }
+
+    /// Whether `date`'s local hour-of-day falls inside the configured quiet-hours window.
+    /// The window can wrap past midnight (e.g. 22 -> 8), so this compares hour-of-day rather
+    /// than a simple date range comparison.
+    private func isWithinQuietHours(_ date: Date) -> Bool {
+        guard quietHoursEnabled else { return false }
+        guard quietHoursStartHour != quietHoursEndHour else { return true }
+        let hour = Calendar.current.component(.hour, from: date)
+        if quietHoursStartHour < quietHoursEndHour {
+            return hour >= quietHoursStartHour && hour < quietHoursEndHour
+        } else {
+            return hour >= quietHoursStartHour || hour < quietHoursEndHour
         }
     }
 
