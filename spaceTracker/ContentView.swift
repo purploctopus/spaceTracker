@@ -164,6 +164,32 @@ struct ContentView: View {
         }
         return adEngine.premiumProduct?.displayPrice ?? "$2.99"
     }
+
+    /// The "go ad-free" entry point, shared by all three tabs' toolbars so it reads
+    /// identically everywhere instead of three independently-drifting copies. Bumped up
+    /// from a bare 9pt label to a larger pill with a background/border -- a plain unlabeled
+    /// icon (and later a tiny caption) both tested as too easy to miss; this is sized and
+    /// styled to actually read as a tappable button.
+    @ViewBuilder
+    private var adFreeToolbarButton: some View {
+        Button(action: { showAdPromptOverlay = true }) {
+            HStack(spacing: 5) {
+                Image(systemName: adEngine.hasTemporaryAdFreeActive ? "checkmark.seal.fill" : "tv.slash")
+                    .font(.system(size: 14, weight: .semibold))
+                Text(adFreeToolbarLabelText)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+            }
+            .foregroundColor(.cyan)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.cyan.opacity(0.12))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.cyan.opacity(0.4), lineWidth: 1)
+            )
+        }
+    }
     @State private var showAcknowledgements = false
     @State private var showConditionsExplainer = false
     @StateObject private var newsViewModel = SpaceNewsViewModel()
@@ -1296,15 +1322,7 @@ struct ContentView: View {
                                     // only disappearing once ads are actually gone for good.
                                     if !adEngine.hasPermanentAdFree {
                                         ToolbarItem(placement: .navigationBarTrailing) {
-                                            Button(action: { showAdPromptOverlay = true }) {
-                                                HStack(spacing: 4) {
-                                                    Image(systemName: adEngine.hasTemporaryAdFreeActive ? "checkmark.seal.fill" : "tv.slash")
-                                                        .font(.system(size: 14, weight: .semibold))
-                                                    Text(adFreeToolbarLabelText)
-                                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                                }
-                                                .foregroundColor(.cyan)
-                                            }
+                                            adFreeToolbarButton
                                         }
                                     }
                                 }
@@ -1542,36 +1560,49 @@ struct ContentView: View {
             // ==============================================================================
             // CHANNEL TAB 2: STAR GAZERS TELEMETRY CARD TRAY DECK
             // ==============================================================================
-            VStack(spacing: 0) {
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        stargazerDashboardChannelBlock
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 24)
+            NavigationView {
+                VStack(spacing: 0) {
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            stargazerDashboardChannelBlock
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 24)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 24)
+                        .padding(.bottom, 60)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 24)
-                    .padding(.bottom, 60)
+                    .task {
+                        guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
+                        
+                        print("📡 [ASTRONOMY UPDATE]: Ingesting live hardware GPS telemetry...")
+                        
+                        let resolvedCoordinate = await locationProvider.currentLocation()
+                        let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                        let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                        if resolvedCoordinate == nil {
+                            print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
+                        }
+                        
+                        // Clean, true parameter inputs with absolutely zero made-up variables!
+                        await stargazerViewModel.ensureTelemetryLoaded(
+                            latitude: hardwareLat,
+                            longitude: hardwareLng
+                        )
+                    }
                 }
-                .task {
-                    guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
-                    
-                    print("📡 [ASTRONOMY UPDATE]: Ingesting live hardware GPS telemetry...")
-                    
-                    let resolvedCoordinate = await locationProvider.currentLocation()
-                    let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
-                    let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
-                    if resolvedCoordinate == nil {
-                        print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
+                // Same persistent "go ad-free" entry point as Home Command -- previously
+                // this tab had no toolbar of its own at all, so the button only ever
+                // appeared when Home Command happened to be the active tab.
+                .toolbar {
+                    if !adEngine.hasPermanentAdFree {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            adFreeToolbarButton
+                        }
                     }
-                    
-                    // Clean, true parameter inputs with absolutely zero made-up variables!
-                    await stargazerViewModel.ensureTelemetryLoaded(
-                        latitude: hardwareLat,
-                        longitude: hardwareLng
-                    )
                 }
             }
+            .navigationViewStyle(.stack)
             .tabItem {
                 Label("Star Gazers", systemImage: "moon.stars")
             }
@@ -1579,15 +1610,25 @@ struct ContentView: View {
             // ==============================================================================
             // CHANNEL TAB 3: SPACE NEWS
             // ==============================================================================
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 8) {
-                    spaceflightNewsChannelBlock
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 24)
+            NavigationView {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        spaceflightNewsChannelBlock
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 24)
+                    }
+                    .padding(.top, 24)
+                    .padding(.bottom, 60)
                 }
-                .padding(.top, 24)
-                .padding(.bottom, 60)
+                .toolbar {
+                    if !adEngine.hasPermanentAdFree {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            adFreeToolbarButton
+                        }
+                    }
+                }
             }
+            .navigationViewStyle(.stack)
             .tabItem {
                 Label("Space News", systemImage: "newspaper")
             }
