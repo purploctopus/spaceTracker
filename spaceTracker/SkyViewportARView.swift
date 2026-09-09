@@ -42,6 +42,14 @@ class SkyViewportARView: UIView {
         scnView.scene = scene
         scnView.backgroundColor = .black
         scnView.antialiasingMode = .multisampling4X
+        // ARSCNView renders continuously by default, driven by the AR session's own frame
+        // updates -- plain SCNView does NOT: left at its default, it only redraws when
+        // something in the scene graph itself changes, so the per-frame delegate callback
+        // that rotates the camera (Coordinator.renderer below) would almost never fire, and
+        // the view would appear frozen on whatever was rendered at creation. isPlaying = true
+        // puts it in a continuous render loop at the display's refresh rate instead, the same
+        // way a video player stays in a "playing" state rather than showing one frame.
+        scnView.isPlaying = true
         // automaticallyUpdatesLighting was an ARSCNView-only property (it toggles ARKit's
         // camera-image-based light estimation, which needs a live camera feed to estimate
         // from) -- doesn't exist on plain SCNView, and doesn't need a replacement here: every
