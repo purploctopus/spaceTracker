@@ -14,7 +14,7 @@ struct SpaceStationRadarChannelView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("SPACE STATION TRACKER // LIVE ORBITAL POSITION")
+            Text("ORBITAL TRACKER // LIVE POSITION: ISS · TIANGONG · HUBBLE")
                 .font(.system(.caption, design: .monospaced).weight(.bold))
                 .foregroundColor(.cyan)
                 .tracking(1)
@@ -30,9 +30,11 @@ struct SpaceStationRadarChannelView: View {
                     OrbitalGlobeView(
                         issCoordinate: $trackingViewModel.stationState.issCoordinate,
                         tiangongCoordinate: $trackingViewModel.stationState.tiangongCoordinate,
+                        hubbleCoordinate: $trackingViewModel.stationState.hubbleCoordinate,
                         currentFocus: $trackingViewModel.stationState.currentFocus, // 💡 FIXED: Safely wires the selection binding token down to MapKit
                         issGroundTrack: $trackingViewModel.stationState.issGroundTrack,
-                        tiangongGroundTrack: $trackingViewModel.stationState.tiangongGroundTrack
+                        tiangongGroundTrack: $trackingViewModel.stationState.tiangongGroundTrack,
+                        hubbleGroundTrack: $trackingViewModel.stationState.hubbleGroundTrack
                     )
                     .frame(height: 280)
                     .contentShape(Rectangle())
@@ -73,6 +75,18 @@ struct SpaceStationRadarChannelView: View {
                                 .padding(.vertical, 6)
                                 .background(trackingViewModel.stationState.currentFocus == .tiangong ? Color.orange : Color.black.opacity(0.75))
                                 .border(Color.orange.opacity(0.5), width: 1)
+                                .cornerRadius(2)
+                        }
+                        
+                        // CONTROLLER 3: INTERCEPT FOCUS HUBBLE
+                        Button(action: { trackingViewModel.stationState.currentFocus = .hubble }) {
+                            Text("TRACKING: HUBBLE")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(trackingViewModel.stationState.currentFocus == .hubble ? .black : .yellow)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(trackingViewModel.stationState.currentFocus == .hubble ? Color.yellow : Color.black.opacity(0.75))
+                                .border(Color.yellow.opacity(0.5), width: 1)
                                 .cornerRadius(2)
                         }
                     }
@@ -118,9 +132,11 @@ struct OrbitalGlobeFullScreenView: View {
             OrbitalGlobeView(
                 issCoordinate: $trackingViewModel.stationState.issCoordinate,
                 tiangongCoordinate: $trackingViewModel.stationState.tiangongCoordinate,
+                hubbleCoordinate: $trackingViewModel.stationState.hubbleCoordinate,
                 currentFocus: $trackingViewModel.stationState.currentFocus,
                 issGroundTrack: $trackingViewModel.stationState.issGroundTrack,
-                tiangongGroundTrack: $trackingViewModel.stationState.tiangongGroundTrack
+                tiangongGroundTrack: $trackingViewModel.stationState.tiangongGroundTrack,
+                hubbleGroundTrack: $trackingViewModel.stationState.hubbleGroundTrack
             )
             .ignoresSafeArea()
 
@@ -160,6 +176,17 @@ struct OrbitalGlobeFullScreenView: View {
                             .padding(.vertical, 8)
                             .background(trackingViewModel.stationState.currentFocus == .tiangong ? Color.orange : Color.black.opacity(0.75))
                             .border(Color.orange.opacity(0.5), width: 1)
+                            .cornerRadius(2)
+                    }
+
+                    Button(action: { trackingViewModel.stationState.currentFocus = .hubble }) {
+                        Text("TRACKING: HUBBLE")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(trackingViewModel.stationState.currentFocus == .hubble ? .black : .yellow)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(trackingViewModel.stationState.currentFocus == .hubble ? Color.yellow : Color.black.opacity(0.75))
+                            .border(Color.yellow.opacity(0.5), width: 1)
                             .cornerRadius(2)
                     }
                 }

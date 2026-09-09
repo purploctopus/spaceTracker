@@ -28,14 +28,19 @@ struct ISSResponse: Codable {
 
 // MARK: - 🗺️ UNIFIED ORBITAL STATION STATE MATRIX
 struct OrbitalStationState {
-    enum TrackingTarget { case iss, tiangong } // 💡 TARGET ENUM DEFINITION
+    enum TrackingTarget { case iss, tiangong, hubble } // 💡 TARGET ENUM DEFINITION
     
     var issCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
     var tiangongCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
-    // Predicted future ground-track points, both from real SGP4 propagation — a dashed
+    // Hubble isn't a station, but it's the 3rd tracked object -- reuses the exact same
+    // TLE + SGP4 pipeline as Tiangong below (no live "current position" API for it, unlike
+    // the ISS's wheretheiss.at feed, so its position is SGP4-propagated only).
+    var hubbleCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+    // Predicted future ground-track points, all from real SGP4 propagation — a dashed
     // "where it's headed" line to draw on the globe, distinct from the solid current-position dot.
     var issGroundTrack: [CLLocationCoordinate2D] = []
     var tiangongGroundTrack: [CLLocationCoordinate2D] = []
+    var hubbleGroundTrack: [CLLocationCoordinate2D] = []
     var currentFocus: TrackingTarget = .iss // 💡 ISS IS THE STANDARD DEFAULT FOCUS TARGET
     var isDataLoaded: Bool = false
 }
@@ -73,6 +78,9 @@ class OrbitalTrackingViewModel: ObservableObject {
             // fresh SGP4 propagation on every poll.
             let tiangongFetchTask = Task { await fetchTLEData(noradId: 48274) }
             let issFetchTask = Task { await fetchTLEData(noradId: 25544) }
+            // Hubble Space Telescope -- NORAD 20580. Same generic pipeline as Tiangong: no
+            // live position feed, current position + ground track both come from SGP4.
+            let hubbleFetchTask = Task { await fetchTLEData(noradId: 20580) }
             
             while !Task.isCancelled {
                 // ISS current position: stays on the live wheretheiss.at feed — the most
@@ -96,6 +104,14 @@ class OrbitalTrackingViewModel: ObservableObject {
                     self.stationState.issGroundTrack = generateGroundTrack(tle: issTLE)
                 } else {
                     print("⏳ ISS TLE data is still downloading or empty...")
+                }
+                
+                let hubbleTLE = await hubbleFetchTask.value
+                if !hubbleTLE.isEmpty {
+                    self.stationState.hubbleCoordinate = calculateOrbitPosition(tle: hubbleTLE)
+                    self.stationState.hubbleGroundTrack = generateGroundTrack(tle: hubbleTLE)
+                } else {
+                    print("⏳ Hubble TLE data is still downloading or empty...")
                 }
                 
                 do {
