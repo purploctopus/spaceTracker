@@ -1328,6 +1328,10 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
+            // ==============================================================================
+            // CHANNEL TAB 1: HOME COMMAND
+            // ==============================================================================
+            Tab("Home Command", systemImage: "house") {
             NavigationView {
                 ZStack {
                     TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
@@ -1703,18 +1707,12 @@ struct ContentView: View {
             .task {
                 await newsViewModel.loadLatestSpaceNews()
             }
-            
-            // ==============================================================================
-            // CHANNEL TAB 1: HOME COMMAND
-            // ==============================================================================
-            // (Your untouched home command views sit inside this frame slot)
-            .tabItem {
-                Label("Home Command", systemImage: "house")
-            }
+            } // Closes Tab("Home Command")
             
             // ==============================================================================
             // CHANNEL TAB 2: STAR GAZERS TELEMETRY CARD TRAY DECK
             // ==============================================================================
+            Tab("Star Gazers", systemImage: "moon.stars") {
             NavigationView {
                 VStack(spacing: 0) {
                     ScrollView(showsIndicators: false) {
@@ -1762,13 +1760,12 @@ struct ContentView: View {
                 }
             }
             .navigationViewStyle(.stack)
-            .tabItem {
-                Label("Star Gazers", systemImage: "moon.stars")
-            }
+            } // Closes Tab("Star Gazers")
 
             // ==============================================================================
             // CHANNEL TAB 3: EARTH WATCH
             // ==============================================================================
+            Tab("Earth Watch", systemImage: earthWatchTabIconName) {
             NavigationView {
                 EarthWatchView(
                     crewViewModel: crewViewModel,
@@ -1790,13 +1787,12 @@ struct ContentView: View {
                 }
             }
             .navigationViewStyle(.stack)
-            .tabItem {
-                Label("Earth Watch", systemImage: earthWatchTabIconName)
-            }
+            } // Closes Tab("Earth Watch")
 
             // ==============================================================================
             // CHANNEL TAB 4: SPACE NEWS
             // ==============================================================================
+            Tab("Space News", systemImage: "newspaper") {
             NavigationView {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -1819,10 +1815,9 @@ struct ContentView: View {
                 }
             }
             .navigationViewStyle(.stack)
-            .tabItem {
-                Label("Space News", systemImage: "newspaper")
-            }
+            } // Closes Tab("Space News")
         }
+        .tabViewStyle(.sidebarAdaptable)
         // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
         .fullScreenCover(isPresented: $showLiveViewfinderOverlay) {
             // 💡 THE TRUE DATA FEED: Passes your real live downloaded planets list array down into the finder lookups!
