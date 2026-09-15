@@ -1516,55 +1516,6 @@ struct ContentView: View {
                         }
                     }
                     .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
-                    // 💡 THE CONDITIONS BRIEFING POPUP: Dimmed backdrop with a clean, centralized terminal box
-                    if showConditionsExplainer {
-                        ZStack {
-                            Color.black.opacity(0.85)
-                                .ignoresSafeArea()
-                                .onTapGesture { showConditionsExplainer = false } // Dismiss when background is tapped
-                            
-                            VStack(alignment: .leading, spacing: 20) {
-                                // Header Row
-                                HStack {
-                                    Text("FIELD BRIEFING: WEATHER STATUS")
-                                        .font(.system(.subheadline, design: .monospaced))
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.cyan)
-                                    Spacer()
-                                    Button(action: { showConditionsExplainer = false }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.gray)
-                                    }
-                                }
-                                
-                                Divider()
-                                    .background(Color.white.opacity(0.15))
-                                
-                                // Human-Readable Telemetry Breakdown
-                                VStack(alignment: .leading, spacing: 14) {
-                                    // 💡 THE COMPLIANT TARGET INSIGHT ROW: Renders our exact dynamic string matrix text flawlessly
-                                    Text(dynamicMissionBriefingText)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(weatherViewModel.cloudCoverPercent <= 30 ? .green : (weatherViewModel.cloudCoverPercent > 70 ? .orange : .yellow))
-                                    Text("• CLOUDS & HUMIDITY: This dictates your visual visibility vector. Low cloud cover (< 30%) and low humidity mean crisp, high-clarity viewing conditions through your local atmospheric path.")
-                                    
-                                    Text("• KP-INDEX: This tracks geomagnetic solar storms in the upper atmosphere on a scale of 0 to 9. High scores (5+) trigger aurora displays.")
-                                    
-                                }
-                                .font(.system(.footnote, design: .monospaced))
-                                .foregroundColor(.secondary)
-                                .lineSpacing(4)
-                            }
-                            .padding(24)
-                            .background(Color(red: 0.06, green: 0.06, blue: 0.06))
-                            .border(Color.white.opacity(0.1), width: 1)
-                            .cornerRadius(6)
-                            .padding(.horizontal, horizontalSizeClass == .regular ? 140 : 24)
-                        }
-                        .transition(.opacity.animation(.easeInOut(duration: 0.2)))
-                    }
-                    
                     
                 } // Closes ZStack
                 .onAppear {
@@ -1652,6 +1603,47 @@ struct ContentView: View {
             }// Closes NavigationView
             .navigationViewStyle(.stack)
             .preferredColorScheme(.dark)
+            // BUG-05 FIX: this was a hand-rolled ZStack overlay (see the .sheet content
+            // below for what it used to look like inline) -- converted to a native .sheet,
+            // matching APODCreditDetailSheet/MeteorShowerDetailSheet just below, both of
+            // which already work fine on iPad. Sidesteps whatever the custom-overlay-inside-
+            // .sidebarAdaptable-NavigationView interaction was that swallowed the tap.
+            .sheet(isPresented: $showConditionsExplainer) {
+                ZStack {
+                    Color(red: 0.04, green: 0.04, blue: 0.04).ignoresSafeArea()
+                    VStack(alignment: .leading, spacing: 20) {
+                        HStack {
+                            Text("FIELD BRIEFING: WEATHER STATUS")
+                                .font(.system(.subheadline, design: .monospaced))
+                                .fontWeight(.bold)
+                                .foregroundColor(.cyan)
+                            Spacer()
+                            Button(action: { showConditionsExplainer = false }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.15))
+                        
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text(dynamicMissionBriefingText)
+                                .fontWeight(.bold)
+                                .foregroundColor(weatherViewModel.cloudCoverPercent <= 30 ? .green : (weatherViewModel.cloudCoverPercent > 70 ? .orange : .yellow))
+                            Text("• CLOUDS & HUMIDITY: This dictates your visual visibility vector. Low cloud cover (< 30%) and low humidity mean crisp, high-clarity viewing conditions through your local atmospheric path.")
+                            
+                            Text("• KP-INDEX: This tracks geomagnetic solar storms in the upper atmosphere on a scale of 0 to 9. High scores (5+) trigger aurora displays.")
+                        }
+                        .font(.system(.footnote, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .lineSpacing(4)
+                    }
+                    .padding(24)
+                }
+                .preferredColorScheme(.dark)
+            }
             .sheet(isPresented: $showAPODDetails) {
                 APODCreditDetailSheet(imageURL: apodViewModel.backgroundImageURL, title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
             }
