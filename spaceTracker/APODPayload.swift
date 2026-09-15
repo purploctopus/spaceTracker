@@ -63,7 +63,13 @@ struct TacticalAmbientBackdropView: View {
         // Base layer takes up exactly 100% of the screen bounds
         Color(red: 0.02, green: 0.02, blue: 0.02)
             .ignoresSafeArea()
-            // ✅ THE FIX: Image is isolated inside an overlay so it cannot expand your layout containers
+            // BUG-06 FIX: heavy blur + a lower opacity so the ambient backdrop reads as
+            // pure mood/texture no matter what NASA publishes that day (moody space photo,
+            // text-heavy infographic, busy star-trail shot -- all become an unreadable wash
+            // of color once blurred this hard). It's never meant to be legible; the sharp
+            // original is still one tap away via nasaApodButton -> APODCreditDetailSheet,
+            // unchanged below. Image is isolated inside an overlay so it cannot expand your
+            // layout containers.
             .overlay(
                 Group {
                     if let imgUrl = apodViewModel.backgroundImageURL {
@@ -73,7 +79,8 @@ struct TacticalAmbientBackdropView: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .opacity(0.35)
+                                    .blur(radius: 45)
+                                    .opacity(0.30)
                                     .transition(.opacity.animation(.easeIn(duration: 0.5)))
                             default:
                                 Color.clear
