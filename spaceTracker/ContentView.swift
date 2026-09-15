@@ -1403,8 +1403,11 @@ struct ContentView: View {
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
                             locationFallbackBanner
+                            // TAP DEBUG (BUG-05): user's own suggestion -- a generous fixed gap
+                            // instead of 16pt, to test whether the conditions bar just needs to
+                            // clear a dead zone near the top of this tab's content on iPad.
+                            Color.clear.frame(height: 100)
                             stargazingConditionsHeaderBar
-                                .padding(.top, 16) // 💡 Clears the frame constraints of the absolutely positioned Daily Command header box
                                 // TAP DEBUG (BUG-05) -- remove once this is solved. Prints this
                                 // view's real frame, and separately probes for ANY tap landing in
                                 // that same screen area -- if this probe never prints on a tap that
@@ -1551,13 +1554,10 @@ struct ContentView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .principal) {
-                            // TAP DEBUG (BUG-05) -- remove once this is solved. Testing whether
-                            // this header box's hit-testable region is what's blocking the
-                            // conditions bar below it. This also disables the small info
-                            // button inside it for now -- if this IS the fix, that button moves
-                            // to Settings.
+                            // TAP DEBUG (BUG-05): ruled out -- disabling hit-testing here changed
+                            // nothing (same dead frame, still no taps reach the conditions bar),
+                            // so this header box isn't the blocker. Reverted.
                             principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
-                                .allowsHitTesting(false)
                         }
                         ToolbarItem(placement: .navigationBarLeading) {
                             settingsToolbarButton
