@@ -20,6 +20,11 @@ struct SatelliteResponse: Codable {
 struct SatellitePass: Codable, Identifiable {
     let id: String
     let name: String
+    // FEAT-25 follow-up (2026-09-15): real launch year, parsed server-side straight from the
+    // TLE's international designator -- present for every satellite the worker now returns,
+    // not just the ~9 with a hand-written missionProfile entry below. Optional/decodes to nil
+    // rather than breaking anything if an older cached response doesn't have it.
+    let launchYear: String?
     let utcTimeISO: String
     let peakElevationDegrees: Double
     let durationMinutes: Int
@@ -37,6 +42,22 @@ struct SatellitePass: Codable, Identifiable {
         let outputFormatter = DateFormatter()
         outputFormatter.dateFormat = "h:mm a (MMM d)"
         return outputFormatter.string(from: date)
+    }
+
+    // FEAT-25 follow-up (2026-09-15): the small set of satellites with a real hand-written
+    // missionProfile entry below -- same name-substring list, shared here so
+    // NotificationManager can use it too. Now that the worker's whitelist is gone and it
+    // returns everything in CelesTrak's visual group (100+ objects on a clear night), this is
+    // also what NotificationManager falls back to for alerts when the user hasn't explicitly
+    // favorited specific satellites, so an opted-out user doesn't get flooded with alerts for
+    // satellites they've never heard of.
+    static let originalCuratedNameFragments = [
+        "ISS", "CSS", "TIANHE", "SHENZHOU", "TIANGONG", "HUBBLE", "STARLINK", "X37-B", "ENVISAT", "AQUA", "TERRA"
+    ]
+
+    var isOriginalCuratedTarget: Bool {
+        let upperName = name.uppercased()
+        return Self.originalCuratedNameFragments.contains { upperName.contains($0) }
     }
 }
 
@@ -511,7 +532,58 @@ struct SatelliteDetailSheet: View {
         } else if name.contains("TERRA") {
             return ("UNITED STATES (NASA)", "1999-12-18", "EARTH OBSERVATION", "PRIMARY FLAGSHIP SPECTRUM MONITOR ANALYZING THE GLOBAL SPREAD OF VEGETATION AND CLIMATE TRANSITIONS OVER HORIZONS.")
         }
-        return ("INTERNATIONAL", "UNKNOWN", "ORBITAL PAYLOAD", "HIGH-VISIBILITY TARGET TRACKED IN REAL-TIME BY HORIZON COMPASS SURVEILLANCE RADAR RAILS.")
+        // FEAT-25 curated additions (2026-09-15): picked from the first real post-space-junk-filter
+        // pass list -- real, verified satellites judged worth a real writeup, beyond the original
+        // 9. Launch dates below use sat.launchYear (parsed live from this exact object's own TLE)
+        // rather than a hardcoded date, since several of these are shared entries covering more
+        // than one satellite (a whole family/constellation, or a name too generic to disambiguate),
+        // so a single fixed date would be wrong for some of the satellites it matches.
+        else if name.contains("AJISAI") {
+            return ("JAPAN (NASDA)", sat.launchYear ?? "1986", "GEODETIC SATELLITE", "A SPHERE COVERED IN OVER 1,400 MIRRORS, BUILT SPECIFICALLY TO REFLECT SUNLIGHT AND LASER RANGING BEAMS FOR PRECISE EARTH-SHAPE MEASUREMENTS -- ONE OF THE FEW SATELLITES EVER DESIGNED FROM THE START TO BE THIS BRIGHT.")
+        } else if name.contains("SAOCOM") {
+            return ("ARGENTINA (CONAE)", sat.launchYear ?? "UNKNOWN", "RADAR EARTH OBSERVATION", "L-BAND RADAR SATELLITE FOR SOIL MOISTURE, AGRICULTURE, AND EMERGENCY/DISASTER MONITORING -- FLIES AS PART OF A JOINT CONSTELLATION WITH ITALY'S COSMO-SKYMED RADAR SATELLITES.")
+        } else if name.contains("COSMO-SKYMED") {
+            return ("ITALY (ASI)", sat.launchYear ?? "UNKNOWN", "RADAR EARTH OBSERVATION", "X-BAND RADAR IMAGING SATELLITE, PART OF A DUAL CIVIL/MILITARY ITALIAN CONSTELLATION USED FOR DISASTER RESPONSE, MARITIME SURVEILLANCE, AND MAPPING.")
+        } else if name.contains("ERS-1") {
+            return ("EUROPEAN UNION (ESA)", sat.launchYear ?? "1991", "RADAR EARTH OBSERVATION", "EUROPE'S FIRST EARTH REMOTE-SENSING SATELLITE -- RADAR IMAGING OF OCEANS, ICE, AND LAND. RETIRED IN 2000 AFTER NEARLY A DECADE OF SERVICE.")
+        } else if name.contains("ISIS 1") {
+            return ("CANADA (WITH NASA)", sat.launchYear ?? "1969", "IONOSPHERIC RESEARCH SATELLITE", "ONE OF CANADA'S EARLIEST SATELLITES, PART OF A JOINT CANADA-US PROGRAM STUDYING THE IONOSPHERE AND UPPER ATMOSPHERE.")
+        } else if name.contains("OAO 2") {
+            return ("UNITED STATES (NASA)", sat.launchYear ?? "1968", "SPACE TELESCOPE", "THE FIRST SUCCESSFUL ORBITING ASTRONOMICAL OBSERVATORY -- AN EARLY UV SPACE TELESCOPE AND A DIRECT PRECURSOR TO HUBBLE.")
+        } else if name.contains("OAO 3") {
+            return ("UNITED STATES (NASA)", sat.launchYear ?? "1972", "SPACE TELESCOPE", "NICKNAMED \"COPERNICUS\" -- FOLLOWED UP OAO-2 WITH X-RAY AND ULTRAVIOLET ASTRONOMY INSTRUMENTS.")
+        } else if name.contains("SERT 2") {
+            return ("UNITED STATES (NASA)", sat.launchYear ?? "1970", "ION PROPULSION TECH DEMO", "TESTED ONE OF THE EARLIEST ELECTRIC ION THRUSTERS FLOWN IN ORBIT -- THE SAME BASIC TECHNOLOGY MANY MODERN SATELLITES NOW USE FOR STATION-KEEPING.")
+        } else if name.contains("ADEOS") {
+            return ("JAPAN (JAXA)", sat.launchYear ?? "2002", "EARTH OBSERVATION", "CLIMATE AND OCEAN/ATMOSPHERE MONITORING SATELLITE, ALSO KNOWN AS MIDORI II -- MISSION ENDED AFTER ABOUT 10 MONTHS DUE TO A SOLAR-POWER SYSTEM FAILURE.")
+        } else if name.contains("ALOS") {
+            return ("JAPAN (JAXA)", sat.launchYear ?? "2006", "EARTH OBSERVATION", "ALSO KNOWN AS DAICHI -- A HIGH-RESOLUTION LAND-IMAGING SATELLITE USED FOR MAPPING, DISASTER RESPONSE, AND RESOURCE SURVEYING.")
+        } else if name.contains("ORBVIEW") {
+            return ("UNITED STATES (ORBITAL SCIENCES)", sat.launchYear ?? "1997", "OCEAN COLOR OBSERVATION", "CARRIED THE SEAWIFS SENSOR, WHICH PROVIDED NEARLY A DECADE OF GLOBAL OCEAN-COLOR AND VEGETATION DATA FOR CLIMATE RESEARCH.")
+        } else if name.contains("SPACEMOBILE") {
+            return ("UNITED STATES (AST SPACEMOBILE)", sat.launchYear ?? "UNKNOWN", "DIRECT-TO-PHONE BROADBAND", "PART OF A NEW CONSTELLATION WITH HUGE PHASED-ARRAY ANTENNAS BUILT TO CONNECT DIRECTLY TO ORDINARY, UNMODIFIED SMARTPHONES -- THEIR SIZE IS EXACTLY WHY THEY'RE BRIGHT ENOUGH TO NOTICE.")
+        } else if name.contains("ACS3") {
+            return ("UNITED STATES (NASA)", sat.launchYear ?? "2024", "SOLAR SAIL TECH DEMO", "NASA'S ADVANCED COMPOSITE SOLAR SAIL SYSTEM -- UNFURLED A LARGE REFLECTIVE SAIL FROM A SMALL CUBESAT TO TEST LIGHTWEIGHT DEPLOYABLE BOOMS, BECOMING ONE OF THE BRIGHTER OBJECTS IN THE SKY PURELY BECAUSE OF ITS SIZE.")
+        } else if name.contains("INTERCOSMOS") {
+            return ("SOVIET UNION / RUSSIA", sat.launchYear ?? "UNKNOWN", "SPACE PHYSICS RESEARCH", "PART OF THE INTERCOSMOS PROGRAM -- A COLD WAR-ERA COOPERATIVE EFFORT BETWEEN THE USSR AND ALLIED NATIONS STUDYING THE IONOSPHERE, MAGNETOSPHERE, AND NEAR-EARTH SPACE ENVIRONMENT.")
+        } else if name.contains("YAOGAN") {
+            return ("CHINA", sat.launchYear ?? "UNKNOWN", "REMOTE SENSING SATELLITE", "OFFICIALLY DESIGNATED FOR CIVILIAN REMOTE SENSING AND DISASTER/RESOURCE MONITORING, THOUGH THE YAOGAN SERIES IS WIDELY BELIEVED TO ALSO SERVE CHINESE MILITARY RECONNAISSANCE.")
+        } else if name.contains("OKEAN") {
+            return ("UKRAINE / RUSSIA", sat.launchYear ?? "1999", "OCEAN & EARTH OBSERVATION", "JOINT UKRAINIAN-RUSSIAN SATELLITE CARRYING RADAR AND MULTISPECTRAL SENSORS TO MONITOR OCEANS, ICE, AND VEGETATION -- MISSION CUT SHORT BY AN ATTITUDE-CONTROL FAILURE ABOUT A YEAR IN.")
+        } else if name.contains("ASTEX") {
+            return ("UNITED STATES (USAF)", sat.launchYear ?? "1971", "EXPERIMENTAL TECH SATELLITE", "TESTED A LARGE DEPLOYABLE FLEXIBLE SOLAR ARRAY AND AN INFRARED SENSOR FOR THE AIR FORCE'S SPACE TEST PROGRAM -- OPERATED UNTIL A TRANSMITTER FAILURE IN 1973.")
+        } else if name.contains("USA ") {
+            return ("UNITED STATES (CLASSIFIED)", sat.launchYear ?? "UNKNOWN", "CLASSIFIED PAYLOAD", "\"USA\" IS A GENERIC COVER DESIGNATION USED FOR CLASSIFIED U.S. GOVERNMENT SATELLITES -- THE SPECIFIC MISSION BEHIND THIS PARTICULAR ONE ISN'T PUBLICLY DISCLOSED.")
+        } else if name.contains("COSMOS") {
+            return ("SOVIET UNION / RUSSIA", sat.launchYear ?? "UNKNOWN", "MILITARY / SCIENTIFIC SATELLITE", "\"COSMOS\" IS THE GENERIC NAME THE USSR (AND LATER RUSSIA) GAVE TO THOUSANDS OF SATELLITES ACROSS EVERY PROGRAM -- MILITARY RECONNAISSANCE, NAVIGATION, EARLY-WARNING, AND SCIENTIFIC RESEARCH ALIKE. FOR MOST INDIVIDUAL COSMOS SATELLITES, INCLUDING THIS ONE, THE EXACT MISSION WAS NEVER PUBLICLY DISCLOSED.")
+        }
+        // FEAT-25 follow-up (2026-09-15): satellites without a hand-written entry above now
+        // get a real launch year (parsed server-side from the TLE itself) instead of a
+        // hardcoded "UNKNOWN" -- still generic on country/type/summary since we have no
+        // catalog lookup for those, but at least one real fact instead of none. See FEAT-25
+        // backlog note for growing the hand-written list above as specific satellites are spotted.
+        let launched = sat.launchYear ?? "UNKNOWN"
+        return ("INTERNATIONAL", launched, "ORBITAL PAYLOAD", "HIGH-VISIBILITY TARGET TRACKED IN REAL-TIME BY HORIZON COMPASS SURVEILLANCE RADAR RAILS.")
     }
     
     var body: some View {

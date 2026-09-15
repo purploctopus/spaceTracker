@@ -240,12 +240,19 @@ class NotificationManager: ObservableObject {
             }
 
             // Same opt-in scoping for satellite passes, keyed on the satellite's stable id.
+            // FEAT-25 follow-up (2026-09-15): the worker's whitelist is gone now, so
+            // "satellites" here can be 100+ objects on a clear night instead of ~9. Favoriting
+            // still scopes alerts to exactly what's favorited like before -- but the *default*,
+            // before anyone's favorited anything, now falls back to just the originally curated
+            // set (isOriginalCuratedTarget) instead of literally everything, so a user who's
+            // never touched the favorites screen doesn't suddenly get flooded with alerts for
+            // satellites they don't recognize.
             let favoriteSatellites = FavoritesStore.shared.favoriteSatellites
 
             if self.passAlertsEnabled {
                 let upcoming = satellites
                     .filter { sat in
-                        favoriteSatellites.isEmpty || favoriteSatellites.contains(sat.id)
+                        favoriteSatellites.isEmpty ? sat.isOriginalCuratedTarget : favoriteSatellites.contains(sat.id)
                     }
                     .compactMap { sat -> (SatellitePass, Date)? in
                         guard let date = parseISO(sat.utcTimeISO) else { return nil }
