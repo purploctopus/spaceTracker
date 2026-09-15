@@ -16,12 +16,14 @@ struct OrbitalGlobeView: UIViewRepresentable {
     @Binding var issCoordinate: CLLocationCoordinate2D
     @Binding var tiangongCoordinate: CLLocationCoordinate2D
     @Binding var hubbleCoordinate: CLLocationCoordinate2D
+    @Binding var terraCoordinate: CLLocationCoordinate2D
     @Binding var currentFocus: OrbitalStationState.TrackingTarget // 💡 THE FOCUS BINDING RESCUE LINE
     // Predicted future ground-track points, from real SGP4 propagation — drawn as dashed
     // lines distinct from the solid current-position markers.
     @Binding var issGroundTrack: [CLLocationCoordinate2D]
     @Binding var tiangongGroundTrack: [CLLocationCoordinate2D]
     @Binding var hubbleGroundTrack: [CLLocationCoordinate2D]
+    @Binding var terraGroundTrack: [CLLocationCoordinate2D]
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -51,14 +53,15 @@ struct OrbitalGlobeView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
-        context.coordinator.updateAnnotationPositions(on: uiView, iss: issCoordinate, tiangong: tiangongCoordinate, hubble: hubbleCoordinate)
-        context.coordinator.updateGroundTracks(on: uiView, issTrack: issGroundTrack, tiangongTrack: tiangongGroundTrack, hubbleTrack: hubbleGroundTrack)
+        context.coordinator.updateAnnotationPositions(on: uiView, iss: issCoordinate, tiangong: tiangongCoordinate, hubble: hubbleCoordinate, terra: terraCoordinate)
+        context.coordinator.updateGroundTracks(on: uiView, issTrack: issGroundTrack, tiangongTrack: tiangongGroundTrack, hubbleTrack: hubbleGroundTrack, terraTrack: terraGroundTrack)
         
         let activeTargetCoordinate: CLLocationCoordinate2D
         switch currentFocus {
         case .iss: activeTargetCoordinate = issCoordinate
         case .tiangong: activeTargetCoordinate = tiangongCoordinate
         case .hubble: activeTargetCoordinate = hubbleCoordinate
+        case .terra: activeTargetCoordinate = terraCoordinate
         }
         
         let trackingCamera = MKMapCamera(
@@ -83,6 +86,7 @@ class Coordinator: NSObject, MKMapViewDelegate {
     private var issAnnotation = MKPointAnnotation()
     private var tiangongAnnotation = MKPointAnnotation()
     private var hubbleAnnotation = MKPointAnnotation()
+    private var terraAnnotation = MKPointAnnotation()
     private var isFirstLoad = true
     
     // Predicted ground-track overlays. MKPolyline's point array is immutable once created,
@@ -91,21 +95,24 @@ class Coordinator: NSObject, MKMapViewDelegate {
     private var issTrackOverlay: MKPolyline?
     private var tiangongTrackOverlay: MKPolyline?
     private var hubbleTrackOverlay: MKPolyline?
+    private var terraTrackOverlay: MKPolyline?
     
     override init() {
         super.init()
         issAnnotation.title = "ISS"
         tiangongAnnotation.title = "TIANGONG"
         hubbleAnnotation.title = "HUBBLE"
+        terraAnnotation.title = "TERRA"
     }
     
-    func updateAnnotationPositions(on mapView: MKMapView, iss: CLLocationCoordinate2D, tiangong: CLLocationCoordinate2D, hubble: CLLocationCoordinate2D) {
+    func updateAnnotationPositions(on mapView: MKMapView, iss: CLLocationCoordinate2D, tiangong: CLLocationCoordinate2D, hubble: CLLocationCoordinate2D, terra: CLLocationCoordinate2D) {
         // 💡 FIRST TIME SETUP: Safely attach the nodes onto the 3D grid layout mesh exactly once
         if isFirstLoad {
             issAnnotation.coordinate = iss
             tiangongAnnotation.coordinate = tiangong
             hubbleAnnotation.coordinate = hubble
-            mapView.addAnnotations([issAnnotation, tiangongAnnotation, hubbleAnnotation])
+            terraAnnotation.coordinate = terra
+            mapView.addAnnotations([issAnnotation, tiangongAnnotation, hubbleAnnotation, terraAnnotation])
             isFirstLoad = false
             return
         }
@@ -115,13 +122,14 @@ class Coordinator: NSObject, MKMapViewDelegate {
             self.issAnnotation.coordinate = iss
             self.tiangongAnnotation.coordinate = tiangong
             self.hubbleAnnotation.coordinate = hubble
+            self.terraAnnotation.coordinate = terra
         }
     }
     
     /// Replaces each satellite's predicted ground-track overlay with a fresh one built from
     /// its latest SGP4-propagated points. Empty arrays (TLE not loaded yet) simply clear
     /// any existing line rather than drawing nothing new.
-    func updateGroundTracks(on mapView: MKMapView, issTrack: [CLLocationCoordinate2D], tiangongTrack: [CLLocationCoordinate2D], hubbleTrack: [CLLocationCoordinate2D]) {
+    func updateGroundTracks(on mapView: MKMapView, issTrack: [CLLocationCoordinate2D], tiangongTrack: [CLLocationCoordinate2D], hubbleTrack: [CLLocationCoordinate2D], terraTrack: [CLLocationCoordinate2D]) {
         if let existing = issTrackOverlay {
             mapView.removeOverlay(existing)
             issTrackOverlay = nil
@@ -154,6 +162,17 @@ class Coordinator: NSObject, MKMapViewDelegate {
             mapView.addOverlay(polyline)
             hubbleTrackOverlay = polyline
         }
+        
+        if let existing = terraTrackOverlay {
+            mapView.removeOverlay(existing)
+            terraTrackOverlay = nil
+        }
+        if !terraTrack.isEmpty {
+            let polyline = MKPolyline(coordinates: terraTrack, count: terraTrack.count)
+            polyline.title = "TERRA_TRACK"
+            mapView.addOverlay(polyline)
+            terraTrackOverlay = polyline
+        }
     }
     
     // 🎨 GROUND TRACK STYLING: color-matches each satellite's existing callsign label color
@@ -168,6 +187,7 @@ class Coordinator: NSObject, MKMapViewDelegate {
         switch polyline.title {
         case "TIANGONG_TRACK": trackColor = .orange
         case "HUBBLE_TRACK": trackColor = .systemYellow
+        case "TERRA_TRACK": trackColor = .systemGreen
         default: trackColor = .cyan
         }
         
@@ -186,6 +206,7 @@ class Coordinator: NSObject, MKMapViewDelegate {
         switch annotation.title {
         case "ISS": identifier = "ISS_Marker"
         case "TIANGONG": identifier = "Tiangong_Marker"
+        case "TERRA": identifier = "Terra_Marker"
         default: identifier = "Hubble_Marker"
         }
         var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier)
@@ -203,7 +224,7 @@ class Coordinator: NSObject, MKMapViewDelegate {
             // 1. THE ICON NODE LAYER -- a telescope glyph reads better for Hubble than the
             // generic satellite icon used for the two crewed stations.
             let iconLabel = UILabel()
-            iconLabel.text = annotation.title == "HUBBLE" ? "🔭" : "🛰️"
+            iconLabel.text = annotation.title == "HUBBLE" ? "🔭" : (annotation.title == "TERRA" ? "🌎" : "🛰️")
             iconLabel.font = .systemFont(ofSize: 24) // Slightly downscaled from 28 to balance the text addition
             
             // 2. THE FLIGHT CALLSIGN TEXT LAYER
@@ -216,6 +237,7 @@ class Coordinator: NSObject, MKMapViewDelegate {
             switch annotation.title {
             case "ISS": callsignLabel.textColor = .cyan
             case "TIANGONG": callsignLabel.textColor = .orange
+            case "TERRA": callsignLabel.textColor = .systemGreen
             default: callsignLabel.textColor = .systemYellow
             }
             callsignLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6) // Tiny backdrop prevents map bleed

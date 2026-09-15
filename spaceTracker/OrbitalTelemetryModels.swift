@@ -28,7 +28,7 @@ struct ISSResponse: Codable {
 
 // MARK: - 🗺️ UNIFIED ORBITAL STATION STATE MATRIX
 struct OrbitalStationState {
-    enum TrackingTarget { case iss, tiangong, hubble } // 💡 TARGET ENUM DEFINITION
+    enum TrackingTarget { case iss, tiangong, hubble, terra } // 💡 TARGET ENUM DEFINITION
     
     var issCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
     var tiangongCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
@@ -36,11 +36,16 @@ struct OrbitalStationState {
     // TLE + SGP4 pipeline as Tiangong below (no live "current position" API for it, unlike
     // the ISS's wheretheiss.at feed, so its position is SGP4-propagated only).
     var hubbleCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+    // FEAT-18: Terra (NORAD 25994) -- 4th tracked object, same SGP4-only pipeline as Hubble.
+    // Genuinely naked-eye visible (mag 2-3), unlike the geostationary/dim options that were
+    // researched and ruled out for this slot.
+    var terraCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
     // Predicted future ground-track points, all from real SGP4 propagation — a dashed
     // "where it's headed" line to draw on the globe, distinct from the solid current-position dot.
     var issGroundTrack: [CLLocationCoordinate2D] = []
     var tiangongGroundTrack: [CLLocationCoordinate2D] = []
     var hubbleGroundTrack: [CLLocationCoordinate2D] = []
+    var terraGroundTrack: [CLLocationCoordinate2D] = []
     var currentFocus: TrackingTarget = .iss // 💡 ISS IS THE STANDARD DEFAULT FOCUS TARGET
     var isDataLoaded: Bool = false
 }
@@ -81,6 +86,8 @@ class OrbitalTrackingViewModel: ObservableObject {
             // Hubble Space Telescope -- NORAD 20580. Same generic pipeline as Tiangong: no
             // live position feed, current position + ground track both come from SGP4.
             let hubbleFetchTask = Task { await fetchTLEData(noradId: 20580) }
+            // FEAT-18: Terra -- NORAD 25994. Same generic SGP4-only pipeline as Hubble/Tiangong.
+            let terraFetchTask = Task { await fetchTLEData(noradId: 25994) }
             
             while !Task.isCancelled {
                 // ISS current position: stays on the live wheretheiss.at feed — the most
@@ -112,6 +119,14 @@ class OrbitalTrackingViewModel: ObservableObject {
                     self.stationState.hubbleGroundTrack = generateGroundTrack(tle: hubbleTLE)
                 } else {
                     print("⏳ Hubble TLE data is still downloading or empty...")
+                }
+                
+                let terraTLE = await terraFetchTask.value
+                if !terraTLE.isEmpty {
+                    self.stationState.terraCoordinate = calculateOrbitPosition(tle: terraTLE)
+                    self.stationState.terraGroundTrack = generateGroundTrack(tle: terraTLE)
+                } else {
+                    print("⏳ Terra TLE data is still downloading or empty...")
                 }
                 
                 do {

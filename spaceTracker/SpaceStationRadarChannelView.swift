@@ -14,7 +14,7 @@ struct SpaceStationRadarChannelView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("ORBITAL TRACKER // LIVE POSITION: ISS · TIANGONG · HUBBLE")
+            Text("ORBITAL TRACKER // LIVE POSITION: ISS · TIANGONG · HUBBLE · TERRA")
                 .font(.system(.caption, design: .monospaced).weight(.bold))
                 .foregroundColor(.cyan)
                 .tracking(1)
@@ -31,10 +31,12 @@ struct SpaceStationRadarChannelView: View {
                         issCoordinate: $trackingViewModel.stationState.issCoordinate,
                         tiangongCoordinate: $trackingViewModel.stationState.tiangongCoordinate,
                         hubbleCoordinate: $trackingViewModel.stationState.hubbleCoordinate,
+                        terraCoordinate: $trackingViewModel.stationState.terraCoordinate,
                         currentFocus: $trackingViewModel.stationState.currentFocus, // 💡 FIXED: Safely wires the selection binding token down to MapKit
                         issGroundTrack: $trackingViewModel.stationState.issGroundTrack,
                         tiangongGroundTrack: $trackingViewModel.stationState.tiangongGroundTrack,
-                        hubbleGroundTrack: $trackingViewModel.stationState.hubbleGroundTrack
+                        hubbleGroundTrack: $trackingViewModel.stationState.hubbleGroundTrack,
+                        terraGroundTrack: $trackingViewModel.stationState.terraGroundTrack
                     )
                     .frame(height: 280)
                     .contentShape(Rectangle())
@@ -89,6 +91,18 @@ struct SpaceStationRadarChannelView: View {
                                 .border(Color.yellow.opacity(0.5), width: 1)
                                 .cornerRadius(2)
                         }
+                        
+                        // CONTROLLER 4: INTERCEPT FOCUS TERRA (FEAT-18)
+                        Button(action: { trackingViewModel.stationState.currentFocus = .terra }) {
+                            Text("TRACKING: TERRA")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(trackingViewModel.stationState.currentFocus == .terra ? .black : .green)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(trackingViewModel.stationState.currentFocus == .terra ? Color.green : Color.black.opacity(0.75))
+                                .border(Color.green.opacity(0.5), width: 1)
+                                .cornerRadius(2)
+                        }
                     }
                     .padding(12) // Positions the dock beautifully inside the lower-left corner bounding edge
                 }
@@ -133,10 +147,12 @@ struct OrbitalGlobeFullScreenView: View {
                 issCoordinate: $trackingViewModel.stationState.issCoordinate,
                 tiangongCoordinate: $trackingViewModel.stationState.tiangongCoordinate,
                 hubbleCoordinate: $trackingViewModel.stationState.hubbleCoordinate,
+                terraCoordinate: $trackingViewModel.stationState.terraCoordinate,
                 currentFocus: $trackingViewModel.stationState.currentFocus,
                 issGroundTrack: $trackingViewModel.stationState.issGroundTrack,
                 tiangongGroundTrack: $trackingViewModel.stationState.tiangongGroundTrack,
-                hubbleGroundTrack: $trackingViewModel.stationState.hubbleGroundTrack
+                hubbleGroundTrack: $trackingViewModel.stationState.hubbleGroundTrack,
+                terraGroundTrack: $trackingViewModel.stationState.terraGroundTrack
             )
             .ignoresSafeArea()
 
@@ -187,6 +203,17 @@ struct OrbitalGlobeFullScreenView: View {
                             .padding(.vertical, 8)
                             .background(trackingViewModel.stationState.currentFocus == .hubble ? Color.yellow : Color.black.opacity(0.75))
                             .border(Color.yellow.opacity(0.5), width: 1)
+                            .cornerRadius(2)
+                    }
+
+                    Button(action: { trackingViewModel.stationState.currentFocus = .terra }) {
+                        Text("TRACKING: TERRA")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(trackingViewModel.stationState.currentFocus == .terra ? .black : .green)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(trackingViewModel.stationState.currentFocus == .terra ? Color.green : Color.black.opacity(0.75))
+                            .border(Color.green.opacity(0.5), width: 1)
                             .cornerRadius(2)
                     }
                 }

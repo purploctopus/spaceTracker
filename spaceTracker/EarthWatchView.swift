@@ -127,6 +127,13 @@ struct EarthWatchView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
+                // THE 3D ORBITAL INTERCEPT RADAR MAP CONTAINER (moved from Home Command) --
+                // promoted above the EPIC imagery below: the live tracker is the stronger
+                // feature of this tab, so it's what greets you first.
+                SpaceStationRadarChannelView()
+
+                Divider().background(Color.cyan)
+
                 Text("EARTH RIGHT NOW // NASA EPIC")
                     .font(.system(.caption, design: .monospaced).weight(.bold))
                     .foregroundColor(.cyan)
@@ -136,11 +143,6 @@ struct EarthWatchView: View {
                 epicImageryBlock
 
                 Divider().background(Color.cyan).padding(.top, 8)
-
-                // THE 3D ORBITAL INTERCEPT RADAR MAP CONTAINER (moved from Home Command)
-                SpaceStationRadarChannelView()
-
-                Divider().background(Color.cyan)
 
                 // LIVE HUMANS IN SPACE ROSTER CHANNEL BLOCK (moved from Home Command)
                 HumansInSpaceRosterView(
