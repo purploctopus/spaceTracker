@@ -22,7 +22,7 @@ enum ShareContentBuilder {
         if let orbit = launch.mission?.orbit?.abbrev {
             lines.append("Target orbit: \(orbit)")
         }
-        lines.append("\nTracked in spaceTracker 🛰️")
+        lines.append("\nTracked in OrbitLog 🛰️")
         return lines.joined(separator: "\n")
     }
 
@@ -32,7 +32,7 @@ enum ShareContentBuilder {
         \(pass.localDisplayTime)
         Look \(pass.travelDirection.uppercased()) \u{2014} peak elevation \(Int(pass.peakElevationDegrees))°, visible for \(pass.durationMinutes) min.
 
-        Tracked in spaceTracker 🛰️
+        Tracked in OrbitLog 🛰️
         """
     }
 
@@ -46,7 +46,7 @@ enum ShareContentBuilder {
         Estimated size: up to \(asteroid.maxDiameterMeters)m
         \(hazardLine)
 
-        Tracked in spaceTracker 🛰️
+        Tracked in OrbitLog 🛰️
         """
     }
 }
