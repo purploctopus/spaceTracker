@@ -262,7 +262,11 @@ struct ContentView: View {
         let shortTermAlert = weatherViewModel.kpIndex >= 5.0 ? "STORM ACTIVE" : weatherViewModel.kpIndex >= 4.0 ? "MODERATE WATCH" : "QUIET"
         
         return VStack(alignment: .leading, spacing: 6) {
-            Button(action: { showConditionsExplainer = true }) {
+            Button(action: {
+                // TAP DEBUG (BUG-05) -- remove once this is solved.
+                print("\u{1F535} [TAP DEBUG] Conditions bar BUTTON action fired -- showConditionsExplainer = true")
+                showConditionsExplainer = true
+            }) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("LOCAL ATMOSPHERIC DATA // TAP FOR FIELD BRIEFING ❯")
                     .font(.system(.caption, design: .monospaced).weight(.bold))
@@ -366,10 +370,25 @@ struct ContentView: View {
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(.blue)
                     .underline()
+                    // TAP DEBUG (BUG-05) -- remove once this is solved.
+                    .simultaneousGesture(TapGesture().onEnded {
+                        print("\u{1F7E1} [TAP DEBUG] Weather Data Link tap GESTURE fired (separate from whether Safari actually opened)")
+                    })
             }
             .foregroundColor(.secondary)
             .padding(.horizontal, 12)
             .padding(.top, 2)
+            // TAP DEBUG (BUG-05) -- remove once this is solved. Prints this row's actual
+            // on-screen rect so we can compare it against the DAILY COMMAND header box's
+            // rect (printed from principalToolbarHeaderTitleStack) and see whether they
+            // overlap.
+            .background(
+                GeometryReader { geo in
+                    Color.clear.onAppear {
+                        print("\u{1F7E2} [TAP DEBUG] Weather Data attribution row global frame: \(geo.frame(in: .global))")
+                    }
+                }
+            )
         }
         .padding(.horizontal)
         .padding(.bottom, 8)
@@ -1091,6 +1110,18 @@ struct ContentView: View {
         )
         .padding(.horizontal)
         .padding(.top, sizeClass == .regular ? 26 : 20)
+        // TAP DEBUG (BUG-05) -- remove once this is solved. This box is placed via
+        // ToolbarItem(placement: .principal), i.e. it lives in the nav bar's own layer,
+        // not the ScrollView content below it -- printing its real global frame so we
+        // can check it against the conditions bar's frame for an actual overlap, not
+        // just a visual one.
+        .background(
+            GeometryReader { geo in
+                Color.clear.onAppear {
+                    print("\u{1F534} [TAP DEBUG] DAILY COMMAND header box global frame: \(geo.frame(in: .global))")
+                }
+            }
+        )
     }
     
     // ==============================================================================
@@ -1366,6 +1397,24 @@ struct ContentView: View {
                             locationFallbackBanner
                             stargazingConditionsHeaderBar
                                 .padding(.top, 16) // 💡 Clears the frame constraints of the absolutely positioned Daily Command header box
+                                // TAP DEBUG (BUG-05) -- remove once this is solved. Prints this
+                                // view's real frame, and separately probes for ANY tap landing in
+                                // that same screen area -- if this probe never prints on a tap that
+                                // also doesn't open the Button, the touch isn't reaching SwiftUI's
+                                // content hierarchy here at all (points at something above it, like
+                                // the nav bar, intercepting first).
+                                .background(
+                                    GeometryReader { geo in
+                                        Color.clear.onAppear {
+                                            print("\u{1F7E2} [TAP DEBUG] CONDITIONS BAR global frame: \(geo.frame(in: .global))")
+                                        }
+                                    }
+                                )
+                                .simultaneousGesture(
+                                    SpatialTapGesture().onEnded { value in
+                                        print("\u{26AA} [TAP DEBUG] A tap gesture reached the conditions bar's own view at local point \(value.location)")
+                                    }
+                                )
                             Divider()
                                 .background(Color.cyan)
                             
@@ -1376,6 +1425,9 @@ struct ContentView: View {
                             // flagship feature of this release shouldn't be a tab-swipe away
                             // from the screen most users land on first.
                             Button(action: {
+                                // TAP DEBUG (BUG-05) -- remove once this is solved. Control test:
+                                // does a normal button on this same tab register taps fine on iPad?
+                                print("\u{1F7E3} [TAP DEBUG] Sky map button action fired (control test)")
                                 Task {
                                     // Gate on real data instead of presenting the sky map with
                                     // whatever (possibly still-empty) catalog happens to be in
