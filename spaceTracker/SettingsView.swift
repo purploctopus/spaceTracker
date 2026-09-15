@@ -14,6 +14,11 @@ struct SettingsView: View {
     // FEAT-15: the dashboard reorder sheet lives here, off a single row below.
     @ObservedObject private var dashboardLayout = DashboardLayoutStore.shared
     @State private var showDashboardReorderSheet = false
+    // 2026-09-15: moved here from Home Command's own nav bar header, which dropped this
+    // entry point on iPhone (see ContentView.swift's principalToolbarHeaderTitleStack) to
+    // fix "DAILY COMMAND" truncating -- Acknowledgements still needs to be reachable
+    // everywhere, so Settings > Legal is its home on every size class now.
+    @State private var showAcknowledgementsSheet = false
     @Environment(\.dismiss) var dismiss
 
     private let leadTimeOptions = [5, 10, 15, 30, 60]
@@ -148,6 +153,34 @@ struct SettingsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
                     .cornerRadius(8)
 
+                    Button(action: { showAcknowledgementsSheet = true }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 14))
+                                .foregroundColor(.cyan)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("OPEN SOURCE ACKNOWLEDGEMENTS")
+                                    .font(.system(.footnote, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                Text("License text for the open-source libraries this app is built on.")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(.gray)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                    }
+                    .background(Color(red: 0.06, green: 0.06, blue: 0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .cornerRadius(8)
+
                     Text("ALERTS ARE SCHEDULED FROM WHATEVER LAUNCH, PASS, AND METEOR SHOWER DATA HAS ALREADY LOADED. REOPEN THE APP TO REFRESH THEM AGAINST THE LATEST SCHEDULE.")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundColor(.gray)
@@ -168,6 +201,9 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showDashboardReorderSheet) {
                 DashboardReorderSheetView(layoutStore: dashboardLayout)
+            }
+            .sheet(isPresented: $showAcknowledgementsSheet) {
+                AcknowledgementsView()
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

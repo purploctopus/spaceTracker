@@ -283,7 +283,7 @@ struct ContentView: View {
                 showConditionsExplainer = true
             }) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("LOCAL ATMOSPHERIC DATA // TAP FOR FIELD BRIEFING ❯")
+                Text("LOCAL ATMOSPHERIC DATA ❯")
                     .font(.system(.caption, design: .monospaced).weight(.bold))
                     .foregroundColor(.cyan)
                     .tracking(1)
@@ -974,75 +974,68 @@ struct ContentView: View {
     }
     
     // Accepts the size class as a parameter to maximize layout readability
+    // 💡 BUG FIX (2026-09-15), round 5: rounds 1-3 kept trying to fit "DAILY COMMAND" /
+    // status text / a data matrix into the iPhone nav bar and kept truncating or looking
+    // bolted-on. Round 4 went further than asked and simplified BOTH size classes down to a
+    // bare centered logo -- but the .regular/iPad layout was never broken and was never part
+    // of the complaint, so it's restored here exactly as it was (full title, live
+    // connectivity status, acknowledgements button, SYS.VER/RADAR data matrix, the original
+    // flat bar + divider styling). ONLY .compact changed: just the logo mark, bigger and
+    // centered, no text of any kind -- since text in that slot is what kept truncating no
+    // matter how it was worded or sized.
+    @ViewBuilder
     private func principalToolbarHeaderTitleStack(sizeClass: UserInterfaceSizeClass?) -> some View {
-        HStack(alignment: .center, spacing: sizeClass == .regular ? 24 : 8) {
-            
-            // 🚀 LEFT LOGO APERTURE
-            Image("logo_transparent")
-                .resizable()
-                .renderingMode(.template)
-                .aspectRatio(contentMode: .fit)
-                .frame(width: sizeClass == .regular ? 48 : 30, height: sizeClass == .regular ? 48 : 30)
-                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
-                .padding(sizeClass == .regular ? 6 : 3)
-                .background(Color.init(red: 0.4, green: 0.8, blue: 0.9).opacity(0.05))
-                .cornerRadius(4)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.init(red: 0.4, green: 0.8, blue: 0.9).opacity(0.2), lineWidth: 1)
-                )
-            
-            // 🚀 CENTRAL CALL SIGN WITH LIVE HARDWARE SYSTEM STATUS BEACON
-            // 💡 BUG FIX: on iPhone this principal toolbar item has to share the nav bar with
-            // BOTH the settings gear (leading) and the ad-free pill (trailing), leaving it far
-            // less width than the .regular/iPad layout ever has to deal with -- "DAILY COMMAND"
-            // was hard-truncating to "D…" as a result. lineLimit+minimumScaleFactor here let it
-            // shrink gracefully instead of clipping, the status line is a shorter string on
-            // compact so it doesn't force the truncation on its own, and the dead-weight
-            // trailing spacer that used to mirror the .regular layout's data matrix is gone on
-            // compact (see below) so that width goes back to this VStack instead.
-            VStack(alignment: .center, spacing: 4) {
-                Text("DAILY COMMAND")
-                    .font(.system(size: sizeClass == .regular ? 24 : 15, weight: .black, design: .monospaced))
-                    .foregroundColor(.white)
-                    .tracking(sizeClass == .regular ? 6 : 1.5)
-                    .lineLimit(1)
-                    // Lowered from 0.6 -- extra headroom now that adFreeToolbarButton no
-                    // longer eats most of the compact nav bar's width on its own (see that
-                    // property's doc comment), but kept as a safety net rather than assuming
-                    // this is the last narrow-screen combination this title will ever meet.
-                    .minimumScaleFactor(0.5)
+        if sizeClass == .regular {
+            HStack(alignment: .center, spacing: 24) {
                 
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(connectivityMonitor.isSystemOnline ? Color.green : Color.red)
-                        .frame(width: 6, height: 6)
-                        .shadow(color: connectivityMonitor.isSystemOnline ? Color.green.opacity(0.5) : Color.red.opacity(0.5), radius: 3)
-                    
-                    Text(sizeClass == .regular
-                         ? (connectivityMonitor.isSystemOnline ? "ORBITLOG LINK OPERATIONAL" : "ORBITLOG DISCONNECTED")
-                         : (connectivityMonitor.isSystemOnline ? "LINK OK" : "LINK DOWN"))
-                        .font(.system(size: sizeClass == .regular ? 9 : 8, weight: .bold, design: .monospaced))
-                        .foregroundColor(connectivityMonitor.isSystemOnline ? .gray : .red)
-                        .tracking(1.5)
+                // 🚀 LEFT LOGO APERTURE
+                Image("logo_transparent")
+                    .resizable()
+                    .renderingMode(.template)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 48, height: 48)
+                    .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
+                    .padding(6)
+                    .background(Color.init(red: 0.4, green: 0.8, blue: 0.9).opacity(0.05))
+                    .cornerRadius(4)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.init(red: 0.4, green: 0.8, blue: 0.9).opacity(0.2), lineWidth: 1)
+                    )
+                
+                // 🚀 CENTRAL CALL SIGN WITH LIVE HARDWARE SYSTEM STATUS BEACON
+                VStack(alignment: .center, spacing: 4) {
+                    Text("DAILY COMMAND")
+                        .font(.system(size: 24, weight: .black, design: .monospaced))
+                        .foregroundColor(.white)
+                        .tracking(6)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.5)
                     
-                    // 💡 Open-source acknowledgements — placed here specifically because
-                    // this status line, unlike the SYS.VER/RADAR block below, renders on
-                    // both iPhone and iPad rather than being iPad-only.
-                    Button(action: { showAcknowledgements = true }) {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 9))
-                            .foregroundColor(.gray)
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(connectivityMonitor.isSystemOnline ? Color.green : Color.red)
+                            .frame(width: 6, height: 6)
+                            .shadow(color: connectivityMonitor.isSystemOnline ? Color.green.opacity(0.5) : Color.red.opacity(0.5), radius: 3)
+                        
+                        Text(connectivityMonitor.isSystemOnline ? "ORBITLOG LINK OPERATIONAL" : "ORBITLOG DISCONNECTED")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundColor(connectivityMonitor.isSystemOnline ? .gray : .red)
+                            .tracking(1.5)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        
+                        // 💡 Open-source acknowledgements
+                        Button(action: { showAcknowledgements = true }) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 9))
+                                .foregroundColor(.gray)
+                        }
                     }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            
-            // 🚀 RIGHT DATA DESCRIPTOR MATRIX: Left-justified grid configuration
-            if sizeClass == .regular {
-                // 💡 FIXED: Changed text stack alignment to .leading to force left justification
+                .frame(maxWidth: .infinity)
+                
+                // 🚀 RIGHT DATA DESCRIPTOR MATRIX: Left-justified grid configuration
                 VStack(alignment: .leading, spacing: 2) {
                     let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
                     Text("SYS.VER // \(appVersion)")
@@ -1057,30 +1050,39 @@ struct ContentView: View {
                         Text("RADAR // \(latStr) : \(lngStr) // \(satViewModel.countryISOCode)")
                     }
                 }
-                .font(.system(size: sizeClass == .regular ? 9 : 8, weight: .semibold, design: .monospaced))
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundColor(.gray)
                 .opacity(0.65)
-                .frame(width: 170, alignment: .leading) // 💡 FIXED: Changed alignment boundary frame to .leading
+                .frame(width: 170, alignment: .leading)
             }
-            // 💡 BUG FIX: this used to be `else { Spacer().frame(width: 24) }` on compact --
-            // a fixed-width spacer that existed only to visually balance the .regular layout's
-            // right-side data matrix, but on iPhone it was eating into the very little width
-            // left for the title after the settings gear and ad-free pill toolbar items take
-            // their share. Dropping it on compact gives that width back to "DAILY COMMAND".
-
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .background(Color.black.opacity(0.25))
+            .overlay(
+                VStack {
+                    Divider().background(Color.white.opacity(0.12))
+                    Spacer()
+                    Divider().background(Color.white.opacity(0.12))
+                }
+            )
+            .padding(.horizontal)
+            .padding(.top, 26)
+        } else {
+            // 💡 Round 10 proved the "gap" is actually the nav bar's own fixed system chrome
+            // height -- confirmed by hiding the whole bar, which closed it completely. Round 11
+            // tried filling it with maxHeight: .infinity, but with no matching width cap the
+            // .fit aspect ratio scaled the image up on BOTH axes to match the toolbar's full
+            // width, ballooning it way past the bar itself and overlapping the status bar --
+            // that's the oversized logo from the screenshot. Round 12: bound both dimensions
+            // explicitly so it can't runaway again, sized to roughly half of that overflow.
+            // iPad's .regular branch above is untouched.
+            Image("logo_transparent")
+                .resizable()
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 80, height: 80)
+                .foregroundColor(.init(red: 0.4, green: 0.8, blue: 0.9))
         }
-        .padding(.horizontal, sizeClass == .regular ? 20 : 10)
-        .padding(.vertical, sizeClass == .regular ? 18 : 10)
-        .background(Color.black.opacity(0.25))
-        .overlay(
-            VStack {
-                Divider().background(Color.white.opacity(0.12))
-                Spacer()
-                Divider().background(Color.white.opacity(0.12))
-            }
-        )
-        .padding(.horizontal)
-        .padding(.top, sizeClass == .regular ? 26 : 20)
     }
     
     // ==============================================================================
@@ -1453,7 +1455,7 @@ struct ContentView: View {
                                 .shadow(color: Color.cyan.opacity(0.5), radius: 10, x: 0, y: 0)
                                 .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
                             }
-                            .padding(.top, 16) // clears the DAILY COMMAND header box now that this card is first
+                            .padding(.top, horizontalSizeClass == .regular ? 16 : 8)
                             .buttonStyle(PlainButtonStyle())
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel("Open live interactive sky map")
@@ -1498,6 +1500,9 @@ struct ContentView: View {
                         ToolbarItem(placement: .principal) {
                             principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
                         }
+                        // 🔬 Round 9 tested combining these into one ToolbarItem on compact
+                        // (theory: two separate glass capsules were setting the height floor)
+                        // -- ruled out, gap was unchanged. Reverted to the original structure.
                         ToolbarItem(placement: .navigationBarLeading) {
                             settingsToolbarButton
                         }
@@ -1844,6 +1849,8 @@ struct ContentView: View {
         // (with the original card order) didn't fix tapping, so this stays as
         // .sidebarAdaptable (BUG-03's iPad sidebar navigation) with no regression risk,
         // since the real fix was reordering the scroll content instead.
+        // 🔬 Tested again 2026-09-15 (round 8) as a theory for the iPhone header gap --
+        // ruled out, gap was unchanged with .automatic. Confirmed back to .sidebarAdaptable.
         .tabViewStyle(.sidebarAdaptable)
         // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
         .fullScreenCover(isPresented: $showLiveViewfinderOverlay) {
