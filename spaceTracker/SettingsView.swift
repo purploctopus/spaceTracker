@@ -115,6 +115,39 @@ struct SettingsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
                     .cornerRadius(8)
 
+                    // Required Apple Weather legal attribution -- kept reachable here as a
+                    // second, independent copy alongside the one on Home Command's field
+                    // briefing bar (see BUG-05), since this screen is presented as its own
+                    // .sheet, outside whatever's causing that one to be unreliable on iPad.
+                    sectionHeader("LEGAL")
+                    Link(destination: URL(string: "https://weather-data.apple.com/legal-attribution.html")!) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "apple.logo")
+                                .font(.system(size: 14))
+                                .foregroundColor(.cyan)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("WEATHER DATA ATTRIBUTION")
+                                    .font(.system(.footnote, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                Text("Required legal attribution for the Apple Weather data used throughout the app.")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(.gray)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                    }
+                    .background(Color(red: 0.06, green: 0.06, blue: 0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .cornerRadius(8)
+
                     Text("ALERTS ARE SCHEDULED FROM WHATEVER LAUNCH, PASS, AND METEOR SHOWER DATA HAS ALREADY LOADED. REOPEN THE APP TO REFRESH THEM AGAINST THE LATEST SCHEDULE.")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundColor(.gray)
