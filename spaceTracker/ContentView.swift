@@ -240,6 +240,10 @@ struct ContentView: View {
     }
     @State private var showAcknowledgements = false
     @State private var showConditionsExplainer = false
+    // TAP DEBUG (BUG-05) -- remove once this is solved.
+    @State private var debugHeaderBoxFrame: String = "not measured yet"
+    @State private var debugConditionsBarFrame: String = "not measured yet"
+    @State private var debugTapLog: [String] = ["(no taps registered yet)"]
     @State private var showSettings = false
     @StateObject private var newsViewModel = SpaceNewsViewModel()
     @State private var selectedArticle: SpaceNewsArticle? = nil
@@ -265,6 +269,7 @@ struct ContentView: View {
             Button(action: {
                 // TAP DEBUG (BUG-05) -- remove once this is solved.
                 print("\u{1F535} [TAP DEBUG] Conditions bar BUTTON action fired -- showConditionsExplainer = true")
+                debugTapLog.append("\u{1F535} BUTTON action fired")
                 showConditionsExplainer = true
             }) {
             VStack(alignment: .leading, spacing: 6) {
@@ -373,6 +378,7 @@ struct ContentView: View {
                     // TAP DEBUG (BUG-05) -- remove once this is solved.
                     .simultaneousGesture(TapGesture().onEnded {
                         print("\u{1F7E1} [TAP DEBUG] Weather Data Link tap GESTURE fired (separate from whether Safari actually opened)")
+                        debugTapLog.append("\u{1F7E1} Weather Data Link gesture fired")
                     })
             }
             .foregroundColor(.secondary)
@@ -1118,7 +1124,9 @@ struct ContentView: View {
         .background(
             GeometryReader { geo in
                 Color.clear.onAppear {
-                    print("\u{1F534} [TAP DEBUG] DAILY COMMAND header box global frame: \(geo.frame(in: .global))")
+                    let f = geo.frame(in: .global)
+                    print("\u{1F534} [TAP DEBUG] DAILY COMMAND header box global frame: \(f)")
+                    debugHeaderBoxFrame = "x:\(Int(f.minX)) y:\(Int(f.minY)) w:\(Int(f.width)) h:\(Int(f.height)) (bottom edge y:\(Int(f.maxY)))"
                 }
             }
         )
@@ -1406,13 +1414,16 @@ struct ContentView: View {
                                 .background(
                                     GeometryReader { geo in
                                         Color.clear.onAppear {
-                                            print("\u{1F7E2} [TAP DEBUG] CONDITIONS BAR global frame: \(geo.frame(in: .global))")
+                                            let f = geo.frame(in: .global)
+                                            print("\u{1F7E2} [TAP DEBUG] CONDITIONS BAR global frame: \(f)")
+                                            debugConditionsBarFrame = "x:\(Int(f.minX)) y:\(Int(f.minY)) w:\(Int(f.width)) h:\(Int(f.height)) (top edge y:\(Int(f.minY)))"
                                         }
                                     }
                                 )
                                 .simultaneousGesture(
                                     SpatialTapGesture().onEnded { value in
                                         print("\u{26AA} [TAP DEBUG] A tap gesture reached the conditions bar's own view at local point \(value.location)")
+                                        debugTapLog.append("\u{26AA} tap reached conditions bar view at \(value.location)")
                                     }
                                 )
                             Divider()
@@ -1428,6 +1439,7 @@ struct ContentView: View {
                                 // TAP DEBUG (BUG-05) -- remove once this is solved. Control test:
                                 // does a normal button on this same tab register taps fine on iPad?
                                 print("\u{1F7E3} [TAP DEBUG] Sky map button action fired (control test)")
+                                debugTapLog.append("\u{1F7E3} Sky map button fired (control)")
                                 Task {
                                     // Gate on real data instead of presenting the sky map with
                                     // whatever (possibly still-empty) catalog happens to be in
@@ -1617,6 +1629,34 @@ struct ContentView: View {
                         .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                     }
                     
+                    // TAP DEBUG (BUG-05) -- remove once this is solved. Doesn't depend on
+                    // Xcode's console being attached/visible -- shows the same info directly
+                    // on screen instead. allowsHitTesting(false) so it can never itself
+                    // absorb or explain a tap.
+                    VStack {
+                        Spacer()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\u{1F41E} TAP DEBUG (BUG-05)")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.yellow)
+                            Text("Header box: \(debugHeaderBoxFrame)")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.white)
+                            Text("Conditions bar: \(debugConditionsBarFrame)")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.white)
+                            ForEach(Array(debugTapLog.suffix(6).enumerated()), id: \.offset) { _, line in
+                                Text(line)
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundColor(.green)
+                            }
+                        }
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.black.opacity(0.85))
+                    }
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea(edges: .bottom)
                     
                 } // Closes ZStack
                 .onAppear {
