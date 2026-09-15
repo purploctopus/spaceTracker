@@ -1776,6 +1776,8 @@ struct ContentView: View {
                 // Same persistent "go ad-free" entry point as Home Command -- previously
                 // this tab had no toolbar of its own at all, so the button only ever
                 // appeared when Home Command happened to be the active tab.
+                .navigationTitle("STAR GAZE")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         settingsToolbarButton
@@ -1831,6 +1833,9 @@ struct ContentView: View {
                     .padding(.top, 24)
                     .padding(.bottom, 60)
                 }
+                .navigationTitle("SPACE NEWS")
+                .navigationBarTitleDisplayMode(.inline)
+
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         settingsToolbarButton
