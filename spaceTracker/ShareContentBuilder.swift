@@ -13,6 +13,11 @@
 import Foundation
 
 enum ShareContentBuilder {
+    // FEAT-23: real App Store link (confirmed by the user, 2026-09-15) -- appended after the
+    // "Tracked in OrbitLog" line on every share so whoever receives one of these can actually
+    // get the app, not just see data from it.
+    private static let appStoreLine = "Get OrbitLog: https://apps.apple.com/us/app/orbitlog-space-tracker-hub/id6791340139"
+
     static func shareText(for launch: SpaceLaunch) -> String {
         var lines = ["🚀 \(launch.name)"]
         if let provider = launch.launch_service_provider?.name {
@@ -23,6 +28,7 @@ enum ShareContentBuilder {
             lines.append("Target orbit: \(orbit)")
         }
         lines.append("\nTracked in OrbitLog 🛰️")
+        lines.append(appStoreLine)
         return lines.joined(separator: "\n")
     }
 
@@ -33,6 +39,7 @@ enum ShareContentBuilder {
         Look \(pass.travelDirection.uppercased()) \u{2014} peak elevation \(Int(pass.peakElevationDegrees))°, visible for \(pass.durationMinutes) min.
 
         Tracked in OrbitLog 🛰️
+        \(appStoreLine)
         """
     }
 
@@ -47,6 +54,7 @@ enum ShareContentBuilder {
         \(hazardLine)
 
         Tracked in OrbitLog 🛰️
+        \(appStoreLine)
         """
     }
 }
