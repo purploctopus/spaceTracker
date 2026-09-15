@@ -261,7 +261,8 @@ struct ContentView: View {
     private var stargazingConditionsHeaderBar: some View {
         let shortTermAlert = weatherViewModel.kpIndex >= 5.0 ? "STORM ACTIVE" : weatherViewModel.kpIndex >= 4.0 ? "MODERATE WATCH" : "QUIET"
         
-        return Button(action: { showConditionsExplainer = true }) {
+        return VStack(alignment: .leading, spacing: 6) {
+            Button(action: { showConditionsExplainer = true }) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("LOCAL ATMOSPHERIC DATA // TAP FOR FIELD BRIEFING ❯")
                     .font(.system(.caption, design: .monospaced).weight(.bold))
@@ -306,23 +307,6 @@ struct ContentView: View {
                         .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.white)
                         
-                        // ROW 3: Mandatory Legal Attribution Footer (Aligned cleanly to the right edge)
-                        HStack {
-                            Spacer()
-                            HStack(spacing: 4) {
-                                Image(systemName: "apple.logo")
-                                    .font(.system(size: 9))
-                                Text("Weather")
-                                    .font(.system(size: 9, weight: .semibold))
-                                
-                                Link("Data", destination: URL(string: "https://weather-data.apple.com/legal-attribution.html")!)
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.blue)
-                                    .underline()
-                            }
-                            .foregroundColor(.secondary)
-                        }
-                        
                     } else {
                         // 🖥️ IPAD PAD LAYOUT: Retains your original single horizontal instruments string line row
                         HStack(spacing: 16) {
@@ -352,19 +336,6 @@ struct ContentView: View {
                                 Text("• 3-DAY WATCH: \(shortTermAlert)")
                                     .foregroundColor(.secondary)
                             }
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "apple.logo")
-                                    .font(.system(size: 9))
-                                Text("Weather")
-                                    .font(.system(size: 9, weight: .semibold))
-                                
-                                Link("Data", destination: URL(string: "https://apple.com")!)
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.blue)
-                                    .underline()
-                            }
-                            .foregroundColor(.secondary)
                         }
                         .font(.system(.caption, design: .monospaced))
                     }
@@ -377,8 +348,29 @@ struct ContentView: View {
                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
             }
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            // BUG-05 FIX: attribution Link now sits outside the Button's tappable region
+            // entirely (previously nested inside it in both size-class branches, which
+            // could swallow taps meant for the button -- most visibly on iPad's single-row
+            // layout). One shared row replaces the two divergent per-branch copies (which
+            // had also drifted onto two different URLs -- unified on the real one).
+            HStack(spacing: 4) {
+                Spacer()
+                Image(systemName: "apple.logo")
+                    .font(.system(size: 9))
+                Text("Weather")
+                    .font(.system(size: 9, weight: .semibold))
+                Link("Data", destination: URL(string: "https://weather-data.apple.com/legal-attribution.html")!)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(.blue)
+                    .underline()
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.top, 2)
         }
-        .buttonStyle(PlainButtonStyle())
         .padding(.horizontal)
         .padding(.bottom, 8)
     }
