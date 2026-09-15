@@ -1324,7 +1324,7 @@ struct ContentView: View {
             // CHANNEL TAB 1: HOME COMMAND
             // ==============================================================================
             Tab("Home Command", systemImage: "house") {
-            NavigationView {
+            NavigationStack {
                 ZStack {
                     TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
                         // 💡 FIX: the StarGaze launch card on this tab reads from
@@ -1649,8 +1649,7 @@ struct ContentView: View {
                     print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
                     await crewViewModel.fetchAstronautRoster()
                 }
-            }// Closes NavigationView
-            .navigationViewStyle(.stack)
+            }// Closes NavigationStack
             .preferredColorScheme(.dark)
             .sheet(isPresented: $showAPODDetails) {
                 APODCreditDetailSheet(imageURL: apodViewModel.backgroundImageURL, title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
