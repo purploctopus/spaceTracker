@@ -79,8 +79,8 @@ struct TacticalAmbientBackdropView: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .blur(radius: 45)
-                                    .opacity(0.30)
+                                    .blur(radius: 22)
+                                    .opacity(0.45)
                                     .transition(.opacity.animation(.easeIn(duration: 0.5)))
                             default:
                                 Color.clear
@@ -95,6 +95,7 @@ struct TacticalAmbientBackdropView: View {
 
 // MARK: - NASA TELEMETRY TEXT SHEET COMPONENT
 struct APODCreditDetailSheet: View {
+    let imageURL: URL?
     let title: String
     let explanation: String
     @Environment(\.dismiss) var dismiss
@@ -106,6 +107,28 @@ struct APODCreditDetailSheet: View {
             // ✅ THE FIX: Wraps the entire layout tree so nothing can get pushed off the phone screen
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
+                    // BUG-06 FOLLOW-UP: the sharp, unblurred original -- this is the "see
+                    // today's real photo" moment the blurred ambient backdrop moved here.
+                    if let imageURL {
+                        AsyncImage(url: imageURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxWidth: .infinity)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            case .failure:
+                                EmptyView()
+                            default:
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(height: 200)
+                                    .overlay(ProgressView())
+                            }
+                        }
+                    }
+                    
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("NASA ASTRONOMY BACKGROUND //")

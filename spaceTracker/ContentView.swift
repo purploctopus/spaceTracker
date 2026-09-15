@@ -1653,7 +1653,7 @@ struct ContentView: View {
             .navigationViewStyle(.stack)
             .preferredColorScheme(.dark)
             .sheet(isPresented: $showAPODDetails) {
-                APODCreditDetailSheet(title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
+                APODCreditDetailSheet(imageURL: apodViewModel.backgroundImageURL, title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
             }
             .sheet(item: $selectedMeteorShower) { shower in
                 MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
