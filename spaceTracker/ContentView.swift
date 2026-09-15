@@ -1308,6 +1308,17 @@ struct ContentView: View {
         }
     }
 
+    /// FEAT-22: shared refresh routine for Star Gazers telemetry -- resolves a fresh
+    /// coordinate and recomputes stargazing telemetry, with no isDataLoaded guard (unlike
+    /// the initial-load .task below), so it's safe to call again on a pull-to-refresh or on
+    /// a timer. Both new call sites reuse this instead of duplicating the sequence.
+    private func refreshStargazerTelemetry() async {
+        let resolvedCoordinate = await locationProvider.currentLocation()
+        let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+        let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+        await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
+    }
+
     var body: some View {
         TabView {
             // ==============================================================================
@@ -1734,6 +1745,27 @@ struct ContentView: View {
                             latitude: hardwareLat,
                             longitude: hardwareLng
                         )
+                    }
+                    // FEAT-22: this .task above was isDataLoaded-guarded so it only ever ran
+                    // once per app launch -- great for startup, but it meant everything on
+                    // this tab (visible targets, conditions) went stale the longer the app
+                    // stayed open, with no way to refresh short of a full relaunch. Two new
+                    // ways to refresh, both reusing refreshStargazerTelemetry() so they can't
+                    // drift from the initial-load logic above:
+                    .refreshable {
+                        await refreshStargazerTelemetry()
+                    }
+                    .task {
+                        // Periodic auto-refresh while this tab stays open. 5 minutes matches
+                        // how slowly stargazing conditions realistically change -- frequent
+                        // enough to feel "live" without hammering the weather/telemetry
+                        // sources. Runs as its own .task so SwiftUI cancels it automatically
+                        // the moment this view disappears, same as the initial-load .task.
+                        while !Task.isCancelled {
+                            try? await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000)
+                            guard !Task.isCancelled else { break }
+                            await refreshStargazerTelemetry()
+                        }
                     }
                 }
                 // Same persistent "go ad-free" entry point as Home Command -- previously
