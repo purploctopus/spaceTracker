@@ -222,6 +222,20 @@ struct ContentView: View {
         .accessibilityLabel("Notification Settings")
     }
 
+    /// Quick-access entry point (FEAT) to the dashboard reorder sheet -- lives in the nav
+    /// bar's own toolbar layer, not the scroll content, so it's unaffected by whatever
+    /// BUG-05 turned out to be, and it's always reachable regardless of scroll position.
+    /// Still also reachable from Settings > Dashboard Layout -- this doesn't replace that,
+    /// just surfaces the same feature somewhere less buried.
+    private var dashboardReorderToolbarButton: some View {
+        Button(action: { showDashboardReorderSheet = true }) {
+            Image(systemName: "arrow.up.arrow.down.circle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.cyan)
+        }
+        .accessibilityLabel("Reorder Home Command")
+    }
+
     /// Earth Watch's tab icon mirrors whichever third of the globe the user is actually
     /// standing on -- SF Symbols only ships three globe rotations (Americas,
     /// Europe/Africa, Asia/Australia -- there's no standalone per-continent icon), so
@@ -240,11 +254,10 @@ struct ContentView: View {
     }
     @State private var showAcknowledgements = false
     @State private var showConditionsExplainer = false
-    // TAP DEBUG (BUG-05) -- remove once this is solved.
-    @State private var debugHeaderBoxFrame: String = "not measured yet"
-    @State private var debugConditionsBarFrame: String = "not measured yet"
-    @State private var debugTapLog: [String] = ["(no taps registered yet)"]
     @State private var showSettings = false
+    // FEAT: quick-access entry point to the same dashboard reorder sheet Settings has,
+    // so it's not buried behind Settings > Dashboard Layout anymore.
+    @State private var showDashboardReorderSheet = false
     @StateObject private var newsViewModel = SpaceNewsViewModel()
     @State private var selectedArticle: SpaceNewsArticle? = nil
     @StateObject private var stargazerViewModel = StargazerViewModel()
@@ -267,9 +280,6 @@ struct ContentView: View {
         
         return VStack(alignment: .leading, spacing: 6) {
             Button(action: {
-                // TAP DEBUG (BUG-05) -- remove once this is solved.
-                print("\u{1F535} [TAP DEBUG] Conditions bar BUTTON action fired -- showConditionsExplainer = true")
-                debugTapLog.append("\u{1F535} BUTTON action fired")
                 showConditionsExplainer = true
             }) {
             VStack(alignment: .leading, spacing: 6) {
@@ -279,75 +289,46 @@ struct ContentView: View {
                     .tracking(1)
                 
                 VStack(alignment: .leading, spacing: 12) {
-                    if horizontalSizeClass == .compact {
-                        // 📱 IPHONE MATRIX: Stacks neatly into 3 distinct, uncluttered layout rows
-                        
-                        // ROW 1: Ground-Level Weather Readouts
-                        HStack(spacing: 20) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "cloud.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
-                                    .fontWeight(.bold)
-                            }
-                            
-                            HStack(spacing: 6) {
-                                Image(systemName: "humidity.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.cyan)
-                                Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.cyan)
-                            }
-                            Spacer()
-                        }
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(.white)
-                        
-                        // ROW 2: Geomagnetic Solar Tracking Readouts
+                    // BUG-05 FIX: this view used to branch on horizontalSizeClass -- 3
+                    // stacked rows on iPhone (working), one single HStack row on iPad (the
+                    // one that's never been tappable). One layout, always used regardless of
+                    // size class, so iPad renders the exact same view tree that already works
+                    // correctly on iPhone -- whatever iPad-only layout quirk was causing this,
+                    // it can't happen if the iPad-only code path no longer exists.
+
+                    // ROW 1: Ground-Level Weather Readouts
+                    HStack(spacing: 20) {
                         HStack(spacing: 6) {
-                            Text("KP: \(String(format: "%.1f", weatherViewModel.kpIndex))")
+                            Image(systemName: "cloud.fill")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
                                 .fontWeight(.bold)
-                            Text("• 3-DAY WATCH: \(shortTermAlert)")
-                                .foregroundColor(.secondary)
-                            Spacer()
                         }
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(.white)
-                        
-                    } else {
-                        // 🖥️ IPAD PAD LAYOUT: Retains your original single horizontal instruments string line row
-                        HStack(spacing: 16) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "cloud.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                Text("\(weatherViewModel.cloudCoverPercent)% CLOUDS")
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                            }
-                            
-                            HStack(spacing: 6) {
-                                Image(systemName: "humidity.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.cyan)
-                                Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.cyan)
-                            }
-                            
-                            Spacer()
-                            
-                            HStack(spacing: 6) {
-                                Text("KP: \(String(format: "%.1f", weatherViewModel.kpIndex))")
-                                    .fontWeight(.bold)
-                                Text("• 3-DAY WATCH: \(shortTermAlert)")
-                                    .foregroundColor(.secondary)
-                            }
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "humidity.fill")
+                                .font(.caption)
+                                .foregroundColor(.cyan)
+                            Text("\(weatherViewModel.humidityPercent)% HUMIDITY")
+                                .fontWeight(.bold)
+                                .foregroundColor(.cyan)
                         }
-                        .font(.system(.caption, design: .monospaced))
+                        Spacer()
                     }
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.white)
+
+                    // ROW 2: Geomagnetic Solar Tracking Readouts
+                    HStack(spacing: 6) {
+                        Text("KP: \(String(format: "%.1f", weatherViewModel.kpIndex))")
+                            .fontWeight(.bold)
+                        Text("• 3-DAY WATCH: \(shortTermAlert)")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.white)
                 }
                 .padding(12)
                 .background(Color.white.opacity(0.04))
@@ -375,26 +356,10 @@ struct ContentView: View {
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(.blue)
                     .underline()
-                    // TAP DEBUG (BUG-05) -- remove once this is solved.
-                    .simultaneousGesture(TapGesture().onEnded {
-                        print("\u{1F7E1} [TAP DEBUG] Weather Data Link tap GESTURE fired (separate from whether Safari actually opened)")
-                        debugTapLog.append("\u{1F7E1} Weather Data Link gesture fired")
-                    })
             }
             .foregroundColor(.secondary)
             .padding(.horizontal, 12)
             .padding(.top, 2)
-            // TAP DEBUG (BUG-05) -- remove once this is solved. Prints this row's actual
-            // on-screen rect so we can compare it against the DAILY COMMAND header box's
-            // rect (printed from principalToolbarHeaderTitleStack) and see whether they
-            // overlap.
-            .background(
-                GeometryReader { geo in
-                    Color.clear.onAppear {
-                        print("\u{1F7E2} [TAP DEBUG] Weather Data attribution row global frame: \(geo.frame(in: .global))")
-                    }
-                }
-            )
         }
         .padding(.horizontal)
         .padding(.bottom, 8)
@@ -1116,20 +1081,6 @@ struct ContentView: View {
         )
         .padding(.horizontal)
         .padding(.top, sizeClass == .regular ? 26 : 20)
-        // TAP DEBUG (BUG-05) -- remove once this is solved. This box is placed via
-        // ToolbarItem(placement: .principal), i.e. it lives in the nav bar's own layer,
-        // not the ScrollView content below it -- printing its real global frame so we
-        // can check it against the conditions bar's frame for an actual overlap, not
-        // just a visual one.
-        .background(
-            GeometryReader { geo in
-                Color.clear.onAppear {
-                    let f = geo.frame(in: .global)
-                    print("\u{1F534} [TAP DEBUG] DAILY COMMAND header box global frame: \(f)")
-                    debugHeaderBoxFrame = "x:\(Int(f.minX)) y:\(Int(f.minY)) w:\(Int(f.width)) h:\(Int(f.height)) (bottom edge y:\(Int(f.maxY)))"
-                }
-            }
-        )
     }
     
     // ==============================================================================
@@ -1402,36 +1353,13 @@ struct ContentView: View {
                     
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
-                            locationFallbackBanner
-                            // TAP DEBUG (BUG-05): user's own suggestion -- a generous fixed gap
-                            // instead of 16pt, to test whether the conditions bar just needs to
-                            // clear a dead zone near the top of this tab's content on iPad.
-                            Color.clear.frame(height: 100)
-                            stargazingConditionsHeaderBar
-                                // TAP DEBUG (BUG-05) -- remove once this is solved. Prints this
-                                // view's real frame, and separately probes for ANY tap landing in
-                                // that same screen area -- if this probe never prints on a tap that
-                                // also doesn't open the Button, the touch isn't reaching SwiftUI's
-                                // content hierarchy here at all (points at something above it, like
-                                // the nav bar, intercepting first).
-                                .background(
-                                    GeometryReader { geo in
-                                        Color.clear.onAppear {
-                                            let f = geo.frame(in: .global)
-                                            print("\u{1F7E2} [TAP DEBUG] CONDITIONS BAR global frame: \(f)")
-                                            debugConditionsBarFrame = "x:\(Int(f.minX)) y:\(Int(f.minY)) w:\(Int(f.width)) h:\(Int(f.height)) (top edge y:\(Int(f.minY)))"
-                                        }
-                                    }
-                                )
-                                .simultaneousGesture(
-                                    SpatialTapGesture().onEnded { value in
-                                        print("\u{26AA} [TAP DEBUG] A tap gesture reached the conditions bar's own view at local point \(value.location)")
-                                        debugTapLog.append("\u{26AA} tap reached conditions bar view at \(value.location)")
-                                    }
-                                )
-                            Divider()
-                                .background(Color.cyan)
-                            
+                            // BUG-05 FIX: this card, the conditions bar, and the location
+                            // banner below it all sat in a dead zone near the top of this
+                            // tab's scroll content on iPad -- moving this card (which always
+                            // worked) into the first slot and the others below it resolved
+                            // it for all three. Root cause was never pinned down further than
+                            // "screen position near the top of this tab," but the fix is
+                            // confirmed and stable -- keep this order.
                             // 💡 StarGaze entry point, also on the default landing tab — not a
                             // duplicate dashboard, just the same single launch card used on
                             // the Star Gazer tab, reusing the same trigger
@@ -1439,10 +1367,6 @@ struct ContentView: View {
                             // flagship feature of this release shouldn't be a tab-swipe away
                             // from the screen most users land on first.
                             Button(action: {
-                                // TAP DEBUG (BUG-05) -- remove once this is solved. Control test:
-                                // does a normal button on this same tab register taps fine on iPad?
-                                print("\u{1F7E3} [TAP DEBUG] Sky map button action fired (control test)")
-                                debugTapLog.append("\u{1F7E3} Sky map button fired (control)")
                                 Task {
                                     // Gate on real data instead of presenting the sky map with
                                     // whatever (possibly still-empty) catalog happens to be in
@@ -1518,6 +1442,7 @@ struct ContentView: View {
                                 .shadow(color: Color.cyan.opacity(0.5), radius: 10, x: 0, y: 0)
                                 .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
                             }
+                            .padding(.top, 16) // clears the DAILY COMMAND header box now that this card is first
                             .buttonStyle(PlainButtonStyle())
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel("Open live interactive sky map")
@@ -1526,6 +1451,12 @@ struct ContentView: View {
                                 .background(Color.cyan)
                                 .padding(.top, 8)
                             
+                            stargazingConditionsHeaderBar
+                                .padding(.top, 16)
+                            Divider()
+                                .background(Color.cyan)
+                            
+                            locationFallbackBanner
                             // 🛰️ FEAT-15: dashboard channel blocks (missions/roadway
                             // link, satellites, asteroids, meteor showers) render in
                             // dashboardLayoutStore's order instead of a fixed sequence, so
@@ -1554,13 +1485,13 @@ struct ContentView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .principal) {
-                            // TAP DEBUG (BUG-05): ruled out -- disabling hit-testing here changed
-                            // nothing (same dead frame, still no taps reach the conditions bar),
-                            // so this header box isn't the blocker. Reverted.
                             principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
                         }
                         ToolbarItem(placement: .navigationBarLeading) {
                             settingsToolbarButton
+                        }
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            dashboardReorderToolbarButton
                         }
                         // 💡 Persistent, low-key entry point into the voluntary
                         // "Go Ad-Free" sheet — nothing forces this open, it's
@@ -1634,35 +1565,6 @@ struct ContentView: View {
                         }
                         .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                     }
-                    
-                    // TAP DEBUG (BUG-05) -- remove once this is solved. Doesn't depend on
-                    // Xcode's console being attached/visible -- shows the same info directly
-                    // on screen instead. allowsHitTesting(false) so it can never itself
-                    // absorb or explain a tap.
-                    VStack {
-                        Spacer()
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\u{1F41E} TAP DEBUG (BUG-05)")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.yellow)
-                            Text("Header box: \(debugHeaderBoxFrame)")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.white)
-                            Text("Conditions bar: \(debugConditionsBarFrame)")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.white)
-                            ForEach(Array(debugTapLog.suffix(6).enumerated()), id: \.offset) { _, line in
-                                Text(line)
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundColor(.green)
-                            }
-                        }
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.black.opacity(0.85))
-                    }
-                    .allowsHitTesting(false)
-                    .ignoresSafeArea(edges: .bottom)
                     
                 } // Closes ZStack
                 .onAppear {
@@ -1906,6 +1808,10 @@ struct ContentView: View {
             .navigationViewStyle(.stack)
             } // Closes Tab("Space News")
         }
+        // BUG-05: confirmed this wasn't the cause -- switching to .automatic alone
+        // (with the original card order) didn't fix tapping, so this stays as
+        // .sidebarAdaptable (BUG-03's iPad sidebar navigation) with no regression risk,
+        // since the real fix was reordering the scroll content instead.
         .tabViewStyle(.sidebarAdaptable)
         // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
         .fullScreenCover(isPresented: $showLiveViewfinderOverlay) {
@@ -1920,6 +1826,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(notificationEngine: notificationEngine)
+        }
+        .sheet(isPresented: $showDashboardReorderSheet) {
+            DashboardReorderSheetView(layoutStore: dashboardLayoutStore)
         }
         // 💡 BUG FIX: this used to be rendered as a plain `if` inside Home Command's own
         // ZStack, so tapping the ad-free pill on Star Gazers/Earth Watch/Space News set
