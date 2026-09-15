@@ -1551,7 +1551,13 @@ struct ContentView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .principal) {
+                            // TAP DEBUG (BUG-05) -- remove once this is solved. Testing whether
+                            // this header box's hit-testable region is what's blocking the
+                            // conditions bar below it. This also disables the small info
+                            // button inside it for now -- if this IS the fix, that button moves
+                            // to Settings.
                             principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
+                                .allowsHitTesting(false)
                         }
                         ToolbarItem(placement: .navigationBarLeading) {
                             settingsToolbarButton
