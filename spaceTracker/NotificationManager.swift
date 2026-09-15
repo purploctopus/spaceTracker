@@ -232,8 +232,13 @@ class NotificationManager: ObservableObject {
                     let fireDate = netDate.addingTimeInterval(-Double(self.launchLeadMinutes * 60))
                     guard !self.isWithinQuietHours(fireDate) else { continue }
                     let content = UNMutableNotificationContent()
+                    // FEAT-24: split across title/subtitle/body -- lock screen renders these as
+                    // three distinct lines (title bold, subtitle dimmer, body normal), so the
+                    // countdown reads as its own scannable line instead of being buried inside
+                    // one run-on sentence. Single emoji stays on the title only.
                     content.title = "🚀 LAUNCH ALERT"
-                    content.body = "\(launch.name) lifts off in \(self.launchLeadMinutes) minutes."
+                    content.subtitle = "T-MINUS \(self.launchLeadMinutes) MIN"
+                    content.body = launch.name
                     content.sound = .default
                     self.scheduleOneTime(identifier: "launch-\(launch.id)", content: content, fireDate: fireDate, center: center)
                 }
@@ -266,8 +271,15 @@ class NotificationManager: ObservableObject {
                     let fireDate = passDate.addingTimeInterval(-Double(self.passLeadMinutes * 60))
                     guard !self.isWithinQuietHours(fireDate) else { continue }
                     let content = UNMutableNotificationContent()
+                    // FEAT-24: subtitle carries the countdown + peak elevation (the two numbers
+                    // worth a glance at a lock screen), body carries the satellite name and its
+                    // rise/set direction + how long it's up -- both real fields SatellitePass
+                    // already has (peakElevationDegrees, durationMinutes), just not surfaced
+                    // here before. Fixes the old body's awkward "...minutes — look RISES WEST
+                    // ➔ SETS NORTH." construction along the way.
                     content.title = "🛰️ PASS ALERT"
-                    content.body = "\(sat.name) is overhead in \(self.passLeadMinutes) minutes — look \(sat.travelDirection)."
+                    content.subtitle = "OVERHEAD IN \(self.passLeadMinutes) MIN · PEAK \(Int(sat.peakElevationDegrees.rounded()))°"
+                    content.body = "\(sat.name) — \(sat.travelDirection), visible ~\(sat.durationMinutes) min."
                     content.sound = .default
                     self.scheduleOneTime(identifier: "pass-\(sat.id_swiftui)", content: content, fireDate: fireDate, center: center)
                 }
@@ -297,8 +309,11 @@ class NotificationManager: ObservableObject {
                     guard !self.isWithinQuietHours(fireDate) else { continue }
 
                     let content = UNMutableNotificationContent()
+                    // FEAT-24: "peaks tonight" moves to its own subtitle line instead of being
+                    // folded into the body sentence.
                     content.title = "☄️ METEOR SHOWER PEAK"
-                    content.body = "\(shower.name) peaks tonight — best viewing after dark, away from city lights."
+                    content.subtitle = "PEAKS TONIGHT"
+                    content.body = "\(shower.name) — best viewing after dark, away from city lights."
                     content.sound = .default
                     self.scheduleOneTime(identifier: "meteor-\(shower.name)-\(shower.peakDateStr)", content: content, fireDate: fireDate, center: center)
                 }
