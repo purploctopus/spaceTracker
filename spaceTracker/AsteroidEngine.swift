@@ -14,7 +14,7 @@ struct CloudflareAsteroidResponse: Decodable {
     let asteroids: [Asteroid]
 }
 
-struct Asteroid: Decodable, Identifiable {
+nonisolated struct Asteroid: Decodable, Identifiable {
     let id: String
     let name: String
     let is_potentially_hazardous_asteroid: Bool

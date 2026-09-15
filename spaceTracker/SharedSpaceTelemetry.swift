@@ -84,7 +84,7 @@ enum SharedSpaceStore {
 /// Activity<SpaceTrackerLiveActivityAttributes>.request/.update/.end) and the widget
 /// extension process (which renders it via ActivityConfiguration(for:)) -- that's the actual
 /// technical reason this file needs dual target membership, not just convenience.
-struct SpaceTrackerLiveActivityAttributes: ActivityAttributes {
+nonisolated struct SpaceTrackerLiveActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         /// "COUNTDOWN" / "LIFTOFF" for a launch, "INCOMING" / "OVERHEAD" for a pass. The
         /// Live Activity UI uses this (not a raw date comparison) to decide whether to show

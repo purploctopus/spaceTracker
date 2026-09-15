@@ -14,7 +14,7 @@ struct LaunchResponse: Decodable {
     let results: [SpaceLaunch]
 }
 
-struct SpaceLaunch: Decodable, Identifiable {
+nonisolated struct SpaceLaunch: Decodable, Identifiable {
     let id: String
     let name: String
     let net: String?

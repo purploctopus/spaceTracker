@@ -17,7 +17,7 @@ struct SatelliteResponse: Codable {
     let passes: [SatellitePass]
 }
 
-struct SatellitePass: Codable, Identifiable {
+nonisolated struct SatellitePass: Codable, Identifiable {
     let id: String
     let name: String
     // FEAT-25 follow-up (2026-09-15): real launch year, parsed server-side straight from the
