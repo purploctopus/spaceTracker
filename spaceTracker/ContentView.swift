@@ -157,6 +157,8 @@ struct ContentView: View {
     // taps. See spaceTrackerApp.swift for the transition trigger.
     @EnvironmentObject var adEngine: AdMobEngine
     @State private var showAdPromptOverlay = false
+    
+    @State private var pendingContentAction: (() -> Void)? = nil
 
     /// Toolbar badge text for the ad-free entry point -- the real IAP price when nothing's
     /// unlocked yet, so the icon reads as a buy button instead of decoration, or "UNTIL h:mm"
@@ -763,7 +765,9 @@ struct ContentView: View {
                         ForEach(meteorViewModel.upcomingShowers) { shower in
                             MeteorShowerCardView(shower: shower, userLatitude: universalLatitude)
                                 .onTapGesture {
-                                    selectedMeteorShower = shower
+                                    let action = { selectedMeteorShower = shower }
+                                    if adEngine.isPremiumUnlocked { action() }
+                                    else { pendingContentAction = action; showAdPromptOverlay = true }
                                 }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityLabel("\(shower.name) meteor shower")
@@ -817,7 +821,9 @@ struct ContentView: View {
                                 userLongitude: universalLongitude
                             )
                             .onTapGesture {
-                                selectedAsteroidTarget = asteroid
+                                let action = { selectedAsteroidTarget = asteroid }
+                                if adEngine.isPremiumUnlocked { action() }
+                                else { pendingContentAction = action; showAdPromptOverlay = true }
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel("\(asteroid.name), asteroid")
@@ -959,7 +965,9 @@ struct ContentView: View {
                         ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { (sat: SatellitePass) in
                             SatelliteCardView(sat: sat, location: satViewModel.locationName)
                                 .onTapGesture {
-                                    selectedSatellitePass = sat
+                                    let action = { selectedSatellitePass = sat }
+                                    if adEngine.isPremiumUnlocked { action() }
+                                    else { pendingContentAction = action; showAdPromptOverlay = true }
                                 }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityLabel("\(sat.name) pass at \(sat.localDisplayTime)")
@@ -1268,7 +1276,9 @@ struct ContentView: View {
                                     }
                                 )
                                 .onTapGesture {
-                                    selectedSpaceLaunch = launch
+                                    let action = { selectedSpaceLaunch = launch }
+                                    if adEngine.isPremiumUnlocked { action() }
+                                    else { pendingContentAction = action; showAdPromptOverlay = true }
                                 }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityLabel("\(launch.name)")
@@ -1327,9 +1337,9 @@ struct ContentView: View {
             // CHANNEL TAB 1: HOME COMMAND
             // ==============================================================================
             Tab("Home Command", systemImage: "house") {
-            NavigationStack {
-                ZStack {
-                    TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
+                NavigationStack {
+                    ZStack {
+                        TacticalAmbientBackdropView(apodViewModel: apodViewModel, showInfoSheet: $showAPODDetails)
                         // 💡 FIX: the StarGaze launch card on this tab reads from
                         // stargazerViewModel.stargazerState.liveVisibleTargets, but that data
                         // was only ever fetched by a .task scoped to the Star Gazers tab's own
@@ -1341,484 +1351,484 @@ struct ContentView: View {
                         // regardless of which tab or shortcut the user touches first. Guarded
                         // by isDataLoaded so whichever tab's .task runs first does the real
                         // fetch and the other just skips redundant work.
-                        .task {
-                            guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
-                            
-                            let resolvedCoordinate = await locationProvider.currentLocation()
-                            let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
-                            let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
-                            
-                            await stargazerViewModel.ensureTelemetryLoaded(
-                                latitude: hardwareLat,
-                                longitude: hardwareLng
-                            )
-                        }
+                            .task {
+                                guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
+                                
+                                let resolvedCoordinate = await locationProvider.currentLocation()
+                                let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                                let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                                
+                                await stargazerViewModel.ensureTelemetryLoaded(
+                                    latitude: hardwareLat,
+                                    longitude: hardwareLng
+                                )
+                            }
                         // Bridges AdMobEngine.shouldAutoPresentAdPrompt (set by the cold-launch
                         // ad-break trigger in spaceTrackerApp.swift) into this view's own local
                         // showAdPromptOverlay state, so the automatic trigger surfaces the exact
                         // same voluntary sheet the toolbar icon opens, rather than firing an ad
                         // directly with no explanation.
-                        .onChange(of: adEngine.shouldAutoPresentAdPrompt) { _, shouldPresent in
-                            if shouldPresent {
-                                showAdPromptOverlay = true
-                            }
-                        }
-                    
-                    ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
-                            // BUG-05 FIX: this card, the conditions bar, and the location
-                            // banner below it all sat in a dead zone near the top of this
-                            // tab's scroll content on iPad -- moving this card (which always
-                            // worked) into the first slot and the others below it resolved
-                            // it for all three. Root cause was never pinned down further than
-                            // "screen position near the top of this tab," but the fix is
-                            // confirmed and stable -- keep this order.
-                            // 💡 StarGaze entry point, also on the default landing tab — not a
-                            // duplicate dashboard, just the same single launch card used on
-                            // the Star Gazer tab, reusing the same trigger
-                            // (showLiveViewfinderOverlay) and the same asset/design. The
-                            // flagship feature of this release shouldn't be a tab-swipe away
-                            // from the screen most users land on first.
-                            Button(action: {
-                                Task {
-                                    // Gate on real data instead of presenting the sky map with
-                                    // whatever (possibly still-empty) catalog happens to be in
-                                    // stargazerState right now. See ensureTelemetryLoaded's doc
-                                    // comment for the bug this fixes.
-                                    if !stargazerViewModel.stargazerState.isDataLoaded {
-                                        isPreparingSkyMap = true
-                                        let resolvedCoordinate = await locationProvider.currentLocation()
-                                        let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
-                                        let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
-                                        await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
-                                        isPreparingSkyMap = false
-                                    }
-                                    showLiveViewfinderOverlay = true
+                            .onChange(of: adEngine.shouldAutoPresentAdPrompt) { _, shouldPresent in
+                                if shouldPresent {
+                                    showAdPromptOverlay = true
                                 }
-                            }) {
-                                ZStack(alignment: .bottomLeading) {
-                                    Image("night_sky_banner")
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(height: 120)
-                                        .background(Color(.systemGray6))
-                                        .clipped()
-                                    
-                                    LinearGradient(
-                                        colors: [Color.black.opacity(0.85), Color.black.opacity(0.1)],
-                                        startPoint: .bottom,
-                                        endPoint: .top
-                                    )
-                                    
-                                    HStack(alignment: .bottom) {
-                                        // 💡 The CTA ("open this") is now the dominant line and
-                                        // "point device to find planets" the supporting caption --
-                                        // previously it was the other way around, so the eye
-                                        // landed on an instruction rather than the invitation to tap.
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("OPEN LIVE INTERACTIVE SKY MAP")
-                                                .font(.system(.subheadline, design: .default))
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.white)
-                                            
-                                            Text("POINT DEVICE TO FIND PLANETS")
-                                                .font(.system(.caption2, design: .monospaced))
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.cyan)
+                            }
+                        
+                        ScrollView(showsIndicators: false) {
+                            VStack(alignment: .leading, spacing: 8) { // 💡 Tight 8pt default spacing keeps titles clipped closely to their true cards below
+                                // BUG-05 FIX: this card, the conditions bar, and the location
+                                // banner below it all sat in a dead zone near the top of this
+                                // tab's scroll content on iPad -- moving this card (which always
+                                // worked) into the first slot and the others below it resolved
+                                // it for all three. Root cause was never pinned down further than
+                                // "screen position near the top of this tab," but the fix is
+                                // confirmed and stable -- keep this order.
+                                // 💡 StarGaze entry point, also on the default landing tab — not a
+                                // duplicate dashboard, just the same single launch card used on
+                                // the Star Gazer tab, reusing the same trigger
+                                // (showLiveViewfinderOverlay) and the same asset/design. The
+                                // flagship feature of this release shouldn't be a tab-swipe away
+                                // from the screen most users land on first.
+                                Button(action: {
+                                    Task {
+                                        // Gate on real data instead of presenting the sky map with
+                                        // whatever (possibly still-empty) catalog happens to be in
+                                        // stargazerState right now. See ensureTelemetryLoaded's doc
+                                        // comment for the bug this fixes.
+                                        if !stargazerViewModel.stargazerState.isDataLoaded {
+                                            isPreparingSkyMap = true
+                                            let resolvedCoordinate = await locationProvider.currentLocation()
+                                            let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                                            let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                                            await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
+                                            isPreparingSkyMap = false
                                         }
+                                        showLiveViewfinderOverlay = true
+                                    }
+                                }) {
+                                    ZStack(alignment: .bottomLeading) {
+                                        Image("night_sky_banner")
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(height: 120)
+                                            .background(Color(.systemGray6))
+                                            .clipped()
                                         
-                                        Spacer()
+                                        LinearGradient(
+                                            colors: [Color.black.opacity(0.85), Color.black.opacity(0.1)],
+                                            startPoint: .bottom,
+                                            endPoint: .top
+                                        )
                                         
-                                        // Trailing "❯" matches the tap-affordance glyph already
-                                        // used elsewhere in the app (e.g. "TAP FOR FIELD BRIEFING ❯").
-                                        HStack(spacing: 6) {
-                                            if isPreparingSkyMap {
-                                                ProgressView()
-                                                    .tint(.cyan)
-                                            } else {
-                                                Image(systemName: "scope")
-                                                    .font(.title2)
+                                        HStack(alignment: .bottom) {
+                                            // 💡 The CTA ("open this") is now the dominant line and
+                                            // "point device to find planets" the supporting caption --
+                                            // previously it was the other way around, so the eye
+                                            // landed on an instruction rather than the invitation to tap.
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("OPEN LIVE INTERACTIVE SKY MAP")
+                                                    .font(.system(.subheadline, design: .default))
+                                                    .fontWeight(.bold)
+                                                    .foregroundColor(.white)
+                                                
+                                                Text("POINT DEVICE TO FIND PLANETS")
+                                                    .font(.system(.caption2, design: .monospaced))
+                                                    .fontWeight(.bold)
                                                     .foregroundColor(.cyan)
                                             }
-                                            Text("❯")
-                                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                                .foregroundColor(.cyan)
+                                            
+                                            Spacer()
+                                            
+                                            // Trailing "❯" matches the tap-affordance glyph already
+                                            // used elsewhere in the app (e.g. "TAP FOR FIELD BRIEFING ❯").
+                                            HStack(spacing: 6) {
+                                                if isPreparingSkyMap {
+                                                    ProgressView()
+                                                        .tint(.cyan)
+                                                } else {
+                                                    Image(systemName: "scope")
+                                                        .font(.title2)
+                                                        .foregroundColor(.cyan)
+                                                }
+                                                Text("❯")
+                                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                                    .foregroundColor(.cyan)
+                                            }
+                                        }
+                                        .padding()
+                                    }
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.cyan, lineWidth: 1.5)
+                                    )
+                                    .shadow(color: Color.cyan.opacity(0.5), radius: 10, x: 0, y: 0)
+                                    .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
+                                }
+                                .padding(.top, horizontalSizeClass == .regular ? 16 : 8)
+                                .buttonStyle(PlainButtonStyle())
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("Open live interactive sky map")
+                                .accessibilityHint("Point your device at the sky to find planets")
+                                Divider()
+                                    .background(Color.cyan)
+                                    .padding(.top, 8)
+                                
+                                stargazingConditionsHeaderBar
+                                    .padding(.top, 16)
+                                Divider()
+                                    .background(Color.cyan)
+                                
+                                locationFallbackBanner
+                                // 🛰️ FEAT-15: dashboard channel blocks (missions/roadway
+                                // link, satellites, asteroids, meteor showers) render in
+                                // dashboardLayoutStore's order instead of a fixed sequence, so
+                                // whatever someone checks most gets reordered to the top from
+                                // Settings > Dashboard Layout. The toolbar that used to hang off
+                                // the missions block moved to the ScrollView itself below, since
+                                // it needs to stay put regardless of where missions lands.
+                                ForEach(Array(dashboardLayoutStore.channelOrder.enumerated()), id: \.element) { index, channel in
+                                    dashboardChannelView(for: channel)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.top, index == 0 ? 0 : 24)
+                                    if index < dashboardLayoutStore.channelOrder.count - 1 {
+                                        Divider()
+                                            .background(Color.cyan)
+                                    }
+                                }
+                                // 💡 FEAT-13: Space Station Tracker + Humans in Space moved to
+                                // the new Earth Watch tab -- see EarthWatchView.swift. Both are
+                                // really the same idea Earth Watch is built around (Earth with
+                                // something plotted on/around it), so they belong there rather
+                                // than in this manifest-of-upcoming-events dashboard.
+                            } // Closes the outermost VStack inside ScrollView
+                            .padding(.top, 24)
+                            .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
+                        } // Closes ScrollView
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .principal) {
+                                principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
+                            }
+                            // 🔬 Round 9 tested combining these into one ToolbarItem on compact
+                            // (theory: two separate glass capsules were setting the height floor)
+                            // -- ruled out, gap was unchanged. Reverted to the original structure.
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                settingsToolbarButton
+                            }
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                dashboardReorderToolbarButton
+                            }
+                            // 💡 Persistent, low-key entry point into the voluntary
+                            // "Go Ad-Free" sheet — nothing forces this open, it's
+                            // just always reachable for whoever goes looking for it.
+                            // 💡 Keys off hasPermanentAdFree specifically, not the
+                            // combined isPremiumUnlocked — this icon should stay
+                            // visible through an active temporary ad-free window
+                            // (there's still a reason to tap it: buying permanently),
+                            // only disappearing once ads are actually gone for good.
+                            if !adEngine.hasPermanentAdFree {
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    adFreeToolbarButton
+                                }
+                            }
+                        }
+                        .toolbarBackground(.hidden, for: .navigationBar)
+                        
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                nasaApodButton
+                            }
+                        }
+                        .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
+                        // 💡 THE CONDITIONS BRIEFING POPUP: Dimmed backdrop with a clean, centralized terminal box
+                        if showConditionsExplainer {
+                            ZStack {
+                                Color.black.opacity(0.85)
+                                    .ignoresSafeArea()
+                                    .onTapGesture { showConditionsExplainer = false } // Dismiss when background is tapped
+                                
+                                VStack(alignment: .leading, spacing: 20) {
+                                    // Header Row
+                                    HStack {
+                                        Text("FIELD BRIEFING: WEATHER STATUS")
+                                            .font(.system(.subheadline, design: .monospaced))
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.cyan)
+                                        Spacer()
+                                        Button(action: { showConditionsExplainer = false }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.title2)
+                                                .foregroundColor(.gray)
                                         }
                                     }
-                                    .padding()
-                                }
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.cyan, lineWidth: 1.5)
-                                )
-                                .shadow(color: Color.cyan.opacity(0.5), radius: 10, x: 0, y: 0)
-                                .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
-                            }
-                            .padding(.top, horizontalSizeClass == .regular ? 16 : 8)
-                            .buttonStyle(PlainButtonStyle())
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("Open live interactive sky map")
-                            .accessibilityHint("Point your device at the sky to find planets")
-                            Divider()
-                                .background(Color.cyan)
-                                .padding(.top, 8)
-                            
-                            stargazingConditionsHeaderBar
-                                .padding(.top, 16)
-                            Divider()
-                                .background(Color.cyan)
-                            
-                            locationFallbackBanner
-                            // 🛰️ FEAT-15: dashboard channel blocks (missions/roadway
-                            // link, satellites, asteroids, meteor showers) render in
-                            // dashboardLayoutStore's order instead of a fixed sequence, so
-                            // whatever someone checks most gets reordered to the top from
-                            // Settings > Dashboard Layout. The toolbar that used to hang off
-                            // the missions block moved to the ScrollView itself below, since
-                            // it needs to stay put regardless of where missions lands.
-                            ForEach(Array(dashboardLayoutStore.channelOrder.enumerated()), id: \.element) { index, channel in
-                                dashboardChannelView(for: channel)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.top, index == 0 ? 0 : 24)
-                                if index < dashboardLayoutStore.channelOrder.count - 1 {
+                                    
                                     Divider()
-                                        .background(Color.cyan)
-                                }
-                            }
-                            // 💡 FEAT-13: Space Station Tracker + Humans in Space moved to
-                            // the new Earth Watch tab -- see EarthWatchView.swift. Both are
-                            // really the same idea Earth Watch is built around (Earth with
-                            // something plotted on/around it), so they belong there rather
-                            // than in this manifest-of-upcoming-events dashboard.
-                        } // Closes the outermost VStack inside ScrollView
-                        .padding(.top, 24)
-                        .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
-                    } // Closes ScrollView
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .principal) {
-                            principalToolbarHeaderTitleStack(sizeClass: horizontalSizeClass)
-                        }
-                        // 🔬 Round 9 tested combining these into one ToolbarItem on compact
-                        // (theory: two separate glass capsules were setting the height floor)
-                        // -- ruled out, gap was unchanged. Reverted to the original structure.
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            settingsToolbarButton
-                        }
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            dashboardReorderToolbarButton
-                        }
-                        // 💡 Persistent, low-key entry point into the voluntary
-                        // "Go Ad-Free" sheet — nothing forces this open, it's
-                        // just always reachable for whoever goes looking for it.
-                        // 💡 Keys off hasPermanentAdFree specifically, not the
-                        // combined isPremiumUnlocked — this icon should stay
-                        // visible through an active temporary ad-free window
-                        // (there's still a reason to tap it: buying permanently),
-                        // only disappearing once ads are actually gone for good.
-                        if !adEngine.hasPermanentAdFree {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                adFreeToolbarButton
-                            }
-                        }
-                    }
-                    .toolbarBackground(.hidden, for: .navigationBar)
-                    
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            nasaApodButton
-                        }
-                    }
-                    .opacity(apodViewModel.isLoaded ? 1.0 : 0.0)
-                    // 💡 THE CONDITIONS BRIEFING POPUP: Dimmed backdrop with a clean, centralized terminal box
-                    if showConditionsExplainer {
-                        ZStack {
-                            Color.black.opacity(0.85)
-                                .ignoresSafeArea()
-                                .onTapGesture { showConditionsExplainer = false } // Dismiss when background is tapped
-                            
-                            VStack(alignment: .leading, spacing: 20) {
-                                // Header Row
-                                HStack {
-                                    Text("FIELD BRIEFING: WEATHER STATUS")
-                                        .font(.system(.subheadline, design: .monospaced))
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.cyan)
-                                    Spacer()
-                                    Button(action: { showConditionsExplainer = false }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.gray)
+                                        .background(Color.white.opacity(0.15))
+                                    
+                                    // Human-Readable Telemetry Breakdown
+                                    VStack(alignment: .leading, spacing: 14) {
+                                        // 💡 THE COMPLIANT TARGET INSIGHT ROW: Renders our exact dynamic string matrix text flawlessly
+                                        Text(dynamicMissionBriefingText)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(weatherViewModel.cloudCoverPercent <= 30 ? .green : (weatherViewModel.cloudCoverPercent > 70 ? .orange : .yellow))
+                                        Text("• CLOUDS & HUMIDITY: This dictates your visual visibility vector. Low cloud cover (< 30%) and low humidity mean crisp, high-clarity viewing conditions through your local atmospheric path.")
+                                        
+                                        Text("• KP-INDEX: This tracks geomagnetic solar storms in the upper atmosphere on a scale of 0 to 9. High scores (5+) trigger aurora displays.")
+                                        
                                     }
+                                    .font(.system(.footnote, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                                    .lineSpacing(4)
                                 }
-                                
-                                Divider()
-                                    .background(Color.white.opacity(0.15))
-                                
-                                // Human-Readable Telemetry Breakdown
-                                VStack(alignment: .leading, spacing: 14) {
-                                    // 💡 THE COMPLIANT TARGET INSIGHT ROW: Renders our exact dynamic string matrix text flawlessly
-                                    Text(dynamicMissionBriefingText)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(weatherViewModel.cloudCoverPercent <= 30 ? .green : (weatherViewModel.cloudCoverPercent > 70 ? .orange : .yellow))
-                                    Text("• CLOUDS & HUMIDITY: This dictates your visual visibility vector. Low cloud cover (< 30%) and low humidity mean crisp, high-clarity viewing conditions through your local atmospheric path.")
-                                    
-                                    Text("• KP-INDEX: This tracks geomagnetic solar storms in the upper atmosphere on a scale of 0 to 9. High scores (5+) trigger aurora displays.")
-                                    
-                                }
-                                .font(.system(.footnote, design: .monospaced))
-                                .foregroundColor(.secondary)
-                                .lineSpacing(4)
+                                .padding(24)
+                                .background(Color(red: 0.06, green: 0.06, blue: 0.06))
+                                .border(Color.white.opacity(0.1), width: 1)
+                                .cornerRadius(6)
+                                .padding(.horizontal, horizontalSizeClass == .regular ? 140 : 24)
                             }
-                            .padding(24)
-                            .background(Color(red: 0.06, green: 0.06, blue: 0.06))
-                            .border(Color.white.opacity(0.1), width: 1)
-                            .cornerRadius(6)
-                            .padding(.horizontal, horizontalSizeClass == .regular ? 140 : 24)
+                            .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                         }
-                        .transition(.opacity.animation(.easeInOut(duration: 0.2)))
-                    }
-                    
-                } // Closes ZStack
-                .onAppear {
-                    let navigationBarAppearance = UINavigationBarAppearance()
-                    navigationBarAppearance.configureWithTransparentBackground()
-                    UINavigationBar.appearance().standardAppearance = navigationBarAppearance
-                    UINavigationBar.appearance().compactAppearance = navigationBarAppearance
-                    UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
-                }
-                .task {
-                    // 1. Request local device alert permissions immediately on workspace load
-                    notificationEngine.requestPermission()
-                    
-                    // 2. Fire down all background API web asset streams
-                    await viewModel.fetchLaunches()
-                    satViewModel.requestPasses()
-                    await rockViewModel.fetchAsteroidRadar()
-                    await apodViewModel.fetchDailyBackdrop()
-                    
-                    // 3. Process dynamic hardware location parameters for meteor streams
-                    let resolvedCoordinate = await locationProvider.currentLocation()
-                    let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
-                    let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
-                    if resolvedCoordinate == nil {
-                        print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
-                    }
-                    // 💡 BUG FIX: universalLatitude/Longitude previously only ever moved when the
-                    // user ran a manual city search, so every location-aware view silently read
-                    // the Madison, WI default even after a real GPS fix came back. Sync it here
-                    // so it reflects the actual resolved (or fallback) coordinate app-wide.
-                    universalLatitude = hardwareLat
-                    universalLongitude = hardwareLng
-                    meteorViewModel.generateOutlook(userLatitude: hardwareLat)
-                    
-                    // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
-                    let currentISOString = ISO8601DateFormatter().string(from: Date())
-                    await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
-                    await weatherViewModel.fetchGeomagneticRadar()
-                    await weatherViewModel.fetchMoonData(lat: hardwareLat, lng: hardwareLng)
-                    
-                    // Both cloud/humidity (fetchStargazingWeather) and moon brightness
-                    // (fetchMoonData) are in now, so the composite score can be computed.
-                    weatherViewModel.updateObservationIndex()
-                    
-                    // Real 7-day outlook, replacing the old fixed "EXCELLENT" stub.
-                    stargazerViewModel.stargazerState.forecastWeek = await weatherViewModel.fetchWeekAheadOutlook(lat: hardwareLat, lng: hardwareLng)
-                    
-                    // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
-                    notificationEngine.scheduleDailyBriefing(
-                        launches: viewModel.launches,
-                        satellites: satViewModel.visiblePasses,
-                        meteorShowers: meteorViewModel.upcomingShowers
-                    )
-
-                    // 5. Per-event alerts (FEAT-01): launch T-minus, pass-about-to-start, and
-                    // meteor shower peak alerts, on top of the daily digest above.
-                    notificationEngine.scheduleEventAlerts(
-                        launches: viewModel.launches,
-                        satellites: satViewModel.visiblePasses,
-                        meteorShowers: meteorViewModel.upcomingShowers
-                    )
-
-                    // 6. FEAT-04/FEAT-05: publish the "what's next" snapshot for the Home/Lock
-                    // Screen widget, and start/update/end a Live Activity if a launch or pass
-                    // is currently inside its final window. Same already-fetched arrays as
-                    // step 5 above -- no separate fetch of its own.
-                    LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
-                }
-                // satViewModel.requestPasses() above resolves asynchronously (it waits on a
-                // CLLocationManager delegate callback), so visiblePasses is very often still
-                // empty at the point scheduleEventAlerts() runs just above. Re-run it once
-                // passes actually arrive so pass alerts aren't silently skipped every launch.
-                .onChange(of: satViewModel.visiblePasses.count) { _, _ in
-                    notificationEngine.scheduleEventAlerts(
-                        launches: viewModel.launches,
-                        satellites: satViewModel.visiblePasses,
-                        meteorShowers: meteorViewModel.upcomingShowers
-                    )
-                    LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
-                }
-                .task {
-                    print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
-                    await crewViewModel.fetchAstronautRoster()
-                }
-            }// Closes NavigationStack
-            .preferredColorScheme(.dark)
-            .sheet(isPresented: $showAPODDetails) {
-                APODCreditDetailSheet(imageURL: apodViewModel.backgroundImageURL, title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
-            }
-            .sheet(item: $selectedMeteorShower) { shower in
-                MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
-            }
-            .sheet(item: $selectedSpaceLaunch) { launch in
-                NavigationStack {
-                    MissionSingleDetailView(launch: launch)
-                }
-                .preferredColorScheme(.dark)
-            }
-            // Astronaut crew profile manifest sheet container
-            .sheet(item: Binding(
-                get: { selectedSpacecraftCrewName != nil ? CrewSheetIdentifiable(name: selectedSpacecraftCrewName!) : nil },
-                set: { selectedSpacecraftCrewName = $0?.name }
-            )) { wrapper in
-                // 💡 COMPUTES AUTOMATIC CROSS-REFERENCE TELEMETRY ON OPEN
-                let targetedCrew = wrapper.name.contains("International") ? crewViewModel.issCrew : crewViewModel.tiangongCrew
-                SpacecraftDetailSheet(craftName: wrapper.name, crewList: targetedCrew, passes: satViewModel.visiblePasses)
-            }
-            // 💡 FIXED: Uses exact parameter matching and safely unwraps the heading Double value
-            .sheet(item: $selectedSatellitePass) { pass in
-                SatelliteDetailSheet(
-                    sat: pass,
-                    weatherEngine: weatherViewModel,
-                    location: satViewModel.locationName,
-                    userHeading: satViewModel.currentHeading,
-                    knownLatitude: universalLatitude,
-                    knownLongitude: universalLongitude,
-                    isUsingFallbackLocation: locationProvider.isUsingFallbackLocation
-                )
-            }
-            .sheet(isPresented: $showLiveVideoTelemetrySheet) {
-                LaunchLiveStreamPlayerView(
-                    //            streamURLString: "https://www.youtube.com/watch?v=awQzjn72bI0",
-                    streamURLString: activeLiveStreamURL,
-                    launchName: streamingLaunchName,
-                    launchNetDateString: streamingLaunchNetDate
-                )
-            }
-            .sheet(item: $selectedArticle) { article in
-                SpaceNewsDetailSheet(article: article)
-            }
-            .task {
-                await newsViewModel.loadLatestSpaceNews()
-            }
-            } // Closes Tab("Home Command")
-            
-            // ==============================================================================
-            // CHANNEL TAB 2: STAR GAZERS TELEMETRY CARD TRAY DECK
-            // ==============================================================================
-            Tab("Star Gazers", systemImage: "moon.stars") {
-            NavigationView {
-                VStack(spacing: 0) {
-                    ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            locationFallbackBanner
-                            stargazerDashboardChannelBlock
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 24)
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 24)
-                        .padding(.bottom, 60)
+                        
+                    } // Closes ZStack
+                    .onAppear {
+                        let navigationBarAppearance = UINavigationBarAppearance()
+                        navigationBarAppearance.configureWithTransparentBackground()
+                        UINavigationBar.appearance().standardAppearance = navigationBarAppearance
+                        UINavigationBar.appearance().compactAppearance = navigationBarAppearance
+                        UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
                     }
                     .task {
-                        guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
+                        // 1. Request local device alert permissions immediately on workspace load
+                        notificationEngine.requestPermission()
                         
-                        print("📡 [ASTRONOMY UPDATE]: Ingesting live hardware GPS telemetry...")
+                        // 2. Fire down all background API web asset streams
+                        await viewModel.fetchLaunches()
+                        satViewModel.requestPasses()
+                        await rockViewModel.fetchAsteroidRadar()
+                        await apodViewModel.fetchDailyBackdrop()
                         
+                        // 3. Process dynamic hardware location parameters for meteor streams
                         let resolvedCoordinate = await locationProvider.currentLocation()
                         let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
                         let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
                         if resolvedCoordinate == nil {
                             print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
                         }
+                        // 💡 BUG FIX: universalLatitude/Longitude previously only ever moved when the
+                        // user ran a manual city search, so every location-aware view silently read
+                        // the Madison, WI default even after a real GPS fix came back. Sync it here
+                        // so it reflects the actual resolved (or fallback) coordinate app-wide.
+                        universalLatitude = hardwareLat
+                        universalLongitude = hardwareLng
+                        meteorViewModel.generateOutlook(userLatitude: hardwareLat)
                         
-                        // Clean, true parameter inputs with absolutely zero made-up variables!
-                        await stargazerViewModel.ensureTelemetryLoaded(
-                            latitude: hardwareLat,
-                            longitude: hardwareLng
+                        // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
+                        let currentISOString = ISO8601DateFormatter().string(from: Date())
+                        await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
+                        await weatherViewModel.fetchGeomagneticRadar()
+                        await weatherViewModel.fetchMoonData(lat: hardwareLat, lng: hardwareLng)
+                        
+                        // Both cloud/humidity (fetchStargazingWeather) and moon brightness
+                        // (fetchMoonData) are in now, so the composite score can be computed.
+                        weatherViewModel.updateObservationIndex()
+                        
+                        // Real 7-day outlook, replacing the old fixed "EXCELLENT" stub.
+                        stargazerViewModel.stargazerState.forecastWeek = await weatherViewModel.fetchWeekAheadOutlook(lat: hardwareLat, lng: hardwareLng)
+                        
+                        // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
+                        notificationEngine.scheduleDailyBriefing(
+                            launches: viewModel.launches,
+                            satellites: satViewModel.visiblePasses,
+                            meteorShowers: meteorViewModel.upcomingShowers
                         )
+                        
+                        // 5. Per-event alerts (FEAT-01): launch T-minus, pass-about-to-start, and
+                        // meteor shower peak alerts, on top of the daily digest above.
+                        notificationEngine.scheduleEventAlerts(
+                            launches: viewModel.launches,
+                            satellites: satViewModel.visiblePasses,
+                            meteorShowers: meteorViewModel.upcomingShowers
+                        )
+                        
+                        // 6. FEAT-04/FEAT-05: publish the "what's next" snapshot for the Home/Lock
+                        // Screen widget, and start/update/end a Live Activity if a launch or pass
+                        // is currently inside its final window. Same already-fetched arrays as
+                        // step 5 above -- no separate fetch of its own.
+                        LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
                     }
-                    // FEAT-22: this .task above was isDataLoaded-guarded so it only ever ran
-                    // once per app launch -- great for startup, but it meant everything on
-                    // this tab (visible targets, conditions) went stale the longer the app
-                    // stayed open, with no way to refresh short of a full relaunch. Two new
-                    // ways to refresh, both reusing refreshStargazerTelemetry() so they can't
-                    // drift from the initial-load logic above:
-                    .refreshable {
-                        await refreshStargazerTelemetry()
+                    // satViewModel.requestPasses() above resolves asynchronously (it waits on a
+                    // CLLocationManager delegate callback), so visiblePasses is very often still
+                    // empty at the point scheduleEventAlerts() runs just above. Re-run it once
+                    // passes actually arrive so pass alerts aren't silently skipped every launch.
+                    .onChange(of: satViewModel.visiblePasses.count) { _, _ in
+                        notificationEngine.scheduleEventAlerts(
+                            launches: viewModel.launches,
+                            satellites: satViewModel.visiblePasses,
+                            meteorShowers: meteorViewModel.upcomingShowers
+                        )
+                        LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
                     }
                     .task {
-                        // Periodic auto-refresh while this tab stays open. 5 minutes matches
-                        // how slowly stargazing conditions realistically change -- frequent
-                        // enough to feel "live" without hammering the weather/telemetry
-                        // sources. Runs as its own .task so SwiftUI cancels it automatically
-                        // the moment this view disappears, same as the initial-load .task.
-                        while !Task.isCancelled {
-                            try? await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000)
-                            guard !Task.isCancelled else { break }
+                        print("🚀 [CONTENT VIEW]: Initiating parallel astronaut fetch...")
+                        await crewViewModel.fetchAstronautRoster()
+                    }
+                }// Closes NavigationStack
+                .preferredColorScheme(.dark)
+                .sheet(isPresented: $showAPODDetails) {
+                    APODCreditDetailSheet(imageURL: apodViewModel.backgroundImageURL, title: apodViewModel.photoTitle, explanation: apodViewModel.photoExplanation)
+                }
+                .sheet(item: $selectedMeteorShower) { shower in
+                    MeteorShowerDetailSheet(shower: shower, userLatitude: universalLatitude)
+                }
+                .sheet(item: $selectedSpaceLaunch) { launch in
+                    NavigationStack {
+                        MissionSingleDetailView(launch: launch)
+                    }
+                    .preferredColorScheme(.dark)
+                }
+                // Astronaut crew profile manifest sheet container
+                .sheet(item: Binding(
+                    get: { selectedSpacecraftCrewName != nil ? CrewSheetIdentifiable(name: selectedSpacecraftCrewName!) : nil },
+                    set: { selectedSpacecraftCrewName = $0?.name }
+                )) { wrapper in
+                    // 💡 COMPUTES AUTOMATIC CROSS-REFERENCE TELEMETRY ON OPEN
+                    let targetedCrew = wrapper.name.contains("International") ? crewViewModel.issCrew : crewViewModel.tiangongCrew
+                    SpacecraftDetailSheet(craftName: wrapper.name, crewList: targetedCrew, passes: satViewModel.visiblePasses)
+                }
+                // 💡 FIXED: Uses exact parameter matching and safely unwraps the heading Double value
+                .sheet(item: $selectedSatellitePass) { pass in
+                    SatelliteDetailSheet(
+                        sat: pass,
+                        weatherEngine: weatherViewModel,
+                        location: satViewModel.locationName,
+                        userHeading: satViewModel.currentHeading,
+                        knownLatitude: universalLatitude,
+                        knownLongitude: universalLongitude,
+                        isUsingFallbackLocation: locationProvider.isUsingFallbackLocation
+                    )
+                }
+                .sheet(isPresented: $showLiveVideoTelemetrySheet) {
+                    LaunchLiveStreamPlayerView(
+                        //            streamURLString: "https://www.youtube.com/watch?v=awQzjn72bI0",
+                        streamURLString: activeLiveStreamURL,
+                        launchName: streamingLaunchName,
+                        launchNetDateString: streamingLaunchNetDate
+                    )
+                }
+                .sheet(item: $selectedArticle) { article in
+                    SpaceNewsDetailSheet(article: article)
+                }
+                .task {
+                    await newsViewModel.loadLatestSpaceNews()
+                }
+            } // Closes Tab("Home Command")
+            
+            // ==============================================================================
+            // CHANNEL TAB 2: STAR GAZERS TELEMETRY CARD TRAY DECK
+            // ==============================================================================
+            Tab("Star Gazers", systemImage: "moon.stars") {
+                NavigationView {
+                    VStack(spacing: 0) {
+                        ScrollView(showsIndicators: false) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                locationFallbackBanner
+                                stargazerDashboardChannelBlock
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.top, 24)
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 24)
+                            .padding(.bottom, 60)
+                        }
+                        .task {
+                            guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
+                            
+                            print("📡 [ASTRONOMY UPDATE]: Ingesting live hardware GPS telemetry...")
+                            
+                            let resolvedCoordinate = await locationProvider.currentLocation()
+                            let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                            let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                            if resolvedCoordinate == nil {
+                                print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
+                            }
+                            
+                            // Clean, true parameter inputs with absolutely zero made-up variables!
+                            await stargazerViewModel.ensureTelemetryLoaded(
+                                latitude: hardwareLat,
+                                longitude: hardwareLng
+                            )
+                        }
+                        // FEAT-22: this .task above was isDataLoaded-guarded so it only ever ran
+                        // once per app launch -- great for startup, but it meant everything on
+                        // this tab (visible targets, conditions) went stale the longer the app
+                        // stayed open, with no way to refresh short of a full relaunch. Two new
+                        // ways to refresh, both reusing refreshStargazerTelemetry() so they can't
+                        // drift from the initial-load logic above:
+                        .refreshable {
                             await refreshStargazerTelemetry()
                         }
+                        .task {
+                            // Periodic auto-refresh while this tab stays open. 5 minutes matches
+                            // how slowly stargazing conditions realistically change -- frequent
+                            // enough to feel "live" without hammering the weather/telemetry
+                            // sources. Runs as its own .task so SwiftUI cancels it automatically
+                            // the moment this view disappears, same as the initial-load .task.
+                            while !Task.isCancelled {
+                                try? await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000)
+                                guard !Task.isCancelled else { break }
+                                await refreshStargazerTelemetry()
+                            }
+                        }
                     }
-                }
-                // Same persistent "go ad-free" entry point as Home Command -- previously
-                // this tab had no toolbar of its own at all, so the button only ever
-                // appeared when Home Command happened to be the active tab.
-                .navigationTitle("STAR GAZE")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        settingsToolbarButton
-                    }
-                    if !adEngine.hasPermanentAdFree {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            adFreeToolbarButton
+                    // Same persistent "go ad-free" entry point as Home Command -- previously
+                    // this tab had no toolbar of its own at all, so the button only ever
+                    // appeared when Home Command happened to be the active tab.
+                    .navigationTitle("STAR GAZE")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            settingsToolbarButton
+                        }
+                        if !adEngine.hasPermanentAdFree {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                adFreeToolbarButton
+                            }
                         }
                     }
                 }
-            }
-            .navigationViewStyle(.stack)
+                .navigationViewStyle(.stack)
             } // Closes Tab("Star Gazers")
-
+            
             // ==============================================================================
             // CHANNEL TAB 3: EARTH WATCH
             // ==============================================================================
             Tab("Earth Watch", systemImage: earthWatchTabIconName) {
-            NavigationView {
-                EarthWatchView(
-                    crewViewModel: crewViewModel,
-                    selectedSpacecraftCrewName: $selectedSpacecraftCrewName,
-                    userLatitude: universalLatitude,
-                    userLongitude: universalLongitude
-                )
-                .navigationTitle("EARTH WATCH")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        settingsToolbarButton
-                    }
-                    if !adEngine.hasPermanentAdFree {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            adFreeToolbarButton
+                NavigationView {
+                    EarthWatchView(
+                        crewViewModel: crewViewModel,
+                        selectedSpacecraftCrewName: $selectedSpacecraftCrewName,
+                        userLatitude: universalLatitude,
+                        userLongitude: universalLongitude
+                    )
+                    .navigationTitle("EARTH WATCH")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            settingsToolbarButton
+                        }
+                        if !adEngine.hasPermanentAdFree {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                adFreeToolbarButton
+                            }
                         }
                     }
                 }
-            }
-            .navigationViewStyle(.stack)
+                .navigationViewStyle(.stack)
             } // Closes Tab("Earth Watch")
-
+            
             // ==============================================================================
             // CHANNEL TAB 4: SPACE NEWS
             // ==============================================================================
@@ -1893,11 +1903,20 @@ struct ContentView: View {
                         adEngine.showAdFromKeyWindow {
                             showAdPromptOverlay = false
                             adEngine.shouldAutoPresentAdPrompt = false
+                            
+                            // 🔓 THE AD WAS WATCHED: Fire the precise action that was blocked!
+                            DispatchQueue.main.async {
+                                pendingContentAction?()
+                                pendingContentAction = nil
+                            }
                         }
                     },
                     onDismiss: {
                         showAdPromptOverlay = false
                         adEngine.shouldAutoPresentAdPrompt = false
+                        
+                        // 🚪 User walked away without watching: Clear the blocked navigation action
+                        pendingContentAction = nil
                     }
                 )
                 .transition(.opacity.animation(.easeInOut))

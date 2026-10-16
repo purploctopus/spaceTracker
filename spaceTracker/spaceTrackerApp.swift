@@ -82,29 +82,38 @@ struct spaceTrackerApp: App {
                     // never granting the 24h reward (rewarding someone just for reopening
                     // the app would muddy the "reward means you opted in" framing everything
                     // else here is built around).
-                    if timesRan > 1 {
-                        if isColdLaunch {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-                                if adEngine.canShowTransitionAd() {
-                                    adEngine.markTransitionAdShown()
-                                    // CHANGED: used to call showAdFromKeyWindow() directly here,
-                                    // firing the rewarded interstitial and silently granting its
-                                    // 24h reward with no in-app explanation. triggerAutoAdPrompt()
-                                    // surfaces the same voluntary choice sheet the toolbar icon
-                                    // opens instead, so this is a choice, not a surprise.
-                                    adEngine.triggerAutoAdPrompt()
-                                }
-                            }
-                        } else {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                if adEngine.canShowAppOpenAd() {
-                                    adEngine.markAppOpenAdShown()
-                                    adEngine.showAppOpenAdFromKeyWindow()
-                                }
+//                    if timesRan > 1 {
+//                        if isColdLaunch {
+//                            DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
+//                                if adEngine.canShowTransitionAd() {
+//                                    adEngine.markTransitionAdShown()
+//                                    // CHANGED: used to call showAdFromKeyWindow() directly here,
+//                                    // firing the rewarded interstitial and silently granting its
+//                                    // 24h reward with no in-app explanation. triggerAutoAdPrompt()
+//                                    // surfaces the same voluntary choice sheet the toolbar icon
+//                                    // opens instead, so this is a choice, not a surprise.
+//                                    adEngine.triggerAutoAdPrompt()
+//                                }
+//                            }
+//                        } else {
+//                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+//                                if adEngine.canShowAppOpenAd() {
+//                                    adEngine.markAppOpenAdShown()
+//                                    adEngine.showAppOpenAdFromKeyWindow()
+//                                }
+//                            }
+//                        }
+//                    }
+                    // ✅ CLEAN REPLACEMENT: No more automated popups on cold launch!
+                    if !isColdLaunch {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            if adEngine.canShowAppOpenAd() {
+                                adEngine.markAppOpenAdShown()
+                                adEngine.showAppOpenAdFromKeyWindow()
                             }
                         }
                     }
-                    
+
                     DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
                         print("📈 [REVIEW]: Ask for review has been called")
                         AskForReview().askForReview()
