@@ -1718,9 +1718,9 @@ struct ContentView: View {
                         launchNetDateString: streamingLaunchNetDate
                     )
                 }
-                .sheet(item: $selectedArticle) { article in
-                    SpaceNewsDetailSheet(article: article)
-                }
+//                .sheet(item: $selectedArticle) { article in
+//                    SpaceNewsDetailSheet(article: article)
+//                }
                 .task {
                     await newsViewModel.loadLatestSpaceNews()
                 }
@@ -1830,7 +1830,7 @@ struct ContentView: View {
             } // Closes Tab("Earth Watch")
             
             // ==============================================================================
-            // CHANNEL TAB 4: SPACE NEWS
+            // CHANNEL TAB 4: SPACE NEWS (FIXED STATE-LEAK LAYER)
             // ==============================================================================
             Tab("Space News", systemImage: "newspaper") {
             NavigationView {
@@ -1845,7 +1845,6 @@ struct ContentView: View {
                 }
                 .navigationTitle("SPACE NEWS")
                 .navigationBarTitleDisplayMode(.inline)
-
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         settingsToolbarButton
@@ -1855,6 +1854,11 @@ struct ContentView: View {
                             adFreeToolbarButton
                         }
                     }
+                }
+                // ✅ FIXED: Scoping the sheet directly to Tab 4 seals the state.
+                // It can no longer leak over or force open on the Home Command tab.
+                .sheet(item: $selectedArticle) { article in
+                    SpaceNewsDetailSheet(article: article)
                 }
             }
             .navigationViewStyle(.stack)
