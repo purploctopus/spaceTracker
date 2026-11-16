@@ -70,11 +70,17 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published var requiresManualSelection: Bool = false
     @Published var currentHeading: Double = 0.0
     @Published var countryISOCode: String = "PND" // Defaults to "Pending" on boot
+    // FEAT-31: true once at least one pass fetch has come back successfully, so the UI can
+    // tell "fetched, and nothing is overhead" apart from "haven't fetched yet".
+    @Published var hasLoadedPasses: Bool = false
 
     
     private let locationManager = CLLocationManager()
     private let workerURLString = "https://sat-tracker.purploctopus.workers.dev"
     private var lastQueriedLocationVector: String = ""
+    // FEAT-31: last coordinates a fetch was started for (GPS, cache, or manual city), so a
+    // pull-to-refresh can re-fetch the same place even after a manual city search.
+    private var lastRequestedCoordinates: (lat: String, lng: String)? = nil
     
     override init() {
         super.init()
@@ -144,6 +150,34 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
     
+    /// FEAT-31: forced refresh for Home Command's pull-to-refresh. Unlike requestPasses(),
+    /// this skips the "already have passes" early return and clears the duplicate-query
+    /// guard, so the same coordinates really are fetched again. Then, if location access is
+    /// allowed, it asks for a fresh GPS fix -- the normal delegate path only re-fetches if
+    /// that fix lands somewhere different.
+    @MainActor
+    func refreshPasses() async {
+        print("🤖 [RADAR ENGINE]: refreshPasses() triggered by pull-to-refresh.")
+        lastQueriedLocationVector = ""
+        let savedLat = UserDefaults.standard.string(forKey: "cached_latitude") ?? ""
+        let savedLng = UserDefaults.standard.string(forKey: "cached_longitude") ?? ""
+        let coords = lastRequestedCoordinates ?? ((!savedLat.isEmpty && !savedLng.isEmpty) ? (lat: savedLat, lng: savedLng) : nil)
+
+        guard let coords else {
+            // Nothing to re-fetch yet -- fall back to the normal first-time path.
+            requestPasses()
+            return
+        }
+
+        requiresManualSelection = false
+        await fetchPasses(latitude: coords.lat, longitude: coords.lng)
+
+        let status = locationManager.authorizationStatus
+        if status == .authorizedWhenInUse || status == .authorizedAlways {
+            locationManager.startUpdatingLocation()
+        }
+    }
+
     func selectCityCoordinates(lat: String, lng: String) {
         print("🤖 [RADAR ENGINE]: Manual coordinates received vector: \(lat), \(lng)")
         lastQueriedLocationVector = ""
@@ -276,6 +310,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
         
         lastQueriedLocationVector = locationKey
+        lastRequestedCoordinates = (lat: latitude, lng: longitude)
         isTracking = true
         errorMessage = nil
         
@@ -315,6 +350,7 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
             let decoded = try JSONDecoder().decode(SatelliteResponse.self, from: data)
             print("✅ [RADAR ENGINE]: Successful pipeline synchronization. Loaded \(decoded.passes.count) visual pass records.")
             self.visiblePasses = decoded.passes
+            self.hasLoadedPasses = true
             self.isTracking = false
             
         } catch {

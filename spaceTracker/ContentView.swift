@@ -942,13 +942,40 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } else if satViewModel.visiblePasses.isEmpty && satViewModel.hasLoadedPasses {
+                // FEAT-31: the fetch worked and there just aren't any visible passes right
+                // now -- that's normal, so show it as information, not as something to retry.
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "eye.slash")
+                        .foregroundColor(.gray)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("NOTHING OVERHEAD SOON")
+                            .font(.system(.subheadline, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white.opacity(0.8))
+                        Text("No visible passes in the next 2 days. Pull down to check again.")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.gray)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.03))
+                .border(Color.white.opacity(0.1), width: 1)
+                .padding(.horizontal)
+                .accessibilityElement(children: .combine)
             } else if satViewModel.visiblePasses.isEmpty {
+                // FEAT-31: no successful fetch yet (was "INITIALIZE BACKYARD RADAR").
                 Button(action: { satViewModel.requestPasses() }) {
                     HStack {
-                        Text("INITIALIZE BACKYARD RADAR")
+                        Text("FIND PASSES NEAR ME")
                             .font(.system(.subheadline, design: .monospaced))
                             .fontWeight(.bold)
                             .foregroundColor(.cyan)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                         Spacer()
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .foregroundColor(.cyan)
@@ -1331,6 +1358,77 @@ struct ContentView: View {
         await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
     }
 
+    /// FEAT-31: shared Home Command load sequence, reused by the startup .task and by
+    /// pull-to-refresh (same pattern as FEAT-22's refreshStargazerTelemetry()). On the
+    /// initial load it keeps the original behavior exactly; on a refresh it force-refetches
+    /// satellite passes, skips the once-a-day APOD backdrop, and also refreshes the
+    /// planets/moon telemetry the sky map card on this tab reads from.
+    private func refreshHomeCommandData(isInitialLoad: Bool) async {
+        await viewModel.fetchLaunches()
+        if isInitialLoad {
+            satViewModel.requestPasses()
+        } else {
+            await satViewModel.refreshPasses()
+        }
+        await rockViewModel.fetchAsteroidRadar()
+        if isInitialLoad {
+            await apodViewModel.fetchDailyBackdrop()
+        }
+
+        // Process dynamic hardware location parameters for meteor streams
+        let resolvedCoordinate = await locationProvider.currentLocation()
+        let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+        let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+        if resolvedCoordinate == nil {
+            print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
+        }
+        // 💡 BUG FIX: universalLatitude/Longitude previously only ever moved when the
+        // user ran a manual city search, so every location-aware view silently read
+        // the Madison, WI default even after a real GPS fix came back. Sync it here
+        // so it reflects the actual resolved (or fallback) coordinate app-wide.
+        universalLatitude = hardwareLat
+        universalLongitude = hardwareLng
+        meteorViewModel.generateOutlook(userLatitude: hardwareLat)
+
+        // 💡 INJECTED PRE-FETCH: Pulls current weather data using a clean ISO8601 date string
+        let currentISOString = ISO8601DateFormatter().string(from: Date())
+        await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
+        await weatherViewModel.fetchGeomagneticRadar()
+        await weatherViewModel.fetchMoonData(lat: hardwareLat, lng: hardwareLng)
+
+        // Both cloud/humidity (fetchStargazingWeather) and moon brightness
+        // (fetchMoonData) are in now, so the composite score can be computed.
+        weatherViewModel.updateObservationIndex()
+
+        // Real 7-day outlook, replacing the old fixed "EXCELLENT" stub.
+        stargazerViewModel.stargazerState.forecastWeek = await weatherViewModel.fetchWeekAheadOutlook(lat: hardwareLat, lng: hardwareLng)
+
+        if !isInitialLoad {
+            await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
+        }
+
+        // THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
+        notificationEngine.scheduleDailyBriefing(
+            launches: viewModel.launches,
+            satellites: satViewModel.visiblePasses,
+            meteorShowers: meteorViewModel.upcomingShowers
+        )
+
+        // Per-event alerts (FEAT-01): launch T-minus, pass-about-to-start, and
+        // meteor shower peak alerts, on top of the daily digest above.
+        notificationEngine.scheduleEventAlerts(
+            launches: viewModel.launches,
+            satellites: satViewModel.visiblePasses,
+            meteorShowers: meteorViewModel.upcomingShowers
+        )
+
+        // FEAT-04/FEAT-05: publish the "what's next" snapshot for the Home/Lock
+        // Screen widget, and start/update/end a Live Activity if a launch or pass
+        // is currently inside its final window. Same already-fetched arrays as
+        // above -- no separate fetch of its own.
+        LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
+    }
+
     var body: some View {
         TabView {
             // ==============================================================================
@@ -1505,6 +1603,11 @@ struct ContentView: View {
                             .padding(.top, 24)
                             .padding(.bottom, 60) // Safe scrolling buffer space so the lower content clears the hardware device bezels cleanly
                         } // Closes ScrollView
+                        // FEAT-31: pull-to-refresh for Home Command (same pattern as FEAT-22 on
+                        // Star Gazers) -- re-runs the shared load sequence with a forced pass refetch.
+                        .refreshable {
+                            await refreshHomeCommandData(isInitialLoad: false)
+                        }
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .principal) {
@@ -1604,60 +1707,9 @@ struct ContentView: View {
                         // 1. Request local device alert permissions immediately on workspace load
                         notificationEngine.requestPermission()
                         
-                        // 2. Fire down all background API web asset streams
-                        await viewModel.fetchLaunches()
-                        satViewModel.requestPasses()
-                        await rockViewModel.fetchAsteroidRadar()
-                        await apodViewModel.fetchDailyBackdrop()
-                        
-                        // 3. Process dynamic hardware location parameters for meteor streams
-                        let resolvedCoordinate = await locationProvider.currentLocation()
-                        let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
-                        let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
-                        if resolvedCoordinate == nil {
-                            print("⚠️ [LOCATION]: No authorized fix available — using fallback coordinate (Madison, WI).")
-                        }
-                        // 💡 BUG FIX: universalLatitude/Longitude previously only ever moved when the
-                        // user ran a manual city search, so every location-aware view silently read
-                        // the Madison, WI default even after a real GPS fix came back. Sync it here
-                        // so it reflects the actual resolved (or fallback) coordinate app-wide.
-                        universalLatitude = hardwareLat
-                        universalLongitude = hardwareLng
-                        meteorViewModel.generateOutlook(userLatitude: hardwareLat)
-                        
-                        // 💡 INJECTED PRE-FETCH INTO STEP 3: Pulls current weather data using a clean ISO8601 date string
-                        let currentISOString = ISO8601DateFormatter().string(from: Date())
-                        await weatherViewModel.fetchStargazingWeather(lat: hardwareLat, lng: hardwareLng, targetISO8601Date: currentISOString)
-                        await weatherViewModel.fetchGeomagneticRadar()
-                        await weatherViewModel.fetchMoonData(lat: hardwareLat, lng: hardwareLng)
-                        
-                        // Both cloud/humidity (fetchStargazingWeather) and moon brightness
-                        // (fetchMoonData) are in now, so the composite score can be computed.
-                        weatherViewModel.updateObservationIndex()
-                        
-                        // Real 7-day outlook, replacing the old fixed "EXCELLENT" stub.
-                        stargazerViewModel.stargazerState.forecastWeek = await weatherViewModel.fetchWeekAheadOutlook(lat: hardwareLat, lng: hardwareLng)
-                        
-                        // 4. THE ALERT INTEGRATION: Compile today's targets and arm the 08:00 AM local alarm block
-                        notificationEngine.scheduleDailyBriefing(
-                            launches: viewModel.launches,
-                            satellites: satViewModel.visiblePasses,
-                            meteorShowers: meteorViewModel.upcomingShowers
-                        )
-                        
-                        // 5. Per-event alerts (FEAT-01): launch T-minus, pass-about-to-start, and
-                        // meteor shower peak alerts, on top of the daily digest above.
-                        notificationEngine.scheduleEventAlerts(
-                            launches: viewModel.launches,
-                            satellites: satViewModel.visiblePasses,
-                            meteorShowers: meteorViewModel.upcomingShowers
-                        )
-                        
-                        // 6. FEAT-04/FEAT-05: publish the "what's next" snapshot for the Home/Lock
-                        // Screen widget, and start/update/end a Live Activity if a launch or pass
-                        // is currently inside its final window. Same already-fetched arrays as
-                        // step 5 above -- no separate fetch of its own.
-                        LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
+                        // 2. FEAT-31: everything else now lives in refreshHomeCommandData(),
+                        // shared with pull-to-refresh below. Same steps, same order as before.
+                        await refreshHomeCommandData(isInitialLoad: true)
                     }
                     // satViewModel.requestPasses() above resolves asynchronously (it waits on a
                     // CLLocationManager delegate callback), so visiblePasses is very often still
