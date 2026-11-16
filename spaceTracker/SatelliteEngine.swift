@@ -33,6 +33,21 @@ nonisolated struct SatellitePass: Codable, Identifiable {
     var id_swiftui: String {
         return "\(id)-\(utcTimeISO)"
     }
+
+    // BUG-11: when this pass is over (start time + its duration). nil if the time string
+    // can't be read, in which case the pass is kept rather than hidden.
+    var endDate: Date? {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        guard let start = withFraction.date(from: utcTimeISO) ?? plain.date(from: utcTimeISO) else { return nil }
+        return start.addingTimeInterval(TimeInterval(durationMinutes * 60))
+    }
+
+    var hasEnded: Bool {
+        guard let endDate else { return false }
+        return endDate < Date()
+    }
     
     var localDisplayTime: String {
         let formatter = ISO8601DateFormatter()
@@ -277,8 +292,28 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
     // MARK: - CoreLocation Error Stream Callback
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("❌ [RADAR ENGINE]: CoreLocation Hardware Error stream: \(error.localizedDescription)")
-        manager.stopUpdatingLocation()
         Task { @MainActor in
+            // GPS fix failed, but if we already know a location (last fetch or the saved
+            // cache), keep using it quietly instead of showing an error and the city search.
+            let savedLat = UserDefaults.standard.string(forKey: "cached_latitude") ?? ""
+            let savedLng = UserDefaults.standard.string(forKey: "cached_longitude") ?? ""
+            let knownCoords = self.lastRequestedCoordinates ?? ((!savedLat.isEmpty && !savedLng.isEmpty) ? (lat: savedLat, lng: savedLng) : nil)
+            if let knownCoords {
+                manager.stopUpdatingLocation()
+                print("📡 [RADAR ENGINE]: GPS fix failed -- falling back to last known location.")
+                if self.visiblePasses.isEmpty {
+                    await self.fetchPasses(latitude: knownCoords.lat, longitude: knownCoords.lng)
+                }
+                return
+            }
+            // kCLErrorLocationUnknown (error 0) is temporary: Core Location keeps trying on
+            // its own. Don't give up on the first one -- keep waiting for a fix; the 4-second
+            // safety timeout in requestPasses() still switches to the city search if none comes.
+            if (error as? CLError)?.code == .locationUnknown {
+                print("⏳ [RADAR ENGINE]: No fix yet (location unknown) -- still waiting.")
+                return
+            }
+            manager.stopUpdatingLocation()
             if self.visiblePasses.isEmpty {
                 self.isTracking = false
                 self.requiresManualSelection = true
@@ -352,6 +387,10 @@ class SatelliteViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
             self.visiblePasses = decoded.passes
             self.hasLoadedPasses = true
             self.isTracking = false
+            // A GPS error or the 4-second timeout can land while this fetch is still in
+            // flight; once real passes are in, clear that so the list actually shows.
+            self.requiresManualSelection = false
+            self.errorMessage = nil
             
         } catch {
             print("❌ [RADAR ENGINE]: Data processing conversion exception thrown: \(error)")

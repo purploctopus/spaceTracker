@@ -91,7 +91,18 @@ struct CelestialTargetRowView: View {
             Spacer()
             
             // 💡 DYNAMIC STATUS LABELS: Instantly toggles based on local astronomical visibility
-            if shouldObscure(planet.name) {
+            // BUG-10: anything below the horizon can't be seen at all, so it gets its own
+            // label instead of a naked-eye/binoculars one.
+            if planet.altitude < 0 {
+                Text("BELOW HORIZON")
+                    .font(.system(.caption2, design: .monospaced))
+                    .fontWeight(.bold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.gray.opacity(0.15))
+                    .foregroundColor(.gray)
+                    .cornerRadius(4)
+            } else if shouldObscure(planet.name) {
                 Text("DAYLIGHT OBSCURED")
                     .font(.system(.caption2, design: .monospaced))
                     .fontWeight(.bold)

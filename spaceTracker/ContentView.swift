@@ -267,6 +267,11 @@ struct ContentView: View {
     // True only while a tap on "open sky map" is waiting on ensureTelemetryLoaded --
     // see that function's doc comment for the bug this closes.
     @State private var isPreparingSkyMap: Bool = false
+    // BUG-12: when Home Command last finished a full load, so coming back to the foreground
+    // can re-load if it's been 5+ minutes; plus a flag so two loads never overlap.
+    @State private var lastHomeCommandRefresh: Date? = nil
+    @State private var isRefreshingHomeCommand: Bool = false
+    @Environment(\.scenePhase) private var scenePhase
     
     @StateObject private var connectivityMonitor = SystemConnectivityMonitor()
     @StateObject private var locationProvider = DeviceLocationProvider()
@@ -878,6 +883,11 @@ struct ContentView: View {
         }
     }
 
+    // BUG-11: passes that have already finished drop off the list.
+    private var upcomingPasses: [SatellitePass] {
+        satViewModel.visiblePasses.filter { !$0.hasEnded }
+    }
+
     // Safely unloads complex view logic from the main layout tree
     private var visibleSatellitesChannelBlock: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -942,7 +952,7 @@ struct ContentView: View {
                     .padding(.horizontal)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            } else if satViewModel.visiblePasses.isEmpty && satViewModel.hasLoadedPasses {
+            } else if upcomingPasses.isEmpty && satViewModel.hasLoadedPasses {
                 // FEAT-31: the fetch worked and there just aren't any visible passes right
                 // now -- that's normal, so show it as information, not as something to retry.
                 HStack(alignment: .top, spacing: 12) {
@@ -966,7 +976,7 @@ struct ContentView: View {
                 .border(Color.white.opacity(0.1), width: 1)
                 .padding(.horizontal)
                 .accessibilityElement(children: .combine)
-            } else if satViewModel.visiblePasses.isEmpty {
+            } else if upcomingPasses.isEmpty {
                 // FEAT-31: no successful fetch yet (was "INITIALIZE BACKYARD RADAR").
                 Button(action: { satViewModel.requestPasses() }) {
                     HStack {
@@ -989,7 +999,7 @@ struct ContentView: View {
                 // 💡 FIXED: Completely cleaned up and type-safe layout points exclusively to your satellite array dataset
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(satViewModel.visiblePasses, id: \.id_swiftui) { (sat: SatellitePass) in
+                        ForEach(upcomingPasses, id: \.id_swiftui) { (sat: SatellitePass) in
                             SatelliteCardView(sat: sat, location: satViewModel.locationName)
                                 .onTapGesture {
                                     let action = { selectedSatellitePass = sat }
@@ -1364,6 +1374,13 @@ struct ContentView: View {
     /// satellite passes, skips the once-a-day APOD backdrop, and also refreshes the
     /// planets/moon telemetry the sky map card on this tab reads from.
     private func refreshHomeCommandData(isInitialLoad: Bool) async {
+        guard !isRefreshingHomeCommand else { return }
+        isRefreshingHomeCommand = true
+        defer {
+            isRefreshingHomeCommand = false
+            lastHomeCommandRefresh = Date()
+        }
+
         await viewModel.fetchLaunches()
         if isInitialLoad {
             satViewModel.requestPasses()
@@ -1923,6 +1940,18 @@ struct ContentView: View {
         // 🔬 Tested again 2026-09-15 (round 8) as a theory for the iPhone header gap --
         // ruled out, gap was unchanged with .automatic. Confirmed back to .sidebarAdaptable.
         .tabViewStyle(.sidebarAdaptable)
+        // BUG-12: re-load time-sensitive data (passes, weather, moon/planet positions) when
+        // the app comes back to the foreground, if the last load is 5+ minutes old. Lives on
+        // the TabView so it works no matter which tab is open. Skipped until the first
+        // launch load has finished (lastHomeCommandRefresh is nil until then).
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active,
+                  let last = lastHomeCommandRefresh,
+                  Date().timeIntervalSince(last) >= 5 * 60 else { return }
+            Task {
+                await refreshHomeCommandData(isInitialLoad: false)
+            }
+        }
         // 🪐 FULL SCREEN LENS VIEWFINDER MODAL POPUP LAYER COVERAGE
         .fullScreenCover(isPresented: $showLiveViewfinderOverlay) {
             // 💡 THE TRUE DATA FEED: Passes your real live downloaded planets list array down into the finder lookups!
