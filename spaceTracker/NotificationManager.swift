@@ -33,6 +33,16 @@ class NotificationManager: ObservableObject {
     @Published var passLeadMinutes: Int {
         didSet { UserDefaults.standard.set(passLeadMinutes, forKey: Keys.passLeadMinutes) }
     }
+    // FEAT-33: "clear skies tonight" alert. Turning it off also cancels one already scheduled.
+    @Published var clearSkiesAlertsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(clearSkiesAlertsEnabled, forKey: Keys.clearSkiesAlertsEnabled)
+            if !clearSkiesAlertsEnabled {
+                UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.clearSkiesIdentifier])
+                forgetUnfiredClearSkiesAlert()
+            }
+        }
+    }
 
     // MARK: - Quiet hours
     // Best practice for local alerts: don't wake someone up for a launch or pass at 3 AM.
@@ -59,7 +69,13 @@ class NotificationManager: ObservableObject {
         static let quietHoursEnabled = "notif_quietHoursEnabled"
         static let quietHoursStartHour = "notif_quietHoursStartHour"
         static let quietHoursEndHour = "notif_quietHoursEndHour"
+        static let clearSkiesAlertsEnabled = "notif_clearSkiesAlertsEnabled"
+        static let lastClearSkiesFireDate = "notif_lastClearSkiesFireDate"
     }
+
+    private static let clearSkiesIdentifier = "clear-skies-tonight"
+    // At most one clear-skies alert every 3 days, so it never turns into a second daily briefing.
+    private let clearSkiesMinimumGap: TimeInterval = 3 * 24 * 60 * 60
 
     // iOS caps an app at 64 pending local notifications system-wide, shared across every
     // category below plus the daily briefing. These per-run limits keep total scheduling
@@ -78,6 +94,7 @@ class NotificationManager: ObservableObject {
         self.dailyBriefingEnabled = defaults.object(forKey: Keys.dailyBriefingEnabled) as? Bool ?? true
         self.launchLeadMinutes = defaults.object(forKey: Keys.launchLeadMinutes) as? Int ?? 15
         self.passLeadMinutes = defaults.object(forKey: Keys.passLeadMinutes) as? Int ?? 5
+        self.clearSkiesAlertsEnabled = defaults.object(forKey: Keys.clearSkiesAlertsEnabled) as? Bool ?? true
         // Default window: 10 PM-8 AM local time, on by default so new installs don't get
         // buzzed overnight without asking; easy to switch off entirely in Settings.
         self.quietHoursEnabled = defaults.object(forKey: Keys.quietHoursEnabled) as? Bool ?? true
@@ -318,6 +335,54 @@ class NotificationManager: ObservableObject {
                     self.scheduleOneTime(identifier: "meteor-\(shower.name)-\(shower.peakDateStr)", content: content, fireDate: fireDate, center: center)
                 }
             }
+        }
+    }
+
+    /// FEAT-33: schedules a "clear skies tonight" alert at today's sunset, but only when
+    /// tonight's forecast grade is the top one (EXCELLENT), and at most once every 3 days.
+    /// Safe to call on every refresh: it replaces its own pending alert each time, so a
+    /// forecast that drops below EXCELLENT later in the day cancels it.
+    func scheduleClearSkiesAlert(forecast: [StargazeForecastDay]) {
+        // A failed forecast fetch comes back empty -- keep whatever is already scheduled.
+        guard !forecast.isEmpty else { return }
+
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.clearSkiesIdentifier])
+        // The alert just removed (if any) hadn't fired yet, so it shouldn't count toward
+        // the 3-day limit.
+        forgetUnfiredClearSkiesAlert()
+
+        guard clearSkiesAlertsEnabled else { return }
+        guard let tonight = forecast.first(where: { day in
+            guard let sunset = day.sunset else { return false }
+            return Calendar.current.isDateInToday(sunset)
+        }),
+              tonight.conditionGrade == "EXCELLENT",
+              let fireDate = tonight.sunset,
+              fireDate > Date() else { return }
+        guard !isWithinQuietHours(fireDate) else { return }
+
+        let defaults = UserDefaults.standard
+        if let lastFire = defaults.object(forKey: Keys.lastClearSkiesFireDate) as? Date,
+           fireDate.timeIntervalSince(lastFire) < clearSkiesMinimumGap {
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "🌌 CLEAR SKIES TONIGHT"
+        content.subtitle = "TOP STARGAZING CONDITIONS"
+        content.body = "Clear skies are forecast near you tonight. Head out once it gets dark."
+        content.sound = .default
+        scheduleOneTime(identifier: Self.clearSkiesIdentifier, content: content, fireDate: fireDate, center: center)
+        defaults.set(fireDate, forKey: Keys.lastClearSkiesFireDate)
+    }
+
+    /// Clears the stored clear-skies fire date if that alert is still in the future (never
+    /// fired), so cancelling or replacing it doesn't block the next 3 days.
+    private func forgetUnfiredClearSkiesAlert() {
+        let defaults = UserDefaults.standard
+        if let lastFire = defaults.object(forKey: Keys.lastClearSkiesFireDate) as? Date, lastFire > Date() {
+            defaults.removeObject(forKey: Keys.lastClearSkiesFireDate)
         }
     }
 

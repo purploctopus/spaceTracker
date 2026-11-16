@@ -67,6 +67,14 @@ struct SettingsView: View {
                             subtitle: "Alert the evening a shower peaks",
                             isOn: $notificationEngine.meteorAlertsEnabled
                         )
+                        Divider().background(Color.white.opacity(0.08))
+
+                        toggleRow(
+                            icon: "moon.stars.fill",
+                            title: "CLEAR SKIES ALERTS",
+                            subtitle: "Alert at sunset on great nights",
+                            isOn: $notificationEngine.clearSkiesAlertsEnabled
+                        )
                     }
                     .background(Color(red: 0.06, green: 0.06, blue: 0.06))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))

@@ -190,7 +190,7 @@ class StargazingWeatherViewModel: ObservableObject {
                 let illumination = illuminationEstimate(for: day.moon.phase)
                 let grade = combinedNightGrade(condition: day.condition, moonIllumination: illumination)
                 let commentary = "MOONLIGHT: \(Int(illumination * 100))% (\(day.moon.phase.description.uppercased()))"
-                return StargazeForecastDay(dayLabel: dayLabel, conditionGrade: grade, commentary: commentary)
+                return StargazeForecastDay(dayLabel: dayLabel, conditionGrade: grade, commentary: commentary, sunset: day.sun.sunset)
             }
             
             print("✅ [WEATHERKIT]: 7-day outlook built (\(outlook.count) days).")

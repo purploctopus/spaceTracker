@@ -1420,6 +1420,9 @@ struct ContentView: View {
         // Real 7-day outlook, replacing the old fixed "EXCELLENT" stub.
         stargazerViewModel.stargazerState.forecastWeek = await weatherViewModel.fetchWeekAheadOutlook(lat: hardwareLat, lng: hardwareLng)
 
+        // FEAT-33: sunset alert on top-rated stargazing nights (max once every 3 days).
+        notificationEngine.scheduleClearSkiesAlert(forecast: stargazerViewModel.stargazerState.forecastWeek)
+
         if !isInitialLoad {
             await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
         }

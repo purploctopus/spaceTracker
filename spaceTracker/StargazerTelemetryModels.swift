@@ -38,6 +38,8 @@ struct StargazeForecastDay: Identifiable, Equatable {
     let dayLabel: String
     let conditionGrade: String
     let commentary: String
+    // FEAT-33: that day's sunset, so the clear-skies alert can fire around sunset.
+    var sunset: Date? = nil
 }
 
 // MARK: - 🔌 CORE INTERFACE STATES (100% Intact)
