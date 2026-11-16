@@ -132,6 +132,33 @@ struct SettingsView: View {
                     // second, independent copy alongside the one on Home Command's field
                     // briefing bar (see BUG-05), since this screen is presented as its own
                     // .sheet, outside whatever's causing that one to be unreliable on iPad.
+                    sectionHeader("HELP")
+                    Button(action: { OnboardingStore.shared.replayTips() }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.cyan)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("SHOW TIPS AGAIN")
+                                    .font(.system(.footnote, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                Text("Each tab shows its quick tip next time you open it")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(.gray)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 8)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .background(Color(red: 0.06, green: 0.06, blue: 0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .cornerRadius(8)
+
                     sectionHeader("LEGAL")
                     Link(destination: URL(string: "https://weather-data.apple.com/legal-attribution.html")!) {
                         HStack(spacing: 12) {
@@ -252,9 +279,9 @@ struct SettingsView: View {
 
             if !notificationEngine.isAuthorized {
                 Button(action: {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
+                    // Onboarding: notifications are no longer asked on launch, so someone may
+                    // never have been asked -- prompt first, else open iOS Settings.
+                    notificationEngine.requestPermissionOrOpenSettings()
                 }) {
                     Text("ENABLE")
                         .font(.system(.caption, design: .monospaced))

@@ -263,6 +263,8 @@ struct ContentView: View {
     @StateObject private var newsViewModel = SpaceNewsViewModel()
     @State private var selectedArticle: SpaceNewsArticle? = nil
     @StateObject private var stargazerViewModel = StargazerViewModel()
+    // Onboarding: first-launch welcome card + one-time tab tips.
+    @ObservedObject private var onboarding = OnboardingStore.shared
     @State private var showLiveViewfinderOverlay: Bool = false
     // True only while a tap on "open sky map" is waiting on ensureTelemetryLoaded --
     // see that function's doc comment for the bug this closes.
@@ -1462,6 +1464,79 @@ struct ContentView: View {
         LiveActivityCoordinator.shared.sync(launches: viewModel.launches, satellites: satViewModel.visiblePasses)
     }
 
+    /// Onboarding: the single best "tonight" highlight for the welcome card -- next visible
+    /// pass in the next 24 hours (ISS first, else the highest one), else a planet or the Moon
+    /// up right now (only with a real location fix), else the next launch. nil while loading.
+    private var welcomeHighlight: WelcomeHighlight? {
+        let now = Date()
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mm a"
+
+        let soonPasses = satViewModel.visiblePasses.filter { pass in
+            guard let start = pass.startDate, let end = pass.endDate else { return false }
+            return end > now && start < now.addingTimeInterval(24 * 60 * 60)
+        }
+        let nextISS = soonPasses
+            .filter { SightingsStore.satelliteIndexKey(for: $0.name) == "ISS" }
+            .min { ($0.startDate ?? .distantFuture) < ($1.startDate ?? .distantFuture) }
+        if let pass = nextISS ?? soonPasses.max(by: { $0.peakElevationDegrees < $1.peakElevationDegrees }),
+           let start = pass.startDate {
+            let when = start <= now ? "RIGHT NOW" : "AT \(timeFormatter.string(from: start))"
+            return WelcomeHighlight(
+                icon: "scope",
+                title: "\(pass.name.uppercased()) PASSES OVER YOU \(when)",
+                detail: "\(Int(pass.peakElevationDegrees))° HIGH · \(pass.durationMinutes) MIN · \(pass.travelDirection.uppercased())"
+            )
+        }
+
+        if !locationProvider.isUsingFallbackLocation {
+            let hour = Calendar.current.component(.hour, from: now)
+            let isDaytime = hour >= 6 && hour < 19
+            let upNow = stargazerViewModel.stargazerState.liveVisibleTargets.filter { target in
+                (target.classification == "PLANET" || target.classification == "MOON")
+                    && target.altitude > 10
+                    && (!isDaytime || target.classification == "MOON")
+            }
+            if let target = upNow.min(by: { ($0.magnitude ?? 99) < ($1.magnitude ?? 99) }) {
+                return WelcomeHighlight(
+                    icon: "moon.stars.fill",
+                    title: "\(target.name.uppercased()) IS UP RIGHT NOW",
+                    detail: "LOOK \(WelcomeSheet.compassWord(target.azimuth)), \(Int(target.altitude))° ABOVE THE HORIZON"
+                )
+            }
+        }
+
+        let nextLaunch = viewModel.launches
+            .compactMap { launch -> (SpaceLaunch, Date)? in
+                guard let date = SightingsStore.parseISO(launch.net), date > now else { return nil }
+                return (launch, date)
+            }
+            .min { $0.1 < $1.1 }
+        if let launch = nextLaunch?.0 {
+            return WelcomeHighlight(
+                icon: "flame.fill",
+                title: "NEXT LAUNCH: \(launch.name.uppercased())",
+                detail: launch.localLaunchTimeDisplay.uppercased()
+            )
+        }
+        return nil
+    }
+
+    /// Onboarding: same open-the-sky-map logic as the Home Command / Star Gazers cards.
+    private func openSkyMapFromWelcome() {
+        Task {
+            if !stargazerViewModel.stargazerState.isDataLoaded {
+                isPreparingSkyMap = true
+                let resolvedCoordinate = await locationProvider.currentLocation()
+                let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
+                let hardwareLng = resolvedCoordinate?.longitude ?? -89.4012
+                await stargazerViewModel.ensureTelemetryLoaded(latitude: hardwareLat, longitude: hardwareLng)
+                isPreparingSkyMap = false
+            }
+            showLiveViewfinderOverlay = true
+        }
+    }
+
     var body: some View {
         TabView {
             // ==============================================================================
@@ -1482,8 +1557,10 @@ struct ContentView: View {
                         // regardless of which tab or shortcut the user touches first. Guarded
                         // by isDataLoaded so whichever tab's .task runs first does the real
                         // fetch and the other just skips redundant work.
-                            .task {
-                                guard !stargazerViewModel.stargazerState.isDataLoaded else { return }
+                            .task(id: onboarding.allowStartupLoad) {
+                                // Onboarding: wait for the welcome card's SHOW ME on new installs.
+                                guard onboarding.allowStartupLoad,
+                                      !stargazerViewModel.stargazerState.isDataLoaded else { return }
                                 
                                 let resolvedCoordinate = await locationProvider.currentLocation()
                                 let hardwareLat = resolvedCoordinate?.latitude ?? 43.0731
@@ -1641,6 +1718,10 @@ struct ContentView: View {
                         .refreshable {
                             await refreshHomeCommandData(isInitialLoad: false)
                         }
+                        // Onboarding: one-time tip at the top of the tab.
+                        .safeAreaInset(edge: .top) {
+                            TabTipBanner(tab: .home)
+                        }
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .principal) {
@@ -1736,12 +1817,18 @@ struct ContentView: View {
                         UINavigationBar.appearance().compactAppearance = navigationBarAppearance
                         UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
                     }
-                    .task {
-                        // 1. Request local device alert permissions immediately on workspace load
-                        notificationEngine.requestPermission()
-                        
-                        // 2. FEAT-31: everything else now lives in refreshHomeCommandData(),
-                        // shared with pull-to-refresh below. Same steps, same order as before.
+                    .task(id: onboarding.allowStartupLoad) {
+                        // Onboarding: notification permission is no longer asked on launch --
+                        // it's asked the first time someone stars something or taps I SAW IT
+                        // (NotificationManager.requestPermissionIfUndecided). On a brand-new
+                        // install the location-based load waits for the welcome card's SHOW ME,
+                        // so the location prompt comes with context; launches load right away.
+                        guard onboarding.allowStartupLoad else {
+                            await viewModel.fetchLaunches()
+                            return
+                        }
+                        // FEAT-31: everything lives in refreshHomeCommandData(), shared with
+                        // pull-to-refresh below. Same steps, same order as before.
                         await refreshHomeCommandData(isInitialLoad: true)
                     }
                     // satViewModel.requestPasses() above resolves asynchronously (it waits on a
@@ -1871,6 +1958,9 @@ struct ContentView: View {
                     // Same persistent "go ad-free" entry point as Home Command -- previously
                     // this tab had no toolbar of its own at all, so the button only ever
                     // appeared when Home Command happened to be the active tab.
+                    .safeAreaInset(edge: .top) {
+                        TabTipBanner(tab: .starGazers)
+                    }
                     .navigationTitle("STAR GAZE")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -1898,6 +1988,9 @@ struct ContentView: View {
                         userLatitude: universalLatitude,
                         userLongitude: universalLongitude
                     )
+                    .safeAreaInset(edge: .top) {
+                        TabTipBanner(tab: .earthWatch)
+                    }
                     .navigationTitle("EARTH WATCH")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -1928,6 +2021,9 @@ struct ContentView: View {
                     .padding(.top, 24)
                     .padding(.bottom, 60)
                 }
+                .safeAreaInset(edge: .top) {
+                    TabTipBanner(tab: .news)
+                }
                 .navigationTitle("SPACE NEWS")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -1956,6 +2052,24 @@ struct ContentView: View {
         // 🔬 Tested again 2026-09-15 (round 8) as a theory for the iPhone header gap --
         // ruled out, gap was unchanged with .automatic. Confirmed back to .sidebarAdaptable.
         .tabViewStyle(.sidebarAdaptable)
+        // Onboarding: first-launch welcome card (new installs only), as a bottom half-sheet
+        // so it stays out of the middle of the screen.
+        .sheet(isPresented: $onboarding.showWelcome, onDismiss: { onboarding.finishWelcome() }) {
+            WelcomeSheet(
+                highlight: welcomeHighlight,
+                hasStartedScan: onboarding.allowStartupLoad,
+                onShowMe: { onboarding.allowStartupLoad = true },
+                onSkyMap: {
+                    onboarding.showWelcome = false
+                    // Let the sheet finish closing before the full-screen sky map opens.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        openSkyMapFromWelcome()
+                    }
+                },
+                onLookAround: { onboarding.showWelcome = false }
+            )
+            .presentationDetents([.medium])
+        }
         // BUG-12: re-load time-sensitive data (passes, weather, moon/planet positions) when
         // the app comes back to the foreground, if the last load is 5+ minutes old. Lives on
         // the TabView so it works no matter which tab is open. Skipped until the first

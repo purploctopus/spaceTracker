@@ -40,16 +40,16 @@ final class FavoritesStore: ObservableObject {
 
     func isProviderFavorite(_ name: String) -> Bool { favoriteProviders.contains(name) }
     func toggleProvider(_ name: String) {
-        if favoriteProviders.contains(name) { favoriteProviders.remove(name) } else { favoriteProviders.insert(name) }
+        if favoriteProviders.contains(name) { favoriteProviders.remove(name) } else { favoriteProviders.insert(name); NotificationManager.requestPermissionIfUndecided() }
     }
 
     func isSatelliteFavorite(_ id: String) -> Bool { favoriteSatellites.contains(id) }
     func toggleSatellite(_ id: String) {
-        if favoriteSatellites.contains(id) { favoriteSatellites.remove(id) } else { favoriteSatellites.insert(id) }
+        if favoriteSatellites.contains(id) { favoriteSatellites.remove(id) } else { favoriteSatellites.insert(id); NotificationManager.requestPermissionIfUndecided() }
     }
 
     func isAsteroidFavorite(_ id: String) -> Bool { favoriteAsteroids.contains(id) }
     func toggleAsteroid(_ id: String) {
-        if favoriteAsteroids.contains(id) { favoriteAsteroids.remove(id) } else { favoriteAsteroids.insert(id) }
+        if favoriteAsteroids.contains(id) { favoriteAsteroids.remove(id) } else { favoriteAsteroids.insert(id); NotificationManager.requestPermissionIfUndecided() }
     }
 }

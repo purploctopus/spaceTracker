@@ -22,6 +22,12 @@ struct spaceTrackerApp: App {
     // someone. The transition ad should only ever become eligible on a genuine
     // return-from-background, never on the literal moment the app opens.
     @State private var hasHadFirstActivation = false
+
+    init() {
+        // Onboarding: create the store before the first activation bumps timesRan, so it
+        // can tell a brand-new install (welcome card) from an update (tips only).
+        _ = OnboardingStore.shared
+    }
     
     var body: some Scene {
         WindowGroup {
@@ -60,7 +66,9 @@ struct spaceTrackerApp: App {
                     hasHadFirstActivation = true
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        if ATTrackingManager.trackingAuthorizationStatus == .notDetermined {
+                        // Onboarding: the tracking prompt waits until the 2nd launch, so a new
+                        // user's first seconds aren't a stack of permission pop-ups.
+                        if timesRan >= 2 && ATTrackingManager.trackingAuthorizationStatus == .notDetermined {
                             ATTrackingManager.requestTrackingAuthorization { status in
                                 switch status {
                                 case .authorized:

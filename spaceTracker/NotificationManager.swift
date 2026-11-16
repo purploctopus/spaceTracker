@@ -8,6 +8,7 @@
 import Foundation
 import UserNotifications
 import Combine
+import UIKit
 
 class NotificationManager: ObservableObject {
     @Published var isAuthorized = false
@@ -110,6 +111,32 @@ class NotificationManager: ObservableObject {
                     print("✅ [NOTIFICATIONS]: System permission authorized by user.")
                 } else {
                     print("❌ [NOTIFICATIONS]: System permission explicitly denied.")
+                }
+            }
+        }
+    }
+
+    /// Onboarding: asks for notification permission only if the user hasn't decided yet.
+    /// Called the first time someone stars something or logs a sighting, instead of on
+    /// app launch, so the prompt shows up when alerts actually mean something to them.
+    nonisolated static func requestPermissionIfUndecided() {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else { return }
+            center.requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
+        }
+    }
+
+    /// Settings' ENABLE button: shows the system prompt if the user was never asked (an app
+    /// that never asked doesn't appear under Notifications in iOS Settings), otherwise opens
+    /// iOS Settings so they can flip it on there.
+    func requestPermissionOrOpenSettings() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                if settings.authorizationStatus == .notDetermined {
+                    self.requestPermission()
+                } else if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
                 }
             }
         }

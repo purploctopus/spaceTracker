@@ -47,3 +47,6 @@ fastlane/test_output
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# --- Claude working files (never commit) ---
+Claude outputs/

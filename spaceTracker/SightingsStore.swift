@@ -101,6 +101,8 @@ final class SightingsStore: ObservableObject {
         } else {
             sightings.append(Sighting(id: UUID(), category: category, indexKey: indexKey,
                                       displayName: displayName, eventKey: eventKey, date: Date()))
+            // Onboarding: first natural moment to offer alerts.
+            NotificationManager.requestPermissionIfUndecided()
         }
     }
 
