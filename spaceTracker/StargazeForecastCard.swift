@@ -56,6 +56,7 @@ struct StargazeForecastCard: View {
 // ==============================================================================
 struct CelestialTargetRowView: View {
     let planet: APIPlanetItem
+    @ObservedObject private var sightings = SightingsStore.shared
     
     // 💡 THE BUG FIX: Check the exact hour integer on the phone clock directly.
     // True if the current local time sits inside active daytime brackets (6 AM to 7 PM).
@@ -90,6 +91,7 @@ struct CelestialTargetRowView: View {
             
             Spacer()
             
+            VStack(alignment: .trailing, spacing: 6) {
             // 💡 DYNAMIC STATUS LABELS: Instantly toggles based on local astronomical visibility
             // BUG-10: anything below the horizon can't be seen at all, so it gets its own
             // label instead of a naked-eye/binoculars one.
@@ -120,6 +122,13 @@ struct CelestialTargetRowView: View {
                     .background(planet.nakedEyeObject ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
                     .foregroundColor(planet.nakedEyeObject ? .green : .blue)
                     .cornerRadius(4)
+            }
+            // FEAT-32: only loggable while it's actually up and not washed out by daylight.
+            if planet.altitude > 0 && !shouldObscure(planet.name) {
+                SawItButton(isLogged: sightings.isLogged(eventKey: SightingsStore.planetEventKey(name: planet.name))) {
+                    sightings.togglePlanet(name: planet.name)
+                }
+            }
             }
         }
         .padding(.vertical, 10)

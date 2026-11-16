@@ -17,6 +17,7 @@ struct LaunchCardView: View {
     let onWatchTap: (String) -> Void
 
     @ObservedObject private var favorites = FavoritesStore.shared
+    @ObservedObject private var sightings = SightingsStore.shared
     
     // ✅ RESPONSIVE: Listens to the environment window layout size category
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
@@ -112,6 +113,16 @@ struct LaunchCardView: View {
             }
 
             HStack {
+                // FEAT-32: "watched" (stream or in person) from liftoff until the card
+                // drops off 48 hours later; counted by launch company in the index.
+                if SightingsStore.canLogLaunch(net: launch.net) {
+                    SawItButton(isLogged: sightings.isLogged(eventKey: "launch-\(launch.id)"), label: "WATCHED") {
+                        sightings.toggle(category: .launch,
+                                         indexKey: launch.launch_service_provider?.name ?? "UNKNOWN COMPANY",
+                                         displayName: launch.name,
+                                         eventKey: "launch-\(launch.id)")
+                    }
+                }
                 Spacer()
                 Text("❯")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))

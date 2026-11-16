@@ -267,6 +267,8 @@ struct ContentView: View {
     // True only while a tap on "open sky map" is waiting on ensureTelemetryLoaded --
     // see that function's doc comment for the bug this closes.
     @State private var isPreparingSkyMap: Bool = false
+    // FEAT-32: My Sightings index/log sheet (opened from the card on Star Gazers).
+    @State private var showSightingsSheet = false
     // BUG-12: when Home Command last finished a full load, so coming back to the foreground
     // can re-load if it's been 5+ minutes; plus a flag so two loads never overlap.
     @State private var lastHomeCommandRefresh: Date? = nil
@@ -603,6 +605,17 @@ struct ContentView: View {
                 .background(Color(.systemBackground))
                 .cornerRadius(12)
                 .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
+            }
+            
+            Divider().background(Color.cyan)
+            
+            // 📓 4. FEAT-32: MY SIGHTINGS -- weekly streak + sightings index/log
+            Button(action: { showSightingsSheet = true }) {
+                MySightingsCard()
+            }
+            .buttonStyle(PlainButtonStyle())
+            .sheet(isPresented: $showSightingsSheet) {
+                SightingsIndexSheet(passes: satViewModel.visiblePasses)
             }
         }
     }

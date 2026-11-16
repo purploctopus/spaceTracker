@@ -32,7 +32,8 @@ class MeteorShowerViewModel: ObservableObject {
     @Published var upcomingShowers: [MeteorShower] = []
     
     // Curated scientific baseline dataset of major stable annual meteor streams
-    private let annualMasterDatabase: [MeteorShower] = [
+    // FEAT-32: static so the sightings index can list every shower, not just upcoming ones.
+    static let annualMasterDatabase: [MeteorShower] = [
         MeteorShower(name: "Quadrantids", peakDateStr: "2026-01-03", peakZHR: 120, parentComet: "Asteroid 2003 EH1", optimalLatitude: 45.0),
         MeteorShower(name: "Lyrids", peakDateStr: "2026-04-22", peakZHR: 18, parentComet: "Comet Thatcher", optimalLatitude: 34.0),
         MeteorShower(name: "Eta Aquariids", peakDateStr: "2026-05-06", peakZHR: 50, parentComet: "Halley's Comet", optimalLatitude: -15.0),
@@ -51,7 +52,7 @@ class MeteorShowerViewModel: ObservableObject {
         let now = Date()
         
         // Filter out dates that have already passed, shifting matching targets forward into the rolling calendar year outlook
-        let adjustedShowers = annualMasterDatabase.map { shower -> MeteorShower in
+        let adjustedShowers = Self.annualMasterDatabase.map { shower -> MeteorShower in
             guard let peakDate = formatter.date(from: shower.peakDateStr) else { return shower }
             
             if peakDate < now {
@@ -92,6 +93,7 @@ struct MeteorShowerCardView: View {
     let shower: MeteorShower
     let userLatitude: Double
     let ratingEngine = MeteorShowerViewModel()
+    @ObservedObject private var sightings = SightingsStore.shared
     
     var body: some View {
         let rating = ratingEngine.checkObservingRating(shower: shower, userLatitude: userLatitude)
@@ -126,6 +128,12 @@ struct MeteorShowerCardView: View {
             }
 
             HStack {
+                // FEAT-32: loggable from 2 nights before the peak to 2 nights after.
+                if let eventKey = SightingsStore.meteorEventKey(name: shower.name, peakDateStr: shower.peakDateStr) {
+                    SawItButton(isLogged: sightings.isLogged(eventKey: eventKey)) {
+                        sightings.toggle(category: .meteorShower, indexKey: shower.name, displayName: shower.name, eventKey: eventKey)
+                    }
+                }
                 Spacer()
                 Text("❯")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))

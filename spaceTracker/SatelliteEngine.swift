@@ -36,11 +36,16 @@ nonisolated struct SatellitePass: Codable, Identifiable {
 
     // BUG-11: when this pass is over (start time + its duration). nil if the time string
     // can't be read, in which case the pass is kept rather than hidden.
-    var endDate: Date? {
+    // FEAT-32: pass start time, shared with endDate below.
+    var startDate: Date? {
         let withFraction = ISO8601DateFormatter()
         withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let plain = ISO8601DateFormatter()
-        guard let start = withFraction.date(from: utcTimeISO) ?? plain.date(from: utcTimeISO) else { return nil }
+        return withFraction.date(from: utcTimeISO) ?? plain.date(from: utcTimeISO)
+    }
+
+    var endDate: Date? {
+        guard let start = startDate else { return nil }
         return start.addingTimeInterval(TimeInterval(durationMinutes * 60))
     }
 
@@ -459,6 +464,7 @@ struct SatelliteCardView: View {
     let sat: SatellitePass
     let location: String
     @ObservedObject private var favorites = FavoritesStore.shared
+    @ObservedObject private var sightings = SightingsStore.shared
     
     // ✅ RESPONSIVE: Listens directly to the device window width size class environment
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
@@ -546,6 +552,12 @@ struct SatelliteCardView: View {
             .foregroundColor(.gray)
 
             HStack {
+                // FEAT-32: loggable once the pass has started.
+                if SightingsStore.canLogPass(sat) {
+                    SawItButton(isLogged: sightings.isLogged(eventKey: SightingsStore.passEventKey(sat))) {
+                        sightings.togglePass(sat)
+                    }
+                }
                 Spacer()
                 Text("❯")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
