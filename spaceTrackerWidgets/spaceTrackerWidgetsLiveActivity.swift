@@ -94,8 +94,19 @@ struct spaceTrackerWidgetsLiveActivity: Widget {
     /// countdown would be invalid -- show the plain phase word instead.
     @ViewBuilder
     private func countdownOrPhase(_ state: SpaceTrackerLiveActivityAttributes.ContentState, font: Font) -> some View {
-        if state.phaseLabel == "COUNTDOWN" || state.phaseLabel == "INCOMING" {
-            Text(timerInterval: Date()...state.targetDate, countsDown: true)
+        let now = Date()
+        // CRASH FIX: with no push server, the phase only flips when the app refreshes, so a
+        // COUNTDOWN/INCOMING state can still be showing after targetDate has passed. Building
+        // now...targetDate with targetDate in the past is an invalid range and crashes the
+        // widget extension ("Range requires lowerBound <= upperBound").
+        if (state.phaseLabel == "COUNTDOWN" || state.phaseLabel == "INCOMING") && state.targetDate > now {
+            Text(timerInterval: now...state.targetDate, countsDown: true)
+                .font(font)
+        } else if state.phaseLabel == "COUNTDOWN" {
+            Text("LIFTOFF")
+                .font(font)
+        } else if state.phaseLabel == "INCOMING" {
+            Text("OVERHEAD")
                 .font(font)
         } else {
             Text(state.phaseLabel)

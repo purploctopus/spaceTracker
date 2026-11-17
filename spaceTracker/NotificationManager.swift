@@ -6,7 +6,7 @@
 //  make an app colin loves
 
 import Foundation
-import UserNotifications
+@preconcurrency import UserNotifications
 import Combine
 import UIKit
 
@@ -120,10 +120,9 @@ class NotificationManager: ObservableObject {
     /// Called the first time someone stars something or logs a sighting, instead of on
     /// app launch, so the prompt shows up when alerts actually mean something to them.
     nonisolated static func requestPermissionIfUndecided() {
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { settings in
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .notDetermined else { return }
-            center.requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
         }
     }
 
